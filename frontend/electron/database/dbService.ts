@@ -299,6 +299,10 @@ async function runMigrations(): Promise<void> {
 		["stock_register", "TINYINT(1) DEFAULT 0"],
 		["current_stock_report", "TINYINT(1) DEFAULT 0"],
 		["discount_limit", "DECIMAL(18,6) DEFAULT 100"],
+		["print_draft_invoice", "TINYINT(1) DEFAULT 0"],
+		["recall_other_shift_tabs", "TINYINT(1) DEFAULT 0"],
+		["settle_outstanding_invoice", "TINYINT(1) DEFAULT 0"],
+		["manage_role_permissions", "TINYINT(1) DEFAULT 0"],
 	];
 
 	const posUserColumnExists = async (col: string): Promise<boolean> => {
