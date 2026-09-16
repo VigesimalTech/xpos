@@ -50,6 +50,22 @@ function isOnline(): boolean {
 	return net.isOnline();
 }
 
+/** Frappe puts the reason for an error in `_server_messages` or `exception`, not `message`. */
+function frappeErrorDetail(data: { _server_messages?: string; exception?: string }): string {
+	try {
+		if (data._server_messages) {
+			const messages = (JSON.parse(data._server_messages) as string[]).map((raw) => {
+				const parsed = JSON.parse(raw) as { message?: string };
+				return String(parsed.message ?? raw).replace(/<[^>]+>/g, "");
+			});
+			if (messages.length) return `: ${messages.join("; ")}`;
+		}
+	} catch {
+		/* fall through to exception */
+	}
+	return data.exception ? `: ${data.exception}` : "";
+}
+
 async function apiCall<T = unknown>(
 	method: string,
 	args: Record<string, unknown> = {},
@@ -105,7 +121,11 @@ async function apiCall<T = unknown>(
 				try {
 					const data = JSON.parse(responseBody);
 					if (response.statusCode && response.statusCode >= 400) {
-						reject(new Error(data.message || `HTTP ${response.statusCode}`));
+						reject(
+							new Error(
+								data.message || `HTTP ${response.statusCode}${frappeErrorDetail(data)}`,
+							),
+						);
 					} else {
 						resolve(data.message as T);
 					}
