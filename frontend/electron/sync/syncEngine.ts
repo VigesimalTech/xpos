@@ -155,7 +155,8 @@ async function pullTable(config: SyncTableConfig): Promise<number> {
 				doctype: config.doctype,
 				fields: config.fields,
 				filters,
-				order_by: `${config.orderBy} asc`,
+				// Frappe v16 rejects "date desc asc" with HTTP 417, so only add a direction when none is given.
+				order_by: /\s(asc|desc)$/i.test(config.orderBy) ? config.orderBy : `${config.orderBy} asc`,
 				limit_start: start,
 				limit_page_length: config.batchSize,
 			},
