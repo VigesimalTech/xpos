@@ -384,6 +384,32 @@ async function runMigrations(): Promise<void> {
 			log.warn(`Migration for ${tbl} dead_letter status failed`, err);
 		}
 	}
+
+	// The push paths mark a record 'syncing' while it is in flight; strict mode rejects it otherwise.
+	for (const tbl of [
+		"pos_opening_shifts",
+		"pos_closing_entries",
+		"expenses",
+		"bank_drops",
+		"stock_adjustments",
+	]) {
+		try {
+			const [cols] = await db.execute<RowDataPacket[]>(
+				"SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = 'sync_status'",
+				[tbl],
+			);
+			const colType = (cols as RowDataPacket[])[0]?.COLUMN_TYPE as string | undefined;
+			if (colType && !colType.includes("syncing")) {
+				await db.execute(
+					`ALTER TABLE \`${tbl}\` MODIFY COLUMN \`sync_status\` ` +
+						"ENUM('pending','syncing','synced','failed') DEFAULT 'pending'",
+				);
+				log.info(`Migration: added 'syncing' status to ${tbl}`);
+			}
+		} catch (err) {
+			log.warn(`Migration for ${tbl} syncing status failed`, err);
+		}
+	}
 }
 
 async function executeSchemaFile(filePath: string): Promise<void> {
