@@ -1048,18 +1048,18 @@ export function registerDbHandlers(): void {
 		const result = await execute(
 			`INSERT INTO \`pos_opening_shifts\`
        (\`pos_profile\`, \`user\`, \`company\`, \`posting_date\`, \`period_start_date\`, \`status\`)
-       VALUES (?, ?, ?, ?, NOW(), 'Open')`,
+       VALUES (?, ?, ?, COALESCE(?, CURDATE()), COALESCE(?, NOW()), 'Open')`,
 			[
 				shift.pos_profile,
 				shift.user,
 				shift.company,
-				shift.opening_date || new Date().toISOString().slice(0, 10),
+				shift.opening_date || null,
+				shift.period_start_date || null,
 			],
 		);
 		const shiftId = result.insertId;
 		const payments = shift.opening_amounts as
-			| Array<{ mode_of_payment: string; opening_amount: number }>
-			| undefined;
+			Array<{ mode_of_payment: string; opening_amount: number }> | undefined;
 		if (payments?.length) {
 			for (const p of payments) {
 				await execute(

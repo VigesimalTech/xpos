@@ -50,6 +50,20 @@ function isOnline(): boolean {
 	return net.isOnline();
 }
 
+/**
+ * JSON for Frappe. mysql2 returns DATE/DATETIME columns as Date objects (read as UTC, since the
+ * pool uses timezone +00:00), and JSON.stringify turns those into "2026-09-17T00:01:01.000Z",
+ * which MariaDB refuses. Send the stored wall-clock value in Frappe's format instead.
+ */
+function toFrappeJson(value: unknown): string {
+	return JSON.stringify(value, function (this: Record<string, unknown>, key, v) {
+		const raw = this[key];
+		if (!(raw instanceof Date) || Number.isNaN(raw.getTime())) return v;
+		const iso = raw.toISOString();
+		return iso.endsWith("T00:00:00.000Z") ? iso.slice(0, 10) : iso.slice(0, 19).replace("T", " ");
+	});
+}
+
 /** Frappe puts the reason for an error in `_server_messages` or `exception`, not `message`. */
 function frappeErrorDetail(data: { _server_messages?: string; exception?: string }): string {
 	try {
@@ -456,7 +470,7 @@ async function pushTable(config: SyncTableConfig): Promise<{ synced: number; fai
 			const serverResult = await apiCall<{ name?: string }>(
 				config.pushMethod,
 				{
-					data: JSON.stringify(data),
+					data: toFrappeJson(data),
 					local_id: recordLocalId,
 				},
 				{ httpMethod: "POST" },

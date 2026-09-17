@@ -18,6 +18,7 @@ import {
 	type ReceiptContext,
 } from "@/types/pos.types";
 import { isOnline } from "@/utils";
+import { nowDate, nowDatetime } from "@/utils/datetime";
 import { symbolFor } from "@/composables/useCurrency";
 
 export const usePosStore = defineStore("pos", () => {
@@ -363,7 +364,9 @@ export const usePosStore = defineStore("pos", () => {
 					pos_profile: profileName,
 					company: companyName,
 					user: authStore.userName,
-					opening_date: new Date().toISOString().slice(0, 10),
+					// The server's time zone, not UTC: a UTC date is the previous day after midnight east of UTC.
+					opening_date: nowDate(),
+					period_start_date: nowDatetime(),
 					opening_amounts: balanceDetails,
 				});
 				const result = (await window.electronAPI!.db.checkOpenShift(
