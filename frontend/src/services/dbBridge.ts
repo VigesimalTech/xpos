@@ -1,5 +1,6 @@
 import { isElectron } from "./electronBridge";
 import type { PendingPurchase } from "./idbService";
+import { sanitizeForIdb } from "./idbSanitize";
 
 function getDb() {
 	return window.electronAPI!.db;
@@ -209,6 +210,9 @@ export async function addPendingInvoice(record: {
 	grand_total?: number;
 	receipt?: import("@/types/pos.types").ReceiptSnapshot;
 }) {
+	// The cart hands over live Vue arrays (payments, change legs); IndexedDB and IPC can only
+	// store plain data and throw DataCloneError otherwise.
+	record = sanitizeForIdb(record);
 	if (isElectron()) {
 		return getDb().addPendingInvoice(record);
 	}
@@ -270,6 +274,7 @@ export async function addPendingPurchase(record: {
 	supplier_name?: string;
 	grand_total?: number;
 }) {
+	record = sanitizeForIdb(record);
 	if (isElectron()) {
 		return getDb().addPendingPurchase(record);
 	}
