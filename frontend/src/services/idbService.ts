@@ -76,6 +76,8 @@ export interface PendingInvoice {
 	retry_count: number;
 	customer_name?: string;
 	grand_total?: number;
+	/** What the till printed. Kept beside `data`, so it is never sent to the server. */
+	receipt?: import("@/types/pos.types").ReceiptSnapshot;
 }
 
 export interface StockEntry {
