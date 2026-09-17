@@ -565,6 +565,24 @@ describe("dbBridge", () => {
 			expect(result).toEqual([]);
 		});
 
+		it("addPendingInvoice keeps the receipt beside the invoice data, not inside it", async () => {
+			const table = mockDb.table("pendingInvoices");
+			const receipt = { name: "", grand_total: 10, items: [] } as any;
+
+			const result = await bridge.addPendingInvoice({
+				data: { customer: "Walk-in Customer" },
+				customer_name: "Walk-in Customer",
+				grand_total: 10,
+				receipt,
+			});
+
+			expect(result).toEqual({ id: 1, local_id: expect.stringMatching(/^inv_/) });
+			const stored = table.add.mock.calls.at(-1)![0];
+			expect(stored.receipt).toBe(receipt);
+			expect(stored.data).toEqual({ customer: "Walk-in Customer" });
+			expect(stored.status).toBe("pending");
+		});
+
 		it("countItems falls back to idbService", async () => {
 			const result = await bridge.countItems();
 			expect(result).toBe(0);
