@@ -6,7 +6,7 @@
  * The renderer never touches MariaDB directly — all access goes through here.
  */
 
-import { ipcMain } from "electron";
+import { ipcMain, net } from "electron";
 import {
 	query,
 	queryOne,
@@ -23,6 +23,30 @@ import {
 import { createLogger } from "../logger";
 
 const log = createLogger("DB-IPC");
+
+/** POST a form outside the app's cookie jar; returns the status and any session id set. */
+function postForm(
+	url: string,
+	fields: Record<string, string>,
+	cookie?: string,
+): Promise<{ status: number; sid?: string }> {
+	return new Promise((resolve, reject) => {
+		const request = net.request({ method: "POST", url, useSessionCookies: false });
+		request.setHeader("Content-Type", "application/x-www-form-urlencoded");
+		request.setHeader("Accept", "application/json");
+		if (cookie) request.setHeader("Cookie", cookie);
+		request.on("response", (response) => {
+			const setCookie = ([] as string[]).concat(response.headers["set-cookie"] ?? []);
+			const sid = setCookie.map((c) => /^sid=([^;]*)/.exec(c)?.[1]).find((v) => v && v !== "Guest");
+			response.on("data", () => {});
+			response.on("end", () => resolve({ status: response.statusCode, sid }));
+			response.on("error", reject);
+		});
+		request.on("error", reject);
+		request.write(new URLSearchParams(fields).toString());
+		request.end();
+	});
+}
 
 const DEFAULT_LOCAL_SEARCH_COLUMNS = ["item_code", "item_name", "local_item_name", "description"];
 const SAFE_COLUMN = /^[a-z_][a-z0-9_]*$/;
@@ -867,6 +891,67 @@ export function registerDbHandlers(): void {
 		}
 		return true;
 	});
+
+	/**
+	 * Check a pulled user's password against the ERPNext server and, if it is accepted, store
+	 * a local hash so the user can sign in offline from then on. Pulled users arrive without
+	 * a password; this is how one gets onto the till.
+	 */
+	ipcMain.handle(
+		"db:cache-password-from-server",
+		async (
+			_e,
+			username: string,
+			password: string,
+		): Promise<{ success: boolean; error?: string; unreachable?: boolean }> => {
+			const row = await queryOne<{ name: string }>(
+				"SELECT `name` FROM `pos_users` WHERE (`username` = ? OR `name` = ?) AND `enabled` = 1",
+				[username, username],
+			);
+			if (!row) return { success: false, error: "User not found. Check your username." };
+
+			const serverUrl = ((await getMeta("server_url")) || process.env.XPOS_SERVER_URL || "").replace(
+				/\/$/,
+				"",
+			);
+			if (!serverUrl) return { success: false, error: "No server configured.", unreachable: true };
+
+			let status: number;
+			let sid: string | undefined;
+			try {
+				({ status, sid } = await postForm(`${serverUrl}/api/method/login`, {
+					usr: row.name,
+					pwd: password,
+				}));
+			} catch (err) {
+				log.warn(`Server login for ${row.name} could not reach ${serverUrl}`, err);
+				return { success: false, error: "Cannot reach the server.", unreachable: true };
+			}
+
+			if (status !== 200) {
+				return {
+					success: false,
+					error: status === 401 ? "Invalid password" : `Server returned ${status}`,
+				};
+			}
+
+			// The check needed a server session; end it rather than leave it open.
+			if (sid) {
+				postForm(`${serverUrl}/api/method/logout`, {}, `sid=${sid}`).catch(() => {
+					/* best effort */
+				});
+			}
+
+			const { hashPassword } = await import("./passwordHash");
+			const { hash, salt } = await hashPassword(password);
+			await execute(
+				"UPDATE `pos_users` SET `password_hash` = ?, `password_salt` = ? WHERE `name` = ?",
+				[hash, salt, row.name],
+			);
+			log.info(`Cached password for ${row.name} after server login`);
+			return { success: true };
+		},
+	);
 
 	ipcMain.handle("db:get-sales-tax-templates", async (_e, company?: string) => {
 		let sql = "SELECT * FROM `sales_taxes_templates` WHERE `disabled` = 0";

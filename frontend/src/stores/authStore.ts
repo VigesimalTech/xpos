@@ -156,26 +156,43 @@ export const useAuthStore = defineStore("auth", () => {
 			}
 
 			const userData = posUser as Record<string, unknown>;
-			if (!userData.password_hash) {
-				error.value = "No password configured for this user.";
-				return false;
-			}
+			const db = window.electronAPI!.db;
 
-			const valid = await window.electronAPI!.db.verifyPassword(username, password);
+			// A user pulled from ERPNext has no local password until it has been checked against
+			// the server once. A failed local check also goes to the server when online, so a
+			// password changed in ERPNext reaches the till.
+			const valid = !!userData.password_hash && (await db.verifyPassword(username, password));
 			if (!valid) {
-				error.value = "Invalid password";
-				return false;
+				if (!isOnline()) {
+					error.value = userData.password_hash
+						? "Invalid password"
+						: "Sign in once while online to set up this user on this till.";
+					return false;
+				}
+				const result = await db.cachePasswordFromServer(username, password);
+				if (!result.success) {
+					error.value =
+						result.unreachable && !userData.password_hash
+							? "Cannot reach the server. Sign in once while online to set up this user on this till."
+							: result.unreachable
+								? "Invalid password"
+								: result.error || "Invalid password";
+					return false;
+				}
 			}
 
+			// Records pushed to ERPNext name the user by its Frappe ID (usually the email),
+			// not the username typed here.
+			const userId = (userData.name as string) || username;
 			isAuthenticated.value = true;
 			isOfflineAuth.value = true;
 			user.value = {
-				user: username,
-				user_email: (userData.email as string) || username,
-				user_fullname: (userData.full_name as string) || username,
+				user: userId,
+				user_email: (userData.email as string) || userId,
+				user_fullname: (userData.full_name as string) || userId,
 			};
 
-			await window.electronAPI!.db.setSetting("last_logged_user", username, "auth");
+			await db.setSetting("last_logged_user", userId, "auth");
 			window
 				.electronAPI!.startSyncEngine()
 				.then((result) => {
@@ -187,7 +204,7 @@ export const useAuthStore = defineStore("auth", () => {
 					console.warn("[XPOS] startSyncEngine error:", err);
 				});
 
-			await loadPermissions(username);
+			await loadPermissions(userId);
 			return true;
 		} catch (err) {
 			console.error("Login failed:", err);

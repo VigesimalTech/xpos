@@ -475,6 +475,14 @@ export async function transaction<T>(fn: (conn: PoolConnection) => Promise<T>): 
 	}
 }
 
+/**
+ * Columns a pull may set on insert but must never overwrite. The server sends an empty
+ * password_hash for every POS user; the real hash only ever exists on this till.
+ */
+const PRESERVE_ON_UPDATE: Record<string, string[]> = {
+	pos_users: ["password_hash", "password_salt"],
+};
+
 export async function upsertBatch(
 	table: string,
 	rows: Record<string, unknown>[],
@@ -484,8 +492,9 @@ export async function upsertBatch(
 
 	const columns = Object.keys(rows[0]);
 	const placeholders = columns.map(() => "?").join(", ");
+	const preserved = PRESERVE_ON_UPDATE[table] ?? [];
 	const updateCols = columns
-		.filter((c) => c !== primaryKey)
+		.filter((c) => c !== primaryKey && !preserved.includes(c))
 		.map((c) => `\`${c}\` = VALUES(\`${c}\`)`)
 		.join(", ");
 
