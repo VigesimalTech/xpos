@@ -21,6 +21,18 @@ jobs:
     name: Frontend Unit Tests
     runs-on: ubuntu-latest
     timeout-minutes: 15
+
+    # The desktop sync integration tests run against a real MariaDB, the
+    # database the desktop app uses on each till.
+    services:
+      mariadb:
+        image: mariadb:11.8
+        env:
+          MARIADB_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: --health-cmd="mariadb-admin ping" --health-interval=5s --health-timeout=2s --health-retries=10
+
     defaults:
       run:
         working-directory: frontend
@@ -45,6 +57,14 @@ jobs:
 
       - name: Unit tests
         run: yarn test:run
+
+      - name: Desktop sync integration tests
+        env:
+          XPOS_TEST_DB_HOST: 127.0.0.1
+          XPOS_TEST_DB_PORT: "3306"
+          XPOS_TEST_DB_USER: root
+          XPOS_TEST_DB_PASSWORD: root
+        run: yarn test:integration
 
   backend-tests:
     name: Python Unit Tests

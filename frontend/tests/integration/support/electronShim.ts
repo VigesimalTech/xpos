@@ -1,0 +1,130 @@
+/**
+ * Stand-in for the `electron` module, so main-process code (sync engine, local
+ * database, IPC handlers) runs under plain Node in integration tests.
+ *
+ * Only what that code touches is here. `net.request` goes out over Node's
+ * http, so requests reach a real (or fake) Frappe server; `net.isOnline` is
+ * switchable; IPC handlers land in a registry tests can invoke; messages to
+ * the renderer are recorded.
+ */
+import { EventEmitter } from "events";
+import http from "http";
+import https from "https";
+import os from "os";
+import path from "path";
+
+// --- connectivity -----------------------------------------------------------
+
+let online = true;
+
+/** Simulate the till losing or regaining its connection. */
+export function setOnline(value: boolean): void {
+	online = value;
+}
+
+class ShimResponse extends EventEmitter {
+	constructor(public statusCode: number) {
+		super();
+	}
+}
+
+class ShimRequest extends EventEmitter {
+	private headers: Record<string, string> = {};
+	private chunks: string[] = [];
+
+	constructor(private options: { method?: string; url: string }) {
+		super();
+	}
+
+	setHeader(name: string, value: string): void {
+		this.headers[name] = value;
+	}
+
+	write(chunk: string): void {
+		this.chunks.push(chunk);
+	}
+
+	end(): void {
+		const url = new URL(this.options.url);
+		const client = url.protocol === "https:" ? https : http;
+		const req = client.request(
+			url,
+			{ method: this.options.method || "GET", headers: this.headers },
+			(res) => {
+				const response = new ShimResponse(res.statusCode || 0);
+				this.emit("response", response);
+				res.on("data", (chunk: Buffer) => response.emit("data", chunk));
+				res.on("end", () => response.emit("end"));
+			},
+		);
+		req.on("error", (err) => this.emit("error", err));
+		for (const chunk of this.chunks) req.write(chunk);
+		req.end();
+	}
+}
+
+export const net = {
+	isOnline: () => online,
+	request: (options: { method?: string; url: string }) => new ShimRequest(options),
+};
+
+// --- app --------------------------------------------------------------------
+
+const userData = path.join(os.tmpdir(), `xpos-integration-${process.pid}`);
+
+export const app = {
+	getPath: (_name: string) => userData,
+	isPackaged: false,
+	getVersion: () => "0.0.0-test",
+};
+
+export const safeStorage = {
+	isEncryptionAvailable: () => false,
+	encryptString: (plain: string) => Buffer.from(plain),
+	decryptString: (buf: Buffer) => buf.toString(),
+};
+
+export const session = { defaultSession: {} };
+
+// --- IPC --------------------------------------------------------------------
+
+type Handler = (event: unknown, ...args: unknown[]) => unknown;
+const handlers = new Map<string, Handler>();
+
+export const ipcMain = {
+	// Electron throws on a second handle() for one channel; tests re-initialise
+	// modules, so the latest registration wins instead.
+	handle: (channel: string, handler: Handler) => {
+		handlers.set(channel, handler);
+	},
+	removeHandler: (channel: string) => {
+		handlers.delete(channel);
+	},
+	on: () => undefined,
+};
+
+/** Call an IPC handler the way the renderer's `ipcRenderer.invoke` would. */
+export async function invoke<T = unknown>(channel: string, ...args: unknown[]): Promise<T> {
+	const handler = handlers.get(channel);
+	if (!handler) throw new Error(`No IPC handler registered for ${channel}`);
+	return (await handler({}, ...args)) as T;
+}
+
+// --- renderer ---------------------------------------------------------------
+
+export const rendererEvents: { channel: string; data: unknown }[] = [];
+
+const mainWindow = {
+	isDestroyed: () => false,
+	webContents: {
+		send: (channel: string, data: unknown) => {
+			rendererEvents.push({ channel, data });
+		},
+	},
+};
+
+export const BrowserWindow = {
+	getAllWindows: () => [mainWindow],
+};
+
+export default { app, net, ipcMain, safeStorage, session, BrowserWindow };
