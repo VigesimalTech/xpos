@@ -9,6 +9,7 @@ import { initRealtimeStock, disconnectRealtime } from "./sync/realtimeStock";
 import { initSyncEngine, stopSyncEngine, updateSyncContext, runSyncCyclePublic } from "./sync/syncEngine";
 import { initAutoUpdater, stopAutoUpdater } from "./autoUpdater";
 import { printReceipt, registerPrintHandlers } from "./print/receiptPrinter";
+import { applyOpenAtLogin, claimSingleInstance, registerStartupHandlers } from "./startup/startup";
 import { startHubServer, stopHubServer, getHubApiSecret } from "./hub/hubServer";
 import { initTillClient, runTillSync, pingHub } from "./hub/tillClient";
 import { type NodeRole } from "./hub/nodeConfig";
@@ -633,7 +634,17 @@ ipcMain.handle("fbr:fiscalize-local", async (_event, url: string, payload: Recor
 	}
 });
 
+// One copy only: a second launch brings this window to the front and quits.
+const isFirstInstance = claimSingleInstance(() => {
+	if (!mainWindow) return;
+	if (mainWindow.isMinimized()) mainWindow.restore();
+	mainWindow.show();
+	mainWindow.focus();
+});
+if (!isFirstInstance) app.quit();
+
 app.whenReady().then(async () => {
+	if (!isFirstInstance) return;
 	Menu.setApplicationMenu(null);
 
 	if (process.platform === "win32") {
@@ -664,6 +675,8 @@ app.whenReady().then(async () => {
 
 	registerDbHandlers();
 	registerPrintHandlers();
+	registerStartupHandlers();
+	applyOpenAtLogin().catch((e) => log.warn("Could not set open at login", e));
 
 	initAutoUpdater();
 

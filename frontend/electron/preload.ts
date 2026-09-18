@@ -437,6 +437,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
 		},
 	},
 
+	startup: {
+		getOpenAtLogin: (): Promise<boolean> => ipcRenderer.invoke("startup:get-open-at-login"),
+		setOpenAtLogin: (enabled: boolean): Promise<boolean> =>
+			ipcRenderer.invoke("startup:set-open-at-login", enabled),
+	},
+
 	print: {
 		printInvoice: (data: {
 			localId: number;

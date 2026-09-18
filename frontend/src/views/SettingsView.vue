@@ -223,6 +223,25 @@
 					</div>
 				</Card>
 
+				<Card v-if="isElectronMode" class="p-5">
+					<div class="flex items-center gap-2 mb-4">
+						<Power class="w-5 h-5 text-primary" />
+						<h2 class="text-base font-semibold text-foreground">Startup</h2>
+					</div>
+					<div class="flex items-center justify-between">
+						<div>
+							<p class="text-sm font-medium text-foreground">Open X POS when this PC starts</p>
+							<p class="text-xs text-muted-foreground">
+								The till is ready to sell again after a power cut or a restart.
+							</p>
+						</div>
+						<Checkbox
+							:checked="openAtLogin"
+							@update:checked="(v: boolean | 'indeterminate') => setOpenAtLogin(v === true)"
+						/>
+					</div>
+				</Card>
+
 				<Card class="p-5">
 					<div class="flex items-center gap-2 mb-4">
 						<Info class="w-5 h-5 text-primary" />
@@ -262,7 +281,17 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Globe, Database, RefreshCw, Monitor, HardDrive, Info, Loader2, Printer } from "lucide-vue-next";
+import {
+	Globe,
+	Database,
+	RefreshCw,
+	Monitor,
+	HardDrive,
+	Info,
+	Loader2,
+	Printer,
+	Power,
+} from "lucide-vue-next";
 
 const posStore = usePosStore();
 const isElectronMode = isElectron();
@@ -293,6 +322,13 @@ const platformInfo = reactive({
 	platform: "",
 });
 
+const openAtLogin = ref(true);
+
+async function setOpenAtLogin(enabled: boolean) {
+	openAtLogin.value = await window.electronAPI!.startup.setOpenAtLogin(enabled);
+	toast.success(enabled ? "X POS will open when this PC starts" : "X POS will not open at startup");
+}
+
 const testingServer = ref(false);
 const testingDb = ref(false);
 const itemCount = ref(0);
@@ -303,6 +339,7 @@ onMounted(async () => {
 		await loadSyncState();
 		await loadPlatformInfo();
 		await loadPrinters();
+		openAtLogin.value = await window.electronAPI!.startup.getOpenAtLogin().catch(() => true);
 		try {
 			itemCount.value = await countItems();
 		} catch {
