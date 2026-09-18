@@ -827,7 +827,8 @@ export async function searchCachedItems(
 	if (isElectron()) {
 		return (await getDb().getItems({
 			search: term || undefined,
-			searchFields,
+			// A plain copy: IPC cannot clone a reactive array.
+			searchFields: searchFields ? [...searchFields] : undefined,
 			group: group && group !== "All Item Groups" ? group : undefined,
 		})) as unknown as POSItem[];
 	}
