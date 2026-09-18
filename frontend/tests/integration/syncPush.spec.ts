@@ -111,6 +111,20 @@ describe("pushing sales to ERPNext", () => {
 		expect((await pendingInvoices())[0].status).toBe("synced");
 	});
 
+	it("O3: a sale being sent when the till crashed is sent after restart", async () => {
+		const localId = await queueSale();
+		// The engine marks a sale 'syncing' just before the request. A crash or
+		// power cut at that moment leaves it there.
+		await execute("UPDATE `pending_invoices` SET `status` = 'syncing' WHERE `local_id` = ?", [localId]);
+
+		stopSyncEngine();
+		startEngine();
+		await runSyncCyclePublic();
+
+		expect(frappe.callsTo(CREATE_INVOICE).map((c) => c.args.local_id)).toEqual([localId]);
+		expect((await pendingInvoices())[0].status).toBe("synced");
+	});
+
 	it("O7: a sale ERPNext rejects keeps the reason and is retried, then set aside", async () => {
 		const localId = await queueSale();
 		frappe.on(CREATE_INVOICE, () => {

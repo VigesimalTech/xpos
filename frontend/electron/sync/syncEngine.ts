@@ -29,6 +29,7 @@ let syncIntervalId: ReturnType<typeof setInterval> | null = null;
 let pushIntervalId: ReturnType<typeof setInterval> | null = null;
 let syncContext: SyncContext | null = null;
 let syncCycleCount = 0;
+let inFlightRecovery: Promise<void> = Promise.resolve();
 
 const DELETION_CHECK_EVERY = 5;
 const DELETION_MIN_LOCAL_FLOOR = 20;
@@ -605,7 +606,36 @@ async function getClosingEntryDetails(closingId: number): Promise<
 	return rows;
 }
 
+/**
+ * A record is marked 'syncing' just before it is sent. If the app stops before the reply (crash,
+ * power cut, closed mid-sync), nothing ever moves it on, and the push query only picks up
+ * 'pending' and 'failed', so the record would never be sent. At engine start no push is in
+ * flight, so every 'syncing' record is one left behind: queue it again. The server returns the
+ * existing document for a local_id it already has, so a record that did arrive is not duplicated.
+ * Purchases are left alone: their endpoint does not dedupe on local_id yet.
+ */
+async function requeueInFlight(): Promise<void> {
+	const tables = [
+		{ table: "pending_invoices", status: "status" },
+		{ table: "pos_opening_shifts", status: "sync_status" },
+		{ table: "pos_closing_entries", status: "sync_status" },
+	];
+	for (const { table, status } of tables) {
+		try {
+			const result = await execute(
+				`UPDATE \`${table}\` SET \`${status}\` = 'pending' WHERE \`${status}\` = 'syncing'`,
+			);
+			if (result.affectedRows) {
+				log.warn(`Requeued ${result.affectedRows} ${table} record(s) left mid-sync by the last run`);
+			}
+		} catch (err) {
+			log.error(`Could not requeue in-flight ${table} records`, err);
+		}
+	}
+}
+
 async function runSyncCycle(): Promise<void> {
+	await inFlightRecovery;
 	if (syncState.isSyncing || !isOnline()) return;
 
 	syncState.isSyncing = true;
@@ -685,6 +715,7 @@ async function runSyncCycle(): Promise<void> {
 }
 
 async function runPushCycle(): Promise<void> {
+	await inFlightRecovery;
 	if (syncState.isSyncing || !isOnline()) return;
 
 	const pushTables = SYNC_TABLES.filter((t) => t.direction === "push" || t.direction === "both").sort(
@@ -716,6 +747,7 @@ export async function runSyncCyclePublic(): Promise<void> {
 
 export function initSyncEngine(context: SyncContext): void {
 	syncContext = context;
+	inFlightRecovery = requeueInFlight();
 
 	ipcMain.handle("trigger-sync", async () => {
 		if (syncState.isSyncing) return false;
