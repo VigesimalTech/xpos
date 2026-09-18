@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 import { VitePWA } from "vite-plugin-pwa";
 import { pwaManifest } from "./pwa.manifest";
+import { pwaWorkbox } from "./pwa.workbox";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -20,73 +21,7 @@ export default defineConfig({
 			devOptions: {
 				enabled: false,
 			},
-			workbox: {
-				globPatterns: ["**/*.{js,css,svg,png,ico,woff,woff2,ttf,eot}"],
-				globIgnores: ["**/index.html"],
-				modifyURLPrefix: { "": "/assets/xpos/xpos/" },
-				maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MB
-				runtimeCaching: [
-					{
-						urlPattern: /^https?:\/\/[^/]+\/xpos\/?$/,
-						handler: "NetworkFirst",
-						options: {
-							cacheName: "xpos-html-cache",
-							expiration: {
-								maxEntries: 5,
-								maxAgeSeconds: 60 * 60 * 24 * 7, // 7 days
-							},
-							networkTimeoutSeconds: 3,
-							cacheableResponse: {
-								statuses: [0, 200],
-							},
-						},
-					},
-					{
-						urlPattern: /^https?:\/\/.*\/api\/method\//,
-						handler: "NetworkFirst",
-						method: "GET",
-						options: {
-							cacheName: "xpos-api-cache",
-							expiration: {
-								maxEntries: 200,
-								maxAgeSeconds: 60 * 60 * 24, // 24 hours
-							},
-							networkTimeoutSeconds: 5,
-							cacheableResponse: {
-								statuses: [0, 200],
-							},
-						},
-					},
-					{
-						urlPattern: /^https?:\/\/.*\/assets\//,
-						handler: "CacheFirst",
-						options: {
-							cacheName: "xpos-assets-cache",
-							expiration: {
-								maxEntries: 200,
-								maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
-							},
-							cacheableResponse: {
-								statuses: [0, 200],
-							},
-						},
-					},
-					{
-						urlPattern: /^https?:\/\/.*\/files\//,
-						handler: "CacheFirst",
-						options: {
-							cacheName: "xpos-files-cache",
-							expiration: {
-								maxEntries: 100,
-								maxAgeSeconds: 60 * 60 * 24 * 7, // 7 days
-							},
-							cacheableResponse: {
-								statuses: [0, 200],
-							},
-						},
-					},
-				],
-			},
+			workbox: pwaWorkbox,
 		}),
 	],
 	css: {
