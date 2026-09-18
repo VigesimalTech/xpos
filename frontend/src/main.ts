@@ -10,8 +10,10 @@ import { usePosStore } from "./stores/posStore";
 import { initializeNamespaces } from "./utils";
 import { dayjs } from "@/utils/datetime";
 import translate from "./lib/translate";
+import { requestPersistentStorage } from "@/services/storagePersistence";
 
 if (!isElectron() && import.meta.env.PROD) {
+	requestPersistentStorage();
 	if ("serviceWorker" in navigator) {
 		navigator.serviceWorker
 			.register("/xpos/sw.js", { scope: "/xpos/" })

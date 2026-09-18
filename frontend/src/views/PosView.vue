@@ -182,6 +182,8 @@ import { usePosStore } from "@/stores/posStore";
 import { useMoney } from "@/composables/useMoney";
 import { useItemStore } from "@/stores/itemStore";
 import { useCartStore } from "@/stores/cartStore";
+import { useAuthStore } from "@/stores/authStore";
+import { enableCartDraft } from "@/services/cartDraft";
 import { useOfferStore } from "@/stores/offerStore";
 import { call, showError, isNetworkError } from "@/services/api";
 import { cacheItemTax, getCachedItemTax } from "@/services/dbBridge";
@@ -242,6 +244,7 @@ const groupAutocompleteOptions = computed(() => {
 });
 
 onMounted(() => {
+	enableCartDraft(useAuthStore().userName);
 	if (posStore.isReady) {
 		loadInitialData();
 	}

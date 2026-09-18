@@ -1,6 +1,7 @@
 import { call } from "@/services/api";
 import { isElectron } from "@/services/electronBridge";
 import { loadPermissions, resetPermissions } from "@/services/userRights";
+import { forgetSession, recallSession, rememberSession } from "@/services/offlineSession";
 import { UserSession } from "@/types/pos.types";
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
@@ -44,6 +45,7 @@ export const useAuthStore = defineStore("auth", () => {
 			const response = await call("frappe.auth.get_logged_user");
 
 			if (!response) {
+				forgetSession();
 				isAuthenticated.value = false;
 				user.value = null;
 				return false;
@@ -62,16 +64,28 @@ export const useAuthStore = defineStore("auth", () => {
 						image: bootUserInfo?.image || "",
 					};
 				}
+				if (user.value) rememberSession(user.value);
 				await loadPermissions(loggedUser);
 				return true;
 			}
 
+			forgetSession();
 			isAuthenticated.value = false;
 			user.value = null;
 			return false;
 		} catch (err) {
 			console.error("Auth check failed:", err);
 			if (isAuthenticated.value && !isOnline()) {
+				return true;
+			}
+			// A reload with no connection (or no server): start as the cashier the
+			// server last confirmed, so selling can go on offline.
+			const remembered = (isNetworkError(err) || !isOnline()) && recallSession();
+			if (remembered) {
+				isAuthenticated.value = true;
+				isOfflineAuth.value = true;
+				user.value = remembered;
+				await loadPermissions(remembered.user);
 				return true;
 			}
 			isAuthenticated.value = false;
@@ -135,6 +149,7 @@ export const useAuthStore = defineStore("auth", () => {
 				user: username,
 				user_email: username,
 			};
+			rememberSession(user.value);
 
 			await loadPermissions(username);
 			return true;
@@ -233,6 +248,7 @@ export const useAuthStore = defineStore("auth", () => {
 	}
 
 	async function logout(): Promise<void> {
+		forgetSession();
 		try {
 			isLoading.value = true;
 
