@@ -5,6 +5,9 @@ import frappe
 from frappe.website.page_renderers.base_renderer import BaseRenderer
 
 PREFIX = "/xpos/"
+# The POS page is served at /xpos (no slash), so the worker must be allowed to
+# control that URL too; a scope of /xpos/ would leave the page outside it.
+SCOPE = "/xpos"
 
 ALLOWED = re.compile(r"\A(sw\.js(\.map)?|workbox-[A-Za-z0-9_-]+\.js(\.map)?|manifest\.webmanifest)\Z")
 
@@ -53,7 +56,7 @@ class ServiceWorkerPage(BaseRenderer):
 			data,
 			headers={
 				"Content-Type": content_type,
-				"Service-Worker-Allowed": PREFIX,
+				"Service-Worker-Allowed": SCOPE,
 				"Cache-Control": "no-cache, no-store, must-revalidate",
 			},
 		)

@@ -1,6 +1,7 @@
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 import { VitePWA } from "vite-plugin-pwa";
+import { pwaManifest } from "./pwa.manifest";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -15,53 +16,7 @@ export default defineConfig({
 			registerType: "autoUpdate",
 			injectRegister: false,
 			includeAssets: ["pwa-192x192.svg", "pwa-512x512.svg", "apple-touch-icon.svg"],
-			manifest: {
-				name: "X POS - Point of Sale",
-				short_name: "X POS",
-				description: "Modern Point of Sale application with offline support",
-				theme_color: "#f97316",
-				background_color: "#ffffff",
-				display: "standalone",
-				orientation: "any",
-				scope: "/xpos/",
-				start_url: "/xpos/",
-				id: "/xpos/",
-				categories: ["business", "finance"],
-				icons: [
-					{
-						src: "pwa-192x192.svg",
-						sizes: "192x192",
-						type: "image/svg+xml",
-					},
-					{
-						src: "pwa-512x512.svg",
-						sizes: "512x512",
-						type: "image/svg+xml",
-					},
-					{
-						src: "pwa-512x512.svg",
-						sizes: "512x512",
-						type: "image/svg+xml",
-						purpose: "any maskable",
-					},
-				],
-				screenshots: [
-					{
-						src: "pwa-512x512.svg",
-						sizes: "512x512",
-						type: "image/svg+xml",
-						form_factor: "wide",
-						label: "X POS Dashboard",
-					},
-					{
-						src: "pwa-512x512.svg",
-						sizes: "512x512",
-						type: "image/svg+xml",
-						form_factor: "narrow",
-						label: "X POS Mobile",
-					},
-				],
-			},
+			manifest: pwaManifest,
 			devOptions: {
 				enabled: false,
 			},
