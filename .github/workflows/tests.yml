@@ -6,6 +6,8 @@ on:
     branches:
       - develop
       - main
+      - "vigesimal/**"
+  workflow_dispatch: {}
 
 permissions:
   contents: read
@@ -15,6 +17,35 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  frontend-tests:
+    name: Frontend Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+
+      - name: Install
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+        run: yarn install --frozen-lockfile
+
+      - name: Typecheck (web and desktop)
+        run: yarn vue-tsc --noEmit && yarn tsc -p tsconfig.electron.json --noEmit
+
+      - name: Unit tests
+        run: yarn test:run
+
   backend-tests:
     name: Python Unit Tests
     runs-on: ubuntu-latest
@@ -76,16 +107,21 @@ jobs:
              SET GLOBAL collation_server = 'utf8mb4_unicode_ci';"
 
       - name: Install bench and set up site
+        env:
+          # Same versions the server image runs (image/build-and-push.sh in
+          # the deployment repo), so tests see the API the tills sync with.
+          FRAPPE_REF: v16.33.1
+          ERPNEXT_REF: v16.34.2
         run: |
           pip install frappe-bench
           bench init --skip-redis-config-generation --skip-assets --python "$(which python)" \
-            --frappe-branch version-16 ~/frappe-bench
+            --frappe-branch "$FRAPPE_REF" ~/frappe-bench
           cd ~/frappe-bench
           bench set-config -g db_host 127.0.0.1
           bench set-config -g redis_cache "redis://127.0.0.1:6379"
           bench set-config -g redis_queue "redis://127.0.0.1:6379"
           bench set-config -g redis_socketio "redis://127.0.0.1:6379"
-          bench get-app --branch version-16 erpnext
+          bench get-app --branch "$ERPNEXT_REF" erpnext
           bench get-app xpos "${GITHUB_WORKSPACE}/xpos"
           bench new-site test_site \
             --db-root-username root \
