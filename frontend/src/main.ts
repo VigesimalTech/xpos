@@ -11,6 +11,7 @@ import { initializeNamespaces } from "./utils";
 import { dayjs } from "@/utils/datetime";
 import translate from "./lib/translate";
 import { requestPersistentStorage } from "@/services/storagePersistence";
+import { warmAppShell } from "@/services/pwaShell";
 
 if (!isElectron() && import.meta.env.PROD) {
 	requestPersistentStorage();
@@ -19,6 +20,7 @@ if (!isElectron() && import.meta.env.PROD) {
 			.register("/xpos/sw.js", { scope: "/xpos" })
 			.then((registration) => {
 				console.log("[XPOS PWA] Service worker registered for", registration.scope);
+				warmAppShell(navigator.serviceWorker);
 
 				registration.addEventListener("updatefound", () => {
 					const installing = registration.installing;
