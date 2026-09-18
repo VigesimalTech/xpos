@@ -21,6 +21,7 @@
     "typecheck": "vue-tsc --noEmit && tsc -p tests/e2e/tsconfig.json --noEmit",
     "test": "vitest",
     "test:run": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
     "pack": "yarn build:electron && electron-builder --dir",
     "dist": "yarn build:electron && electron-builder",
     "dist:win": "yarn build:electron && node scripts/build-win.mjs",
