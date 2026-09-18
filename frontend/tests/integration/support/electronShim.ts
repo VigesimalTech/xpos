@@ -114,17 +114,60 @@ export async function invoke<T = unknown>(channel: string, ...args: unknown[]): 
 
 export const rendererEvents: { channel: string; data: unknown }[] = [];
 
-const mainWindow = {
-	isDestroyed: () => false,
-	webContents: {
-		send: (channel: string, data: unknown) => {
-			rendererEvents.push({ channel, data });
-		},
-	},
+/** Printers the fake OS reports, and every print job sent, for print tests. */
+export const printing = {
+	printers: [] as { name: string; displayName: string }[],
+	jobs: [] as { options: Record<string, unknown>; url: string }[],
+	/** Make the next print fail with this reason, as Chromium does for an unknown printer. */
+	failWith: null as string | null,
 };
 
-export const BrowserWindow = {
-	getAllWindows: () => [mainWindow],
-};
+class ShimWebContents {
+	url = "";
+	constructor(private events: { channel: string; data: unknown }[] | null) {}
+	send(channel: string, data: unknown): void {
+		this.events?.push({ channel, data });
+	}
+	async getPrintersAsync() {
+		return printing.printers;
+	}
+	print(options: Record<string, unknown>, callback: (success: boolean, reason: string) => void): void {
+		const device = options.deviceName as string | undefined;
+		const known = !device || printing.printers.some((p) => p.name === device);
+		const reason = printing.failWith ?? (known ? "" : "Invalid deviceName provided");
+		if (!reason) printing.jobs.push({ options, url: this.url });
+		setTimeout(() => callback(!reason, reason), 0);
+	}
+}
+
+class ShimBrowserWindow {
+	webContents: ShimWebContents;
+	private destroyed = false;
+	constructor(
+		public options: Record<string, unknown> = {},
+		events: { channel: string; data: unknown }[] | null = null,
+	) {
+		this.webContents = new ShimWebContents(events);
+	}
+	async loadURL(url: string): Promise<void> {
+		this.webContents.url = url;
+	}
+	close(): void {
+		this.destroyed = true;
+	}
+	isDestroyed(): boolean {
+		return this.destroyed;
+	}
+	static getAllWindows(): ShimBrowserWindow[] {
+		return [mainWindow];
+	}
+	static getFocusedWindow(): ShimBrowserWindow {
+		return mainWindow;
+	}
+}
+
+const mainWindow = new ShimBrowserWindow({}, rendererEvents);
+
+export const BrowserWindow = ShimBrowserWindow;
 
 export default { app, net, ipcMain, safeStorage, session, BrowserWindow };

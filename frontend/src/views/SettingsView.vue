@@ -135,6 +135,45 @@
 					</div>
 				</Card>
 
+				<Card v-if="isElectronMode" class="p-5">
+					<div class="flex items-center gap-2 mb-4">
+						<Printer class="w-5 h-5 text-primary" />
+						<h2 class="text-base font-semibold text-foreground">Receipt Printer</h2>
+					</div>
+					<div class="space-y-3">
+						<div>
+							<label for="receipt-printer" class="text-sm font-medium text-foreground">
+								Print receipts on
+							</label>
+							<select
+								id="receipt-printer"
+								v-model="settings.receiptPrinter"
+								class="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+							>
+								<option value="">System default printer</option>
+								<option v-for="p in printers" :key="p.name" :value="p.name">
+									{{ p.displayName }}
+								</option>
+							</select>
+							<p class="text-xs text-muted-foreground mt-1">
+								Receipts print straight to this printer, with no print dialog.
+							</p>
+						</div>
+						<div class="flex gap-2">
+							<Button
+								size="sm"
+								variant="outline"
+								@click="testReceiptPrinter"
+								:disabled="testingPrinter"
+							>
+								<Loader2 v-if="testingPrinter" class="w-4 h-4 me-1 animate-spin" />
+								Test Print
+							</Button>
+							<Button size="sm" @click="saveReceiptPrinter">Save</Button>
+						</div>
+					</div>
+				</Card>
+
 				<Card class="p-5">
 					<div class="flex items-center gap-2 mb-4">
 						<Monitor class="w-5 h-5 text-primary" />
@@ -223,7 +262,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Globe, Database, RefreshCw, Monitor, HardDrive, Info, Loader2 } from "lucide-vue-next";
+import { Globe, Database, RefreshCw, Monitor, HardDrive, Info, Loader2, Printer } from "lucide-vue-next";
 
 const posStore = usePosStore();
 const isElectronMode = isElectron();
@@ -237,7 +276,11 @@ const settings = reactive({
 	dbName: "xpos_local",
 	syncInterval: 5,
 	autoSync: true,
+	receiptPrinter: "",
 });
+
+const printers = ref<{ name: string; displayName: string }[]>([]);
+const testingPrinter = ref(false);
 
 const syncState = reactive({
 	isSyncing: false,
@@ -259,6 +302,7 @@ onMounted(async () => {
 	if (isElectronMode) {
 		await loadSyncState();
 		await loadPlatformInfo();
+		await loadPrinters();
 		try {
 			itemCount.value = await countItems();
 		} catch {
@@ -286,9 +330,42 @@ async function loadSettings() {
 
 			const autoSync = await getSetting("auto_sync");
 			settings.autoSync = autoSync !== "false";
+
+			settings.receiptPrinter = (await getSetting("receipt_printer")) || "";
 		}
 	} catch {
 		/* use defaults */
+	}
+}
+
+async function loadPrinters() {
+	try {
+		printers.value = await window.electronAPI!.print.listPrinters();
+	} catch {
+		printers.value = [];
+	}
+}
+
+async function saveReceiptPrinter() {
+	await setSetting("receipt_printer", settings.receiptPrinter, "print");
+	toast.success("Receipt printer saved");
+}
+
+async function testReceiptPrinter() {
+	testingPrinter.value = true;
+	try {
+		await setSetting("receipt_printer", settings.receiptPrinter, "print");
+		const result = await window.electronAPI!.print.printReceipt(
+			`<html><body style="font-family:sans-serif;font-size:12px;width:72mm">
+				<h3 style="text-align:center">X POS test print</h3>
+				<p>If you can read this, receipts will print here.</p>
+				<p>${new Date().toLocaleString()}</p>
+			</body></html>`,
+		);
+		if (result.success) toast.success(`Test receipt sent to ${result.printer}`);
+		else toast.error(result.error || "Test print failed");
+	} finally {
+		testingPrinter.value = false;
 	}
 }
 
