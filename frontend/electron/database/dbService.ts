@@ -299,6 +299,10 @@ async function runMigrations(): Promise<void> {
 		["stock_register", "TINYINT(1) DEFAULT 0"],
 		["current_stock_report", "TINYINT(1) DEFAULT 0"],
 		["discount_limit", "DECIMAL(18,6) DEFAULT 100"],
+		["print_draft_invoice", "TINYINT(1) DEFAULT 0"],
+		["recall_other_shift_tabs", "TINYINT(1) DEFAULT 0"],
+		["settle_outstanding_invoice", "TINYINT(1) DEFAULT 0"],
+		["manage_role_permissions", "TINYINT(1) DEFAULT 0"],
 	];
 
 	const posUserColumnExists = async (col: string): Promise<boolean> => {
@@ -380,6 +384,32 @@ async function runMigrations(): Promise<void> {
 			log.warn(`Migration for ${tbl} dead_letter status failed`, err);
 		}
 	}
+
+	// The push paths mark a record 'syncing' while it is in flight; strict mode rejects it otherwise.
+	for (const tbl of [
+		"pos_opening_shifts",
+		"pos_closing_entries",
+		"expenses",
+		"bank_drops",
+		"stock_adjustments",
+	]) {
+		try {
+			const [cols] = await db.execute<RowDataPacket[]>(
+				"SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = 'sync_status'",
+				[tbl],
+			);
+			const colType = (cols as RowDataPacket[])[0]?.COLUMN_TYPE as string | undefined;
+			if (colType && !colType.includes("syncing")) {
+				await db.execute(
+					`ALTER TABLE \`${tbl}\` MODIFY COLUMN \`sync_status\` ` +
+						"ENUM('pending','syncing','synced','failed') DEFAULT 'pending'",
+				);
+				log.info(`Migration: added 'syncing' status to ${tbl}`);
+			}
+		} catch (err) {
+			log.warn(`Migration for ${tbl} syncing status failed`, err);
+		}
+	}
 }
 
 async function executeSchemaFile(filePath: string): Promise<void> {
@@ -445,6 +475,14 @@ export async function transaction<T>(fn: (conn: PoolConnection) => Promise<T>): 
 	}
 }
 
+/**
+ * Columns a pull may set on insert but must never overwrite. The server sends an empty
+ * password_hash for every POS user; the real hash only ever exists on this till.
+ */
+const PRESERVE_ON_UPDATE: Record<string, string[]> = {
+	pos_users: ["password_hash", "password_salt"],
+};
+
 export async function upsertBatch(
 	table: string,
 	rows: Record<string, unknown>[],
@@ -454,8 +492,9 @@ export async function upsertBatch(
 
 	const columns = Object.keys(rows[0]);
 	const placeholders = columns.map(() => "?").join(", ");
+	const preserved = PRESERVE_ON_UPDATE[table] ?? [];
 	const updateCols = columns
-		.filter((c) => c !== primaryKey)
+		.filter((c) => c !== primaryKey && !preserved.includes(c))
 		.map((c) => `\`${c}\` = VALUES(\`${c}\`)`)
 		.join(", ");
 

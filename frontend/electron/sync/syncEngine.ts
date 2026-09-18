@@ -50,6 +50,36 @@ function isOnline(): boolean {
 	return net.isOnline();
 }
 
+/**
+ * JSON for Frappe. mysql2 returns DATE/DATETIME columns as Date objects (read as UTC, since the
+ * pool uses timezone +00:00), and JSON.stringify turns those into "2026-09-17T00:01:01.000Z",
+ * which MariaDB refuses. Send the stored wall-clock value in Frappe's format instead.
+ */
+function toFrappeJson(value: unknown): string {
+	return JSON.stringify(value, function (this: Record<string, unknown>, key, v) {
+		const raw = this[key];
+		if (!(raw instanceof Date) || Number.isNaN(raw.getTime())) return v;
+		const iso = raw.toISOString();
+		return iso.endsWith("T00:00:00.000Z") ? iso.slice(0, 10) : iso.slice(0, 19).replace("T", " ");
+	});
+}
+
+/** Frappe puts the reason for an error in `_server_messages` or `exception`, not `message`. */
+function frappeErrorDetail(data: { _server_messages?: string; exception?: string }): string {
+	try {
+		if (data._server_messages) {
+			const messages = (JSON.parse(data._server_messages) as string[]).map((raw) => {
+				const parsed = JSON.parse(raw) as { message?: string };
+				return String(parsed.message ?? raw).replace(/<[^>]+>/g, "");
+			});
+			if (messages.length) return `: ${messages.join("; ")}`;
+		}
+	} catch {
+		/* fall through to exception */
+	}
+	return data.exception ? `: ${data.exception}` : "";
+}
+
 async function apiCall<T = unknown>(
 	method: string,
 	args: Record<string, unknown> = {},
@@ -105,7 +135,11 @@ async function apiCall<T = unknown>(
 				try {
 					const data = JSON.parse(responseBody);
 					if (response.statusCode && response.statusCode >= 400) {
-						reject(new Error(data.message || `HTTP ${response.statusCode}`));
+						reject(
+							new Error(
+								data.message || `HTTP ${response.statusCode}${frappeErrorDetail(data)}`,
+							),
+						);
 					} else {
 						resolve(data.message as T);
 					}
@@ -155,7 +189,8 @@ async function pullTable(config: SyncTableConfig): Promise<number> {
 				doctype: config.doctype,
 				fields: config.fields,
 				filters,
-				order_by: `${config.orderBy} asc`,
+				// Frappe v16 rejects "date desc asc" with HTTP 417, so only add a direction when none is given.
+				order_by: /\s(asc|desc)$/i.test(config.orderBy) ? config.orderBy : `${config.orderBy} asc`,
 				limit_start: start,
 				limit_page_length: config.batchSize,
 			},
@@ -435,7 +470,7 @@ async function pushTable(config: SyncTableConfig): Promise<{ synced: number; fai
 			const serverResult = await apiCall<{ name?: string }>(
 				config.pushMethod,
 				{
-					data: JSON.stringify(data),
+					data: toFrappeJson(data),
 					local_id: recordLocalId,
 				},
 				{ httpMethod: "POST" },

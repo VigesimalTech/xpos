@@ -289,6 +289,10 @@ export interface ElectronDbAPI {
 		role?: string;
 	}) => Promise<{ success: boolean; error?: string }>;
 	verifyPassword: (username: string, password: string) => Promise<boolean>;
+	cachePasswordFromServer: (
+		username: string,
+		password: string,
+	) => Promise<{ success: boolean; error?: string; unreachable?: boolean }>;
 	createPosOpeningShift: (shift: Record<string, unknown>) => Promise<Record<string, unknown>>;
 	getOpenShift: (user: string) => Promise<Record<string, unknown> | null>;
 	checkOpenShift: (user: string) => Promise<Record<string, unknown> | null>;

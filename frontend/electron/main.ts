@@ -43,6 +43,53 @@ process.on("unhandledRejection", (reason) => {
 
 const SERVER_URL = process.env.XPOS_SERVER_URL || "http://localhost:8000";
 
+/** Server URL saved in the local DB; kept here so the CORS hook can read it synchronously. */
+let savedServerUrl: string | null = null;
+
+function originOf(url: string | null | undefined): string | null {
+	try {
+		return url ? new URL(url).origin : null;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * The window calls ERPNext with fetch from its own origin (the Vite dev server, or `null` for
+ * the packaged file:// page), and Frappe sends no CORS headers unless the site sets allow_cors.
+ * Add them here, for responses from the configured ERPNext server to this window only, so the
+ * server needs no change.
+ */
+function installServerCors(): void {
+	const windowOrigin = originOf(process.env.VITE_DEV_SERVER_URL) ?? "null";
+	const corsHeaders: Record<string, string[]> = {
+		"Access-Control-Allow-Origin": [windowOrigin],
+		"Access-Control-Allow-Credentials": ["true"],
+		"Access-Control-Allow-Methods": ["GET, POST, PUT, DELETE, OPTIONS"],
+		"Access-Control-Allow-Headers": [
+			"Accept, Authorization, Content-Type, X-Frappe-CSRF-Token, X-Frappe-CMD, X-Requested-With",
+		],
+	};
+
+	session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+		const serverOrigins = [originOf(savedServerUrl), originOf(process.env.XPOS_SERVER_URL)];
+		const fromMainWindow = mainWindow && details.webContentsId === mainWindow.webContents.id;
+		if (!fromMainWindow || !serverOrigins.includes(originOf(details.url))) {
+			callback({});
+			return;
+		}
+
+		const responseHeaders: Record<string, string[]> = {};
+		for (const [name, value] of Object.entries(details.responseHeaders ?? {})) {
+			if (!name.toLowerCase().startsWith("access-control-")) responseHeaders[name] = value;
+		}
+		callback({
+			responseHeaders: { ...responseHeaders, ...corsHeaders },
+			...(details.method === "OPTIONS" ? { statusLine: "HTTP/1.1 204 No Content" } : {}),
+		});
+	});
+}
+
 function createWindow(): void {
 	mainWindow = new BrowserWindow({
 		width: 1280,
@@ -237,6 +284,7 @@ ipcMain.handle("check-mariadb", async () => {
 
 ipcMain.handle("set-server-url", async (_event, url: string) => {
 	process.env.XPOS_SERVER_URL = url;
+	savedServerUrl = url;
 	try {
 		await setMeta("server_url", url); // persist so it survives restarts
 	} catch {
@@ -622,6 +670,13 @@ app.whenReady().then(async () => {
 		const errMsg = err instanceof Error ? err.message : String(err);
 		log.error(`MariaDB init failed: ${errMsg}`);
 	}
+
+	try {
+		savedServerUrl = await getMeta("server_url");
+	} catch {
+		/* DB unavailable; the env URL still applies */
+	}
+	installServerCors();
 
 	registerDbHandlers();
 
