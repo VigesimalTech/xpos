@@ -14,7 +14,7 @@ import translate from "./lib/translate";
 if (!isElectron() && import.meta.env.PROD) {
 	if ("serviceWorker" in navigator) {
 		navigator.serviceWorker
-			.register("/xpos/sw.js", { scope: "/xpos/" })
+			.register("/xpos/sw.js", { scope: "/xpos" })
 			.then((registration) => {
 				console.log("[XPOS PWA] Service worker registered for", registration.scope);
 
