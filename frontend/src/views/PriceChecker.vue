@@ -87,7 +87,7 @@
 					>
 						<img
 							v-if="item.image && !imageFailed"
-							:src="item.image"
+							:src="imageSrc(item.image)"
 							alt=""
 							class="h-full w-full object-cover"
 							@error="imageFailed = true"
@@ -181,6 +181,7 @@
 </template>
 
 <script setup>
+import { imageSrc } from "@/utils/imageSrc";
 import { call } from "@/services/api";
 import { formatFor } from "@/composables/useCurrency";
 import { ref, reactive, onMounted, onBeforeUnmount, nextTick } from "vue";

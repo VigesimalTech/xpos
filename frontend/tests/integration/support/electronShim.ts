@@ -99,7 +99,26 @@ export const safeStorage = {
 	decryptString: (buf: Buffer) => buf.toString(),
 };
 
-export const session = { defaultSession: {} };
+type BeforeSendHeaders = (
+	details: { url: string; method: string; requestHeaders: Record<string, string> },
+	callback: (response: { requestHeaders?: Record<string, string>; cancel?: boolean }) => void,
+) => void;
+
+/** The listeners main-process code installed on the default session. */
+export const webRequest = {
+	beforeSendHeaders: null as BeforeSendHeaders | null,
+};
+
+export const session = {
+	defaultSession: {
+		webRequest: {
+			onBeforeSendHeaders: (listener: BeforeSendHeaders) => {
+				webRequest.beforeSendHeaders = listener;
+			},
+			onHeadersReceived: () => undefined,
+		},
+	},
+};
 
 // --- IPC --------------------------------------------------------------------
 

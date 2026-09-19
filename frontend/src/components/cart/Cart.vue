@@ -76,7 +76,7 @@
 					<Avatar size="sm" class="group-hover:ring-2 group-hover:ring-primary/20 transition-all">
 						<img
 							v-if="cartStore.customer && cartStore.customer.image"
-							:src="cartStore.customer.image as string"
+							:src="imageSrc(cartStore.customer.image as string)"
 							:alt="cartStore.customer.customer_name"
 							class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
 							loading="lazy"
@@ -221,6 +221,7 @@
 </template>
 
 <script setup lang="ts">
+import { imageSrc } from "@/utils/imageSrc";
 import { ref, watch, nextTick, onMounted, onUnmounted } from "vue";
 import { usePosStore } from "@/stores/posStore";
 import { useCartStore } from "@/stores/cartStore";

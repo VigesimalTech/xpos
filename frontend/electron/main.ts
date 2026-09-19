@@ -8,6 +8,7 @@ import { registerDbHandlers } from "./database/ipcHandlers";
 import { initRealtimeStock, disconnectRealtime } from "./sync/realtimeStock";
 import { initSyncEngine, stopSyncEngine, updateSyncContext, runSyncCyclePublic } from "./sync/syncEngine";
 import { initAutoUpdater, stopAutoUpdater } from "./autoUpdater";
+import { installServerFileAuth } from "./serverFiles";
 import { printReceipt, registerPrintHandlers } from "./print/receiptPrinter";
 import { applyOpenAtLogin, claimSingleInstance, registerStartupHandlers } from "./startup/startup";
 import { startHubServer, stopHubServer, getHubApiSecret } from "./hub/hubServer";
@@ -672,6 +673,7 @@ app.whenReady().then(async () => {
 		/* DB unavailable; the env URL still applies */
 	}
 	installServerCors();
+	installServerFileAuth();
 
 	registerDbHandlers();
 	registerPrintHandlers();

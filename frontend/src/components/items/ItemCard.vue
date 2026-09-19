@@ -13,7 +13,7 @@
 		<div class="relative aspect-[4/3] bg-muted overflow-hidden rounded-t-xl">
 			<img
 				v-if="item.image && !hideImages"
-				:src="item.image"
+				:src="imageSrc(item.image)"
 				:alt="item.item_name"
 				class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
 				loading="lazy"
@@ -83,6 +83,7 @@
 </template>
 
 <script setup lang="ts">
+import { imageSrc } from "@/utils/imageSrc";
 import { computed } from "vue";
 import { usePosStore } from "@/stores/posStore";
 import { useMoney } from "@/composables/useMoney";

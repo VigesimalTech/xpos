@@ -161,7 +161,11 @@
 			<PopoverTrigger as-child>
 				<Button variant="ghost" size="icon-sm" class="rounded-full">
 					<Avatar size="sm">
-						<img v-if="authStore.user?.image" :src="authStore.user.image" alt="User Avatar" />
+						<img
+							v-if="authStore.user?.image"
+							:src="imageSrc(authStore.user.image)"
+							alt="User Avatar"
+						/>
 						<AvatarFallback v-else>
 							<User class="w-3.5 h-3.5" />
 						</AvatarFallback>
@@ -239,6 +243,7 @@
 </template>
 
 <script setup lang="ts">
+import { imageSrc } from "@/utils/imageSrc";
 import { computed, inject, onMounted, onUnmounted, ref, nextTick, type Ref } from "vue";
 import { usePosStore } from "@/stores/posStore";
 import { usePaymentStore } from "@/stores/paymentStore";
