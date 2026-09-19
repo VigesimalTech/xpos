@@ -56,9 +56,9 @@ The app syncs with ERPNext using one API key per PC.
 
 | | |
 |---|---|
-| App data and settings | `%APPDATA%\xpos-frontend` |
-| Logs | `%APPDATA%\xpos-frontend\logs` |
-| Database connection | `%APPDATA%\xpos-frontend\db-config.json` |
+| App data and settings | `%APPDATA%\X POS` |
+| Logs | `%APPDATA%\X POS\logs` |
+| Database connection | `%APPDATA%\X POS\db-config.json` |
 
 Only one copy of the app runs at a time: starting it again brings the open
 window to the front.
