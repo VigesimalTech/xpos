@@ -612,11 +612,12 @@ async function getClosingEntryDetails(closingId: number): Promise<
  * 'pending' and 'failed', so the record would never be sent. At engine start no push is in
  * flight, so every 'syncing' record is one left behind: queue it again. The server returns the
  * existing document for a local_id it already has, so a record that did arrive is not duplicated.
- * Purchases are left alone: their endpoint does not dedupe on local_id yet.
+ * Purchase orders dedupe on local_id too (xpos_local_id on Purchase Order).
  */
 async function requeueInFlight(): Promise<void> {
 	const tables = [
 		{ table: "pending_invoices", status: "status" },
+		{ table: "pending_purchases", status: "status" },
 		{ table: "pos_opening_shifts", status: "sync_status" },
 		{ table: "pos_closing_entries", status: "sync_status" },
 	];

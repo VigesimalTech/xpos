@@ -12,6 +12,7 @@ import { initSyncEngine, runSyncCyclePublic, stopSyncEngine } from "../../electr
 import { SYNC_DEFAULTS } from "../../electron/sync/syncConfig";
 
 const CREATE_INVOICE = "xpos.api.invoices.create_invoice";
+const CREATE_PURCHASE_ORDER = "xpos.x_pos.api.purchase_orders.create_purchase_order";
 
 const frappe = new FakeFrappe();
 let serverUrl = "";
@@ -123,6 +124,22 @@ describe("pushing sales to ERPNext", () => {
 
 		expect(frappe.callsTo(CREATE_INVOICE).map((c) => c.args.local_id)).toEqual([localId]);
 		expect((await pendingInvoices())[0].status).toBe("synced");
+	});
+
+	it("O3: a purchase order being sent when the till crashed is sent after restart", async () => {
+		const { local_id } = await invoke<{ local_id: string }>("db:add-pending-purchase", {
+			type: "purchase_order",
+			data: { supplier: "Test Supplier", items: [{ item_code: "TEST-ITEM", qty: 1, rate: 5 }] },
+			supplier_name: "Test Supplier",
+			grand_total: 5,
+		});
+		await execute("UPDATE `pending_purchases` SET `status` = 'syncing' WHERE `local_id` = ?", [local_id]);
+
+		stopSyncEngine();
+		startEngine();
+		await runSyncCyclePublic();
+
+		expect(frappe.callsTo(CREATE_PURCHASE_ORDER).map((c) => c.args.local_id)).toEqual([local_id]);
 	});
 
 	it("O7: a sale ERPNext rejects keeps the reason and is retried, then set aside", async () => {

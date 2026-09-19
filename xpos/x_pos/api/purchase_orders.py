@@ -447,9 +447,26 @@ def _create_payment_entry(
 	return created_payments
 
 
+def find_purchase_order_by_local_id(local_id: str | None) -> str | None:
+	"""Name of the Purchase Order already created for this client local_id, if any.
+
+	The desktop client re-sends a purchase order when a reply is lost. Without
+	this check each resend created another order (and, with receive or invoice
+	set, another receipt and invoice).
+	"""
+	if not local_id:
+		return None
+	return frappe.db.get_value("Purchase Order", {"xpos_local_id": local_id, "docstatus": ["<", 2]}, "name")
+
+
 @frappe.whitelist()
-def create_purchase_order(data: str | dict) -> dict:
+def create_purchase_order(data: str | dict, local_id: str | None = None) -> dict:
 	payload = json.loads(data) if isinstance(data, str) else data
+	local_id = local_id or payload.get("local_id")
+	existing = find_purchase_order_by_local_id(local_id)
+	if existing:
+		return {"name": existing, "purchase_order": existing, "duplicate": True}
+
 	profile = resolve_pos_profile(payload.get("pos_profile")).as_dict()
 	ensure_allowed(profile, "allow_purchase_order", _("Purchase orders"))
 
@@ -522,6 +539,8 @@ def create_purchase_order(data: str | dict) -> dict:
 
 	if warehouse:
 		po_doc.set_warehouse = warehouse
+	if local_id:
+		po_doc.xpos_local_id = local_id
 
 	item_codes = [row.get("item_code") for row in items if row.get("item_code")]
 	if item_codes:
@@ -613,6 +632,7 @@ def create_purchase_order(data: str | dict) -> dict:
 			_create_payment_entry(ref_doc, payments, company, transaction_date)
 
 		return {
+			"name": po_doc.name,
 			"purchase_order": po_doc.name,
 			"purchase_receipt": receipt_name,
 			"purchase_invoice": invoice_name,
