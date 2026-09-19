@@ -55,6 +55,11 @@ export interface ElectronAPI {
 	update: ElectronUpdateAPI;
 	node: ElectronNodeAPI;
 	print: ElectronPrintAPI;
+	/** Open the app when the PC starts (on by default). */
+	startup: {
+		getOpenAtLogin: () => Promise<boolean>;
+		setOpenAtLogin: (enabled: boolean) => Promise<boolean>;
+	};
 	fbr: ElectronFbrAPI;
 }
 

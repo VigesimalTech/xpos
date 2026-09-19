@@ -72,10 +72,25 @@ export const net = {
 
 const userData = path.join(os.tmpdir(), `xpos-integration-${process.pid}`);
 
+/** What the app asked of the OS at startup, for startup tests. */
+export const startup = {
+	loginItem: null as null | { openAtLogin: boolean },
+	/** Whether this launch gets the single-instance lock (false = another copy runs). */
+	lockAvailable: true,
+	listeners: {} as Record<string, (...args: unknown[]) => void>,
+};
+
 export const app = {
 	getPath: (_name: string) => userData,
 	isPackaged: false,
 	getVersion: () => "0.0.0-test",
+	setLoginItemSettings: (settings: { openAtLogin: boolean }) => {
+		startup.loginItem = { openAtLogin: settings.openAtLogin };
+	},
+	requestSingleInstanceLock: () => startup.lockAvailable,
+	on: (event: string, listener: (...args: unknown[]) => void) => {
+		startup.listeners[event] = listener;
+	},
 };
 
 export const safeStorage = {
