@@ -56,7 +56,7 @@ class TestPurchaseOrderDedupe(unittest.TestCase):
 		self.frappe.throw.side_effect = Exception
 		self.frappe.get_all.return_value = []
 		self.frappe.get_value.return_value = "USD"
-		self.new_order = FakeDoc(name=None, items=[], taxes=[], docstatus=0)
+		self.new_order = FakeDoc(name=None, items=[], taxes=[], docstatus=0, flags=SimpleNamespace())
 
 		def get_doc(arg, *rest):
 			if isinstance(arg, dict):
