@@ -154,3 +154,44 @@ jobs:
 
       - name: Run tests
         run: cd ~/frappe-bench && bench --site test_site run-tests --app xpos
+
+      # Desktop round-trip: the Electron sync engine and a real local MariaDB
+      # against this site, served over HTTP (frontend/tests/roundtrip).
+      - name: Seed the round-trip site
+        run: |
+          cd ~/frappe-bench
+          bench --site test_site execute xpos.tests.round_trip.setup --kwargs '{"out": "/tmp/xpos-rt.json"}'
+
+      - name: Serve the site
+        run: |
+          cd ~/frappe-bench
+          nohup bench serve --port 8000 > /tmp/bench-serve.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf http://test_site:8000/api/method/ping && exit 0
+            sleep 2
+          done
+          echo "::error::bench serve did not answer"; cat /tmp/bench-serve.log; exit 1
+
+      - name: Install frontend dependencies
+        working-directory: xpos/frontend
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+        run: yarn install --frozen-lockfile
+
+      - name: Desktop round-trip tests
+        working-directory: xpos/frontend
+        env:
+          XPOS_RT_CONFIG: /tmp/xpos-rt.json
+          XPOS_RT_URL: http://test_site:8000
+          XPOS_TEST_DB_HOST: 127.0.0.1
+          XPOS_TEST_DB_PORT: "3306"
+          XPOS_TEST_DB_USER: root
+          XPOS_TEST_DB_PASSWORD: root
+          XPOS_TEST_DB_NAME: test_xpos_rt
+        run: yarn test:roundtrip
+
+      - name: Server logs
+        if: failure()
+        run: |
+          tail -n 150 /tmp/bench-serve.log || true
+          tail -n 150 ~/frappe-bench/logs/*.log || true
