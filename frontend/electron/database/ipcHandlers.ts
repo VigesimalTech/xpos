@@ -1225,6 +1225,15 @@ export function registerDbHandlers(): void {
 		};
 	});
 
+	// ERPNext's name for a till shift, once it has synced; null until then.
+	ipcMain.handle("db:get-server-shift-name", async (_e, shiftId: string | number) => {
+		const row = await queryOne<{ erp_id: string | null }>(
+			"SELECT `erp_id` FROM `pos_opening_shifts` WHERE `id` = ?",
+			[Number(shiftId)],
+		);
+		return row?.erp_id || null;
+	});
+
 	// What the cashier counts against when closing a shift on the till, from the till's own records.
 	ipcMain.handle("db:get-shift-closing-summary", async (_e, shiftId: string | number) => {
 		const shift = await queryOne<Record<string, unknown>>(
