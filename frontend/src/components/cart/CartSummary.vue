@@ -357,6 +357,7 @@ import { useOfferStore } from "@/stores/offerStore";
 import { call, showSuccess, showError } from "@/services/api";
 import { __ } from "@/lib/translate";
 import { isElectron } from "@/services/electronBridge";
+import { addPendingInvoice } from "@/services/dbBridge";
 import { isTabConflictError } from "@/utils";
 import { useOfflineStore } from "@/stores/offlineStore";
 import { usePrintInvoice } from "@/composables/usePrintInvoice";
@@ -656,8 +657,7 @@ async function holdOrder() {
 		const data = cartStore.getInvoiceData(profileName, shiftName);
 		if (!data.customer) {
 			const bootCustomer = (window.xpos?.boot as Record<string, unknown>)?.sysdefaults as
-				| Record<string, string>
-				| undefined;
+				Record<string, string> | undefined;
 			data.customer = bootCustomer?.customer || "";
 		}
 
@@ -672,7 +672,7 @@ async function holdOrder() {
 		}
 
 		if (isElectron() && window.electronAPI?.db) {
-			await window.electronAPI.db.addPendingInvoice({
+			await addPendingInvoice({
 				data: { ...data, is_draft: true, pos_opening_shift_local_id: shiftName },
 				customer_name: cartStore.customerName || data.customer,
 				grand_total: cartStore.grandTotal || 0,
@@ -736,8 +736,7 @@ async function sendToCashier() {
 
 		if (!data.customer) {
 			const bootCustomer = (window.xpos?.boot as Record<string, unknown>)?.sysdefaults as
-				| Record<string, string>
-				| undefined;
+				Record<string, string> | undefined;
 			data.customer = bootCustomer?.customer || "";
 		}
 
@@ -752,7 +751,7 @@ async function sendToCashier() {
 		}
 
 		if (isElectron() && window.electronAPI?.db) {
-			const result = await window.electronAPI.db.addPendingInvoice({
+			const result = await addPendingInvoice({
 				data: {
 					...data,
 					is_draft: true,

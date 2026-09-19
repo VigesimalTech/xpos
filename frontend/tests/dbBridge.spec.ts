@@ -1,8 +1,12 @@
 /**
  * @vitest-environment jsdom
  */
+import { readdirSync, readFileSync } from "fs";
+import { join } from "path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { isProxy, reactive, ref } from "vue";
+
+const SRC = join(__dirname, "../src");
 
 // ── Mock electronBridge ──────────────────────────────────────
 // In Electron mode, isElectron() returns true and functions go through IPC.
@@ -315,6 +319,16 @@ describe("dbBridge", () => {
 			const sent = mockElectronDb.addPendingInvoice.mock.calls.at(-1)![0];
 			expect(() => structuredClone(sent)).not.toThrow();
 			expect(sent.data.payments).toEqual([{ mode_of_payment: "Cash", amount: 20 }]);
+		});
+
+		it("is the only way the app saves a pending invoice, so every save is plain data", () => {
+			const direct = readdirSync(SRC, { recursive: true, encoding: "utf8" })
+				.filter((f) => /\.(ts|vue)$/.test(f))
+				.filter((f) =>
+					/electronAPI\??\.db\??\.addPendingInvoice/.test(readFileSync(join(SRC, f), "utf8")),
+				);
+
+			expect(direct).toEqual([]);
 		});
 
 		it("getPendingInvoices filters by status", async () => {

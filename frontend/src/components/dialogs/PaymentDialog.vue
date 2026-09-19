@@ -711,6 +711,7 @@ import { __ } from "@/lib/translate";
 import { usePrintInvoice } from "@/composables/usePrintInvoice";
 import { useOfflineSale } from "@/composables/useOfflineSale";
 import { isElectron } from "@/services/electronBridge";
+import { addPendingInvoice } from "@/services/dbBridge";
 import { fiscalizeViaLocalService } from "@/services/fbrLocalService";
 import {
 	Dialog,
@@ -1342,7 +1343,8 @@ async function submitPayment(withPrint: boolean = true) {
 		const invoiceData = buildInvoicePayload();
 
 		if (isElectron() && window.electronAPI?.db) {
-			const result = await window.electronAPI.db.addPendingInvoice({
+			// Through dbBridge, which copies the cart's live Vue arrays to plain data IPC can send.
+			const result = await addPendingInvoice({
 				data: {
 					...invoiceData,
 					pos_opening_shift_local_id: shiftName,
