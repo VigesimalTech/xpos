@@ -182,11 +182,27 @@ def get_pos_users(
 ):
 	"""Return POS-enabled Frappe users for offline authentication sync.
 
+	A till syncs with an API user assigned to its shop's POS Profile(s), and
+	gets the cashiers of those profiles only: another shop's cashiers are not
+	listed on it. A cashier on several of them comes back once, with the first
+	of the till's profiles. An API user on no enabled POS Profile (an admin or
+	integration key) gets every POS user, as before.
+
 	Returns:
 	    list[dict]: One record per user with at minimum
 	"""
 	limit_start = cint(limit_start)
 	limit_page_length = cint(limit_page_length)
+
+	till_profiles = frappe.db.sql_list(
+		"""
+        SELECT DISTINCT pu.parent
+        FROM `tabPOS Profile User` pu
+        INNER JOIN `tabPOS Profile` pp ON pp.name = pu.parent
+        WHERE pp.disabled = 0 AND pu.user = %(user)s
+        """,
+		{"user": frappe.session.user},
+	)
 
 	profile_users = frappe.db.sql(
 		"""
@@ -202,12 +218,19 @@ def get_pos_users(
             FROM `tabPOS Profile User` pu
             INNER JOIN `tabPOS Profile` pp ON pp.name = pu.parent
             WHERE pp.disabled = 0
+              AND (%(all_profiles)s = 1 OR pu.parent IN %(profiles)s)
         ) ranked
         WHERE rn = 1
         ORDER BY user
         LIMIT %(limit)s OFFSET %(offset)s
         """,
-		{"limit": limit_page_length, "offset": limit_start},
+		{
+			"limit": limit_page_length,
+			"offset": limit_start,
+			"all_profiles": 0 if till_profiles else 1,
+			# IN () is not valid SQL; the placeholder matches nothing when all_profiles is 1.
+			"profiles": tuple(till_profiles) or ("",),
+		},
 		as_dict=True,
 	)
 
