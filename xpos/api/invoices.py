@@ -10,6 +10,7 @@ from frappe.utils import cint, flt, getdate, now_datetime, nowdate
 from frappe.utils.background_jobs import enqueue
 
 from xpos.api.exchange import get_currency_precision
+from xpos.api.sale_policy import apply_sale_policy
 from xpos.api.tender import build_change_legs, build_tender_legs, invoice_currency_of
 from xpos.api.utilities import can_recall_other_shift_tabs, get_invoice_type, is_pos_cashier
 
@@ -428,30 +429,13 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 
 	rate_precision = _get_item_rate_precision()
 
-	from xpos.api.auth import user_has_pos_permission
-
-	allow_rate_change = user_has_pos_permission("allow_change_price", pos_profile=pos.name)
-
+	# Prices and discounts are recorded as sold: the till may have taken payment for
+	# them already. apply_sale_policy (below) checks them against the cashier's rights
+	# and flags or rejects the sale as the POS Profile says.
 	for item_data in items:
 		item_rate = flt(item_data.get("rate", 0), rate_precision)
 		item_qty = flt(item_data.get("qty", 1), 3)
 		is_free_item = cint(item_data.get("is_free_item"))
-
-		if not allow_rate_change and not is_free_item:
-			price_list = pos.get("selling_price_list")
-			if price_list:
-				price_list_rate = frappe.db.get_value(
-					"Item Price",
-					{
-						"item_code": item_data.get("item_code"),
-						"price_list": price_list,
-						"selling": 1,
-						"uom": item_data.get("uom") or item_data.get("stock_uom"),
-					},
-					"price_list_rate",
-				)
-				if price_list_rate is not None and flt(price_list_rate, rate_precision) != item_rate:
-					item_rate = flt(price_list_rate, rate_precision)
 
 		item = invoice_doc.append("items", {})
 		item.item_code = item_data.get("item_code")
@@ -483,14 +467,6 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 
 		disc_pct = flt(item_data.get("discount_percentage", 0), 2)
 		disc_amt = flt(item_data.get("discount_amount", 0), 2)
-
-		max_discount = flt(pos.get("max_discount_percentage_allowed", 0))
-		if max_discount > 0 and disc_pct > max_discount and not is_free_item:
-			frappe.throw(
-				_("Item {0}: Discount {1}% exceeds maximum allowed {2}%").format(
-					item_data.get("item_code"), disc_pct, max_discount
-				)
-			)
 
 		if is_free_item:
 			item.is_free_item = 1
@@ -647,6 +623,8 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 				invoice_doc.return_valid_upto = getdate(nowdate()) + timedelta(days=return_days)
 	except Exception:
 		pass
+
+	apply_sale_policy(invoice_doc, {**data, "items": items}, pos)
 
 	try:
 		if is_existing_draft:

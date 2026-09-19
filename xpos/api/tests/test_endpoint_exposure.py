@@ -76,7 +76,7 @@ class TestRepricingEndpointIsGone(unittest.TestCase):
 	def test_update_price_list_rate_is_removed(self):
 		"""It let any user rewrite the Item Price that `allow_change_price` reads.
 
-		`create_invoice` enforces the price lock by re-reading Item Price, so an
+		The sale policy check compares each sold price with Item Price, so an
 		ungated repricing endpoint defeated that control entirely.
 		"""
 		self.assertFalse(function_exists("xpos.api.items", "update_price_list_rate"))

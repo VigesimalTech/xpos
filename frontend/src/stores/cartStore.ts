@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { ref, computed, watch } from "vue";
 import { call } from "@/services/api";
 import { usePosStore } from "./posStore";
+import { useAuthStore } from "./authStore";
 import { useSettingsStore } from "./settingsStore";
 import { getCachedItemByCode, getCachedStockForItem } from "@/services/dbBridge";
 import type {
@@ -1338,6 +1339,8 @@ export const useCartStore = defineStore("cart", () => {
 				}),
 			),
 			pos_opening_shift: posOpeningShift,
+			// The till syncs as its own API user; the server checks the sale against this cashier's rights.
+			xpos_cashier: useAuthStore().userName,
 			posting_date: posStore.allowChangePostingDate ? postingDate.value || nowDate() : nowDate(),
 			additional_discount_percentage: discountPercentage.value,
 			discount_amount: discountAmount.value,
