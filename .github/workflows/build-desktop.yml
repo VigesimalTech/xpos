@@ -1,0 +1,92 @@
+name: Build Desktop App
+
+# Builds the X POS desktop installers for trying out: a Windows NSIS installer
+# and a macOS (Apple silicon) disk image, attached to the run as artifacts.
+# Nothing is published or released, and nothing is signed yet: Windows
+# SmartScreen and macOS Gatekeeper will each warn once on first open.
+#
+# The app version comes from the release tag (v2.9.0-offline.6 -> 2.9.0-offline.6),
+# or, for a manual run, 2.9.0-dev.<short sha> so a build names its commit.
+
+on:
+  workflow_dispatch: {}
+  push:
+    tags:
+      - "v*-offline.*"
+  # Proves a change to this workflow still builds, before it merges.
+  pull_request:
+    paths:
+      - .github/workflows/build-desktop.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-latest
+            target: --win nsis --x64
+            files: frontend/release/*.exe
+          - name: macOS
+            os: macos-latest
+            # build/icon.icns is not in the repo; electron-builder converts the 512 px PNG.
+            target: --mac dmg --arm64 --config.mac.icon=build/icon.png
+            files: frontend/release/*.dmg
+
+    defaults:
+      run:
+        shell: bash
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Work out the version
+        id: version
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="2.9.0-dev.${GITHUB_SHA::7}"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Building X POS $version" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: yarn
+          cache-dependency-path: frontend/yarn.lock
+
+      - name: Install
+        run: yarn install --frozen-lockfile
+
+      - name: Build the app bundle
+        run: yarn build:electron
+
+      - name: Build the installer
+        env:
+          # No signing certificate yet (see D4): build unsigned.
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: >-
+          npx electron-builder ${{ matrix.target }} --publish never
+          --config.extraMetadata.version=${{ steps.version.outputs.version }}
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: xpos-${{ steps.version.outputs.version }}-${{ matrix.name }}
+          path: ${{ matrix.files }}
+          if-no-files-found: error
+          retention-days: 30
