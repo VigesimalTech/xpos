@@ -424,6 +424,8 @@ export interface InvoiceData {
 	pos_notes?: string;
 	pos_delivery_date?: string;
 	pos_opening_shift?: string;
+	/** The cashier signed in on the till (a Frappe user ID). */
+	xpos_cashier?: string;
 	offers?: string;
 	coupons?: string;
 	offers_detail?: Array<Record<string, unknown>>;

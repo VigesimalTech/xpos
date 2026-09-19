@@ -32,6 +32,10 @@ CASHIERS = {
 	"rt-till@example.com": [POS_PROFILE],
 	"rt-till-2@example.com": [POS_PROFILE_2],
 }
+# The sale-policy tests: this cashier may give up to 10% alone; the second shop
+# rejects out-of-policy sales rather than flagging them.
+CASHIER_DISCOUNT_LIMIT = {("rt-cashier@example.com", POS_PROFILE): 10}
+REJECT_PROFILE = POS_PROFILE_2
 OPENING_QTY = 50
 RATE = 100
 
@@ -184,6 +188,12 @@ def setup(out="/tmp/xpos-rt.json"):
 		)
 		profile.insert(ignore_permissions=True)
 
+	for (user, profile_name), limit in CASHIER_DISCOUNT_LIMIT.items():
+		frappe.db.set_value(
+			"POS Profile User", {"parent": profile_name, "user": user}, "discount_limit", limit
+		)
+	frappe.db.set_value("POS Profile", REJECT_PROFILE, "xpos_out_of_policy_action", "Reject")
+
 	from frappe.core.doctype.user.user import generate_keys
 
 	api_secret = generate_keys("Administrator")["api_secret"]
@@ -212,6 +222,8 @@ def setup(out="/tmp/xpos-rt.json"):
 		"cashiers": CASHIERS,
 		"tills": tills,
 		"unassigned": unassigned,
+		"discount_limits": {f"{u}|{p}": v for (u, p), v in CASHIER_DISCOUNT_LIMIT.items()},
+		"reject_profile": REJECT_PROFILE,
 	}
 	# A CI-only seed: `out` is the path the workflow passes. The secret goes to a
 	# file rather than the return value, which bench prints to the job log.

@@ -26,6 +26,8 @@ class TestCreateInvoice(unittest.TestCase):
 		self.stub("build_change_legs", return_value=([], 0.0))
 		self.stub("invoice_currency_of", return_value="USD")
 		self.stub("get_currency_precision", return_value=2)
+		# Checked on its own in test_sale_policy.
+		self.stub("apply_sale_policy")
 
 	def stub(self, name, **kwargs):
 		"""Patch `name` in the xpos.api.invoices namespace for the current test."""

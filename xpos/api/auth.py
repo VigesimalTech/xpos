@@ -26,7 +26,7 @@ ALL_PERMISSION_KEYS = (
 )
 
 DEFAULT_ROLE = "Cashier"
-DEFAULT_DISCOUNT_LIMIT = 100
+DEFAULT_DISCOUNT_LIMIT = 0  # 0 means no discount without a manager; 100 means no cap
 ROLE_CACHE_KEY = "xpos_role_permissions"
 
 
