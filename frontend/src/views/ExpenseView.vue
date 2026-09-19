@@ -607,7 +607,10 @@ function normalizeExpense(row: Record<string, unknown> | Expense): Expense {
 		remarks: String(record.remarks || "") || undefined,
 		posting_date: String(record.posting_date || "") || undefined,
 		docstatus: Number(record.docstatus || 0),
-		can_delete: Boolean(record.can_delete ?? Number(record.docstatus || 0) < 2),
+		// On the till, a record can be deleted until it reaches ERPNext; after that it is cancelled there.
+		can_delete: record.sync_status
+			? record.sync_status === "pending" || record.sync_status === "failed"
+			: Boolean(record.can_delete ?? Number(record.docstatus || 0) < 2),
 		company: String(record.company || "") || undefined,
 		pos_profile: String(record.pos_profile || "") || undefined,
 		user: String(record.user || "") || undefined,
@@ -674,7 +677,11 @@ async function handleSave(values: { expense_account: string; amount: number; rea
 async function handleDelete(id: number | string) {
 	try {
 		if (isElectronMode) {
-			await deleteExpense(id);
+			if (!(await deleteExpense(id))) {
+				showError(__("This expense has reached ERPNext. Cancel it there."));
+				await loadExpenses();
+				return;
+			}
 		} else {
 			await call("frappe.client.cancel", { doctype: "POS Cash Movement", name: String(id) });
 		}

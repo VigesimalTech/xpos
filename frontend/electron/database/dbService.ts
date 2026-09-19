@@ -368,6 +368,10 @@ async function runMigrations(): Promise<void> {
 		["currencies", "number_format", "VARCHAR(20) DEFAULT NULL"],
 		["currencies", "smallest_currency_fraction_value", "DECIMAL(18,6) DEFAULT 0"],
 		["currencies", "symbol_on_right", "TINYINT(1) DEFAULT 0"],
+		["expenses", "local_id", "VARCHAR(64) DEFAULT NULL"],
+		["expenses", "error", "TEXT"],
+		["bank_drops", "local_id", "VARCHAR(64) DEFAULT NULL"],
+		["bank_drops", "error", "TEXT"],
 	];
 	for (const [table, col, typedef] of columnMigrations) {
 		try {
@@ -381,6 +385,15 @@ async function runMigrations(): Promise<void> {
 			}
 		} catch (err) {
 			log.warn(`Migration for ${table}.${col} failed`, err);
+		}
+	}
+
+	// Expenses and bank drops sync under a UUID: the numeric id restarts on every till.
+	for (const tbl of ["expenses", "bank_drops"]) {
+		try {
+			await db.execute(`UPDATE \`${tbl}\` SET \`local_id\` = UUID() WHERE \`local_id\` IS NULL`);
+		} catch (err) {
+			log.warn(`Migration giving ${tbl} a local_id failed`, err);
 		}
 	}
 

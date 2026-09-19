@@ -679,10 +679,12 @@ export async function getExpenses(opts?: {
 	}));
 }
 
-export async function deleteExpense(id: number | string) {
-	if (isElectron()) return getDb().deleteExpense(id as number);
+/** Returns whether it was deleted: on the till, one that has reached ERPNext is not. */
+export async function deleteExpense(id: number | string): Promise<boolean> {
+	if (isElectron()) return Boolean(await getDb().deleteExpense(Number(id)));
 	const { call } = await import("./api");
-	return call("frappe.client.cancel", { doctype: "POS Cash Movement", name: String(id) });
+	await call("frappe.client.cancel", { doctype: "POS Cash Movement", name: String(id) });
+	return true;
 }
 
 export async function getModesOfPayment() {
@@ -728,10 +730,12 @@ export async function getBankDrops(opts?: {
 	}));
 }
 
-export async function deleteBankDrop(id: number | string) {
-	if (isElectron()) return getDb().deleteBankDrop(id as number);
+/** Returns whether it was deleted: on the till, one that has reached ERPNext is not. */
+export async function deleteBankDrop(id: number | string): Promise<boolean> {
+	if (isElectron()) return Boolean(await getDb().deleteBankDrop(Number(id)));
 	const { call } = await import("./api");
-	return call("frappe.client.cancel", { doctype: "POS Cash Movement", name: String(id) });
+	await call("frappe.client.cancel", { doctype: "POS Cash Movement", name: String(id) });
+	return true;
 }
 
 export async function createStockAdjustment(adj: Record<string, unknown>) {

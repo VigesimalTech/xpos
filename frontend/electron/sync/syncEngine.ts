@@ -370,6 +370,10 @@ async function pushTable(config: SyncTableConfig): Promise<{ synced: number; fai
 		statusFailed = "'failed'";
 		statusSyncing = "syncing";
 		statusSynced = "synced";
+	} else if (config.idbStore === "expenses" || config.idbStore === "bank_drops") {
+		pendingTable = config.idbStore;
+		statusField = "sync_status";
+		localIdField = "local_id";
 	} else if (config.idbStore === "pos_closing_entries") {
 		pendingTable = "pos_closing_entries";
 		statusField = "sync_status";
@@ -455,6 +459,17 @@ async function pushTable(config: SyncTableConfig): Promise<{ synced: number; fai
 					company: record.company,
 					balance_details: await getOpeningShiftDetails(recordId),
 				};
+			} else if (pendingTable === "expenses" || pendingTable === "bank_drops") {
+				const serverShiftName = await getServerShiftName(String(record.pos_opening_entry_id ?? ""));
+				if (!serverShiftName) {
+					// Its shift has not reached ERPNext yet; try again next round.
+					await execute(
+						`UPDATE \`${pendingTable}\` SET \`${statusField}\` = 'pending' WHERE \`${idField}\` = ?`,
+						[recordId],
+					);
+					continue;
+				}
+				data = cashMovementPayload(pendingTable, record, serverShiftName);
 			} else if (pendingTable === "pos_closing_entries") {
 				const openingShiftLocalId = record.pos_opening_entry_id as number;
 				const serverOpeningShiftName = await getServerShiftName(String(openingShiftLocalId));
@@ -503,6 +518,11 @@ async function pushTable(config: SyncTableConfig): Promise<{ synced: number; fai
 						`UPDATE \`${pendingTable}\` SET \`server_name\` = ?, \`${statusField}\` = '${statusSynced}' WHERE \`${idField}\` = ?`,
 						[serverResult.name, recordId],
 					);
+				} else if (pendingTable === "expenses" || pendingTable === "bank_drops") {
+					await execute(
+						`UPDATE \`${pendingTable}\` SET \`erp_id\` = ?, \`${statusField}\` = '${statusSynced}', \`error\` = NULL, \`synced_at\` = NOW() WHERE \`${idField}\` = ?`,
+						[serverResult.name, recordId],
+					);
 				} else {
 					await execute(
 						`UPDATE \`${pendingTable}\` SET \`erp_id\` = ?, \`${statusField}\` = '${statusSynced}', \`synced_at\` = NOW() WHERE \`${idField}\` = ?`,
@@ -544,6 +564,11 @@ async function pushTable(config: SyncTableConfig): Promise<{ synced: number; fai
 						error: errMsg,
 					});
 				}
+			} else if (pendingTable === "expenses" || pendingTable === "bank_drops") {
+				await execute(
+					`UPDATE \`${pendingTable}\` SET \`${statusField}\` = 'failed', \`error\` = ? WHERE \`${idField}\` = ?`,
+					[errMsg, recordId],
+				);
 			} else {
 				await execute(
 					`UPDATE \`${pendingTable}\` SET \`${statusField}\` = 'failed' WHERE \`${idField}\` = ?`,
@@ -565,6 +590,32 @@ async function pushTable(config: SyncTableConfig): Promise<{ synced: number; fai
 	}
 
 	return { synced, failed };
+}
+
+/** What sync_cash_movement is sent for a local expense or bank drop. */
+export function cashMovementPayload(
+	table: "expenses" | "bank_drops",
+	record: Record<string, unknown>,
+	serverShiftName: string,
+): Record<string, unknown> {
+	const postingDate =
+		record.posting_date instanceof Date
+			? localDate(record.posting_date)
+			: String(record.posting_date || "").slice(0, 10);
+	return {
+		movement_type: table === "expenses" ? "Expense" : "Deposit",
+		pos_opening_shift: serverShiftName,
+		account: record.to_account,
+		amount: Number(record.amount || 0),
+		remarks: record.remarks || "",
+		posting_date: postingDate || undefined,
+		cashier: record.owner || undefined,
+	};
+}
+
+function localDate(d: Date): string {
+	const pad = (n: number) => String(n).padStart(2, "0");
+	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 async function getServerShiftName(localShiftId: string): Promise<string | null> {

@@ -1529,10 +1529,11 @@ export function registerDbHandlers(): void {
 				: null;
 		const result = await execute(
 			`INSERT INTO \`expenses\`
-       (\`to_account\`, \`amount\`, \`posting_date\`, \`remarks\`,
+       (\`local_id\`, \`to_account\`, \`amount\`, \`posting_date\`, \`remarks\`,
         \`owner\`, \`pos_opening_entry_id\`, \`sync_status\`)
-       VALUES (?, ?, ?, ?, ?, ?, 'pending')`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`,
 			[
+				crypto.randomUUID(),
 				expense.expense_type || expense.to_account || "General",
 				expense.amount || 0,
 				expense.posting_date || new Date().toISOString().slice(0, 10),
@@ -1585,9 +1586,14 @@ export function registerDbHandlers(): void {
 		},
 	);
 
+	// Only a record that has not reached ERPNext can be deleted here; one that has is
+	// cancelled in ERPNext. Returns whether it was deleted.
 	ipcMain.handle("db:delete-expense", async (_e, id: number) => {
-		await execute("DELETE FROM `expenses` WHERE `id` = ? AND `sync_status` = 'pending'", [id]);
-		return true;
+		const result = await execute(
+			"DELETE FROM `expenses` WHERE `id` = ? AND `sync_status` IN ('pending', 'failed')",
+			[id],
+		);
+		return result.affectedRows > 0;
 	});
 
 	ipcMain.handle("db:create-bank-drop", async (_e, drop: Record<string, unknown>) => {
@@ -1598,10 +1604,11 @@ export function registerDbHandlers(): void {
 				: null;
 		const result = await execute(
 			`INSERT INTO \`bank_drops\`
-       (\`to_account\`, \`amount\`, \`posting_date\`, \`remarks\`,
+       (\`local_id\`, \`to_account\`, \`amount\`, \`posting_date\`, \`remarks\`,
         \`owner\`, \`pos_opening_entry_id\`, \`sync_status\`)
-       VALUES (?, ?, ?, ?, ?, ?, 'pending')`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`,
 			[
+				crypto.randomUUID(),
 				drop.mode_of_payment || drop.to_account || "Cash",
 				drop.amount || 0,
 				drop.posting_date || new Date().toISOString().slice(0, 10),
@@ -1654,9 +1661,14 @@ export function registerDbHandlers(): void {
 		},
 	);
 
+	// Only a record that has not reached ERPNext can be deleted here; one that has is
+	// cancelled in ERPNext. Returns whether it was deleted.
 	ipcMain.handle("db:delete-bank-drop", async (_e, id: number) => {
-		await execute("DELETE FROM `bank_drops` WHERE `id` = ? AND `sync_status` = 'pending'", [id]);
-		return true;
+		const result = await execute(
+			"DELETE FROM `bank_drops` WHERE `id` = ? AND `sync_status` IN ('pending', 'failed')",
+			[id],
+		);
+		return result.affectedRows > 0;
 	});
 
 	ipcMain.handle("db:create-stock-adjustment", async (_e, adj: Record<string, unknown>) => {

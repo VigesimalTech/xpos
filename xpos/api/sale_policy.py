@@ -15,6 +15,8 @@ looks up what they need and applies the POS Profile's choice.
 import frappe
 from frappe import _
 
+from xpos.api.till import sent_by_till
+
 # The POS Role permissions a sale can need.
 POLICY_RIGHTS = ("allow_change_price", "show_edit_discount_field", "apply_additional_discount", "sale_return")
 
@@ -134,11 +136,6 @@ def policy_exceptions(
 	return flags
 
 
-def _sent_by_till() -> bool:
-	"""Whether the request came from a till's API key rather than a person's own sign-in."""
-	return (frappe.get_request_header("Authorization") or "").lower().startswith("token ")
-
-
 def resolve_cashier(data: dict) -> str:
 	"""Who made the sale.
 
@@ -146,7 +143,7 @@ def resolve_cashier(data: dict) -> str:
 	can claim a manager's rights by naming them. A till syncs as its own API user and
 	says which cashier signed in on it; without that, the shift's cashier.
 	"""
-	if not _sent_by_till():
+	if not sent_by_till():
 		return frappe.session.user
 	cashier = data.get("xpos_cashier")
 	if cashier:

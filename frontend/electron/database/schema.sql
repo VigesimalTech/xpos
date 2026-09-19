@@ -672,6 +672,7 @@ CREATE TABLE IF NOT EXISTS `sales_invoice_change_legs` (
 
 CREATE TABLE IF NOT EXISTS `expenses` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `local_id` VARCHAR(64) DEFAULT NULL,
   `name` VARCHAR(100) DEFAULT NULL,
   `to_account` VARCHAR(255) NOT NULL,
   `posting_date` DATE NOT NULL,
@@ -681,6 +682,7 @@ CREATE TABLE IF NOT EXISTS `expenses` (
   `pos_opening_entry_id` INT DEFAULT NULL,
   `erp_id` VARCHAR(255) DEFAULT NULL,
   `sync_status` ENUM('pending','syncing','synced','failed') DEFAULT 'pending',
+  `error` TEXT,
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
   `synced_at` DATETIME DEFAULT NULL,
   INDEX `idx_posting_date` (`posting_date`),
@@ -690,6 +692,7 @@ CREATE TABLE IF NOT EXISTS `expenses` (
 
 CREATE TABLE IF NOT EXISTS `bank_drops` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `local_id` VARCHAR(64) DEFAULT NULL,
   `name` VARCHAR(100) DEFAULT NULL,
   `to_account` VARCHAR(255) NOT NULL,
   `posting_date` DATE NOT NULL,
@@ -701,6 +704,7 @@ CREATE TABLE IF NOT EXISTS `bank_drops` (
   `pos_opening_entry_id` INT DEFAULT NULL,
   `erp_id` VARCHAR(255) DEFAULT NULL,
   `sync_status` ENUM('pending','syncing','synced','failed') DEFAULT 'pending',
+  `error` TEXT,
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
   `synced_at` DATETIME DEFAULT NULL,
   INDEX `idx_posting_date` (`posting_date`),

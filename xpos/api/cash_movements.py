@@ -13,12 +13,13 @@ from frappe.utils import cint, flt, now_datetime, nowdate
 
 from xpos.api.auth import is_pos_manager, user_has_pos_permission
 from xpos.api.profiles import resolve_pos_profile
+from xpos.api.till import acting_user, sent_by_till
 
 MOVEMENT_PERMISSION_KEYS = {"Expense": "expense", "Deposit": "bank_drop"}
 
 
-def ensure_cash_movement_allowed(profile, movement_type: str) -> None:
-	"""Raise unless this profile and user may record `movement_type`."""
+def ensure_cash_movement_allowed(profile, movement_type: str, user: str | None = None) -> None:
+	"""Raise unless this profile and `user` (the session's by default) may record `movement_type`."""
 	if not cint(profile.get("enable_cash_movement")):
 		frappe.throw(
 			_("Cash Movement is disabled for POS Profile {0}.").format(profile.name),
@@ -38,7 +39,7 @@ def ensure_cash_movement_allowed(profile, movement_type: str) -> None:
 		)
 
 	permission_key = MOVEMENT_PERMISSION_KEYS.get(movement_type)
-	if permission_key and not user_has_pos_permission(permission_key, pos_profile=profile.name):
+	if permission_key and not user_has_pos_permission(permission_key, user, pos_profile=profile.name):
 		frappe.throw(
 			_("You are not permitted to record a {0}.").format(movement_type.lower()),
 			frappe.PermissionError,
@@ -161,86 +162,28 @@ def create_pos_expense(payload: str | dict):
 		payload = json.loads(payload)
 
 	pos_opening_shift = payload.get("pos_opening_shift")
-	expense_account = payload.get("expense_account")
-	remarks = payload.get("reason", "")
-	cash_account = payload.get("cash_account")
-
 	if not pos_opening_shift:
 		frappe.throw(_("POS Opening Shift is required"))
-	if not expense_account:
+	if not payload.get("expense_account"):
 		frappe.throw(_("Expense account is required"))
 
 	opening = frappe.get_doc("POS Opening Shift", pos_opening_shift)
-
-	if opening.user != frappe.session.user and not is_pos_manager():
+	user = acting_user(payload.get("cashier"), opening.pos_profile)
+	if opening.user != user and not is_pos_manager(user):
 		frappe.throw(
-			_("{0} can only create expenses for their own shift").format(frappe.session.user),
+			_("{0} can only create expenses for their own shift").format(user),
 			frappe.PermissionError,
 		)
 
-	profile = resolve_pos_profile(opening.pos_profile)
-	ensure_cash_movement_allowed(profile, "Expense")
-	amount = validate_cash_movement_amount(profile, payload.get("amount"))
-
-	company = opening.company
-	cost_center = profile.get("cost_center") or frappe.db.get_value("Company", company, "cost_center")
-
-	ensure_account_allowed(profile, expense_account, "allowed_expense_accounts", _("Expense account"))
-	ensure_account_company(expense_account, company, _("Expense account"))
-
-	if cash_account:
-		ensure_account_allowed(profile, cash_account, "allowed_source_accounts", _("Source account"))
-		ensure_account_company(cash_account, company, _("Source account"))
-	else:
-		cash_account = profile.get("default_source_account")
-
-	if not cash_account:
-		cash_mop = profile.get("cash_mode_of_payment") or "Cash"
-		account_info = get_bank_cash_account(cash_mop, company)
-		cash_account = account_info.get("account")
-
-	if not cash_account:
-		frappe.throw(_("No source cash account is configured for POS Profile {0}.").format(profile.name))
-
-	je = frappe.get_doc(
-		{
-			"doctype": "Journal Entry",
-			"posting_date": nowdate(),
-			"company": company,
-			"user_remark": f"POS Expense: {remarks}" if remarks else "POS Expense",
-			"accounts": [
-				{
-					"account": expense_account,
-					"debit_in_account_currency": amount,
-					"cost_center": cost_center,
-					"user_remark": remarks,
-				},
-				{
-					"account": cash_account,
-					"credit_in_account_currency": amount,
-					"cost_center": cost_center,
-					"user_remark": remarks,
-				},
-			],
-		}
-	)
-	je.insert(ignore_permissions=True)
-	je.submit()
-
-	movement = _create_cash_movement_record(
-		pos_profile=frappe.db.get_value("POS Opening Shift", pos_opening_shift, "pos_profile"),
-		pos_opening_shift=pos_opening_shift,
-		source_account=cash_account,
-		target_account=expense_account,
-		expense_account=expense_account,
+	return _post_cash_movement(
 		movement_type="Expense",
-		amount=amount,
-		remarks=remarks,
-		journal_entry=je.name,
-		company=company,
+		opening=opening,
+		user=user,
+		amount=payload.get("amount"),
+		account=payload.get("expense_account"),
+		cash_account=payload.get("cash_account"),
+		remarks=payload.get("reason", ""),
 	)
-
-	return movement
 
 
 @frappe.whitelist()
@@ -251,31 +194,110 @@ def create_cash_deposit(payload: str | dict):
 		payload = json.loads(payload)
 
 	pos_opening_shift = payload.get("pos_opening_shift")
-	target_account = payload.get("target_account")
-	remarks = payload.get("reason", "")
-	cash_account = payload.get("cash_account")
-
 	if not pos_opening_shift:
 		frappe.throw(_("POS Opening Shift is required"))
-	if not target_account:
+	if not payload.get("target_account"):
 		frappe.throw(_("Target account is required"))
 
 	opening = frappe.get_doc("POS Opening Shift", pos_opening_shift)
-
-	if opening.user != frappe.session.user and not is_pos_manager():
+	user = acting_user(payload.get("cashier"), opening.pos_profile)
+	if opening.user != user and not is_pos_manager(user):
 		frappe.throw(
-			_("{0} can only create deposits for their own shift").format(frappe.session.user),
+			_("{0} can only create deposits for their own shift").format(user),
 			frappe.PermissionError,
 		)
 
+	return _post_cash_movement(
+		movement_type="Deposit",
+		opening=opening,
+		user=user,
+		amount=payload.get("amount"),
+		account=payload.get("target_account"),
+		cash_account=payload.get("cash_account"),
+		remarks=payload.get("reason", ""),
+	)
+
+
+@frappe.whitelist(methods=["POST"])
+def sync_cash_movement(data: str | dict, local_id: str | None = None):
+	"""Record an expense or bank drop a till took, perhaps offline, when it syncs.
+
+	The till sends the cashier who recorded it, the shift's name on the server and
+	its own id for the record, so a retry after a lost reply does not post it twice.
+	The shift may have closed since: the money left the drawer either way, so it is
+	still recorded, on the day the till took it.
+	"""
+	if not sent_by_till():
+		frappe.throw(_("Only a till can sync cash movements."), frappe.PermissionError)
+
+	data = json.loads(data) if isinstance(data, str) else (data or {})
+	movement_type = data.get("movement_type")
+	if movement_type not in MOVEMENT_PERMISSION_KEYS:
+		frappe.throw(_("Unknown cash movement type {0}.").format(movement_type))
+	if not local_id:
+		frappe.throw(_("A till's cash movement needs its local id."))
+	if not data.get("pos_opening_shift"):
+		frappe.throw(_("POS Opening Shift is required"))
+	if not data.get("account"):
+		frappe.throw(_("Target account is required"))
+
+	client_request_id = till_request_id(local_id)
+	existing = frappe.db.get_value("POS Cash Movement", {"client_request_id": client_request_id}, "name")
+	if existing:
+		return {"name": existing, "duplicate": True}
+
+	opening = frappe.get_doc("POS Opening Shift", data.get("pos_opening_shift"))
+	user = acting_user(data.get("cashier") or opening.user, opening.pos_profile)
+	if opening.user != user and not is_pos_manager(user):
+		frappe.throw(
+			_("{0} can only record cash movements for their own shift").format(user),
+			frappe.PermissionError,
+		)
+
+	movement = _post_cash_movement(
+		movement_type=movement_type,
+		opening=opening,
+		user=user,
+		amount=data.get("amount"),
+		account=data.get("account"),
+		cash_account=None,
+		remarks=data.get("remarks") or "",
+		posting_date=data.get("posting_date"),
+		client_request_id=client_request_id,
+	)
+	return {"name": movement.get("name")}
+
+
+def till_request_id(local_id: str) -> str:
+	"""The client request id a till's record is stored under. Tills send UUIDs."""
+	return f"till:{local_id}"
+
+
+def _post_cash_movement(
+	*,
+	movement_type: str,
+	opening,
+	user: str,
+	amount,
+	account: str,
+	cash_account: str | None,
+	remarks: str,
+	posting_date: str | None = None,
+	client_request_id: str | None = None,
+):
+	"""Check an expense or deposit against the POS Profile, post its journal entry and record it."""
 	profile = resolve_pos_profile(opening.pos_profile)
-	ensure_cash_movement_allowed(profile, "Deposit")
-	amount = validate_cash_movement_amount(profile, payload.get("amount"))
+	ensure_cash_movement_allowed(profile, movement_type, user)
+	amount = validate_cash_movement_amount(profile, amount)
 
 	company = opening.company
 	cost_center = profile.get("cost_center") or frappe.db.get_value("Company", company, "cost_center")
 
-	ensure_deposit_target_allowed(target_account, company)
+	if movement_type == "Expense":
+		ensure_account_allowed(profile, account, "allowed_expense_accounts", _("Expense account"))
+		ensure_account_company(account, company, _("Expense account"))
+	else:
+		ensure_deposit_target_allowed(account, company)
 
 	if cash_account:
 		ensure_account_allowed(profile, cash_account, "allowed_source_accounts", _("Source account"))
@@ -291,15 +313,16 @@ def create_cash_deposit(payload: str | dict):
 	if not cash_account:
 		frappe.throw(_("No source cash account is configured for POS Profile {0}.").format(profile.name))
 
+	label = "POS Expense" if movement_type == "Expense" else "POS Cash Deposit"
 	je = frappe.get_doc(
 		{
 			"doctype": "Journal Entry",
-			"posting_date": nowdate(),
+			"posting_date": posting_date or nowdate(),
 			"company": company,
-			"user_remark": (f"POS Cash Deposit: {remarks}" if remarks else "POS Cash Deposit"),
+			"user_remark": f"{label}: {remarks}" if remarks else label,
 			"accounts": [
 				{
-					"account": target_account,
+					"account": account,
 					"debit_in_account_currency": amount,
 					"cost_center": cost_center,
 					"user_remark": remarks,
@@ -316,20 +339,21 @@ def create_cash_deposit(payload: str | dict):
 	je.insert(ignore_permissions=True)
 	je.submit()
 
-	movement = _create_cash_movement_record(
-		pos_profile=frappe.db.get_value("POS Opening Shift", pos_opening_shift, "pos_profile"),
-		pos_opening_shift=pos_opening_shift,
+	return _create_cash_movement_record(
+		pos_profile=opening.pos_profile,
+		pos_opening_shift=opening.name,
+		user=user,
 		source_account=cash_account,
-		target_account=target_account,
-		expense_account="",
-		movement_type="Deposit",
+		target_account=account,
+		expense_account=account if movement_type == "Expense" else "",
+		movement_type=movement_type,
 		amount=amount,
 		remarks=remarks,
 		journal_entry=je.name,
 		company=company,
+		posting_date=posting_date,
+		client_request_id=client_request_id,
 	)
-
-	return movement
 
 
 @frappe.whitelist()
@@ -393,7 +417,7 @@ def _create_cash_movement_record(**kwargs):
 			"docstatus": 1,
 			"pos_profile": kwargs.get("pos_profile"),
 			"pos_opening_shift": kwargs.get("pos_opening_shift"),
-			"user": frappe.session.user,
+			"user": kwargs.get("user") or frappe.session.user,
 			"journal_entry": kwargs.get("journal_entry"),
 			"movement_type": kwargs.get("movement_type"),
 			"amount": kwargs.get("amount"),
@@ -402,9 +426,10 @@ def _create_cash_movement_record(**kwargs):
 			"expense_account": kwargs.get("expense_account"),
 			"remarks": kwargs.get("remarks"),
 			"company": kwargs.get("company"),
-			"posting_date": nowdate(),
+			"posting_date": kwargs.get("posting_date") or nowdate(),
 			"posting_time": now_datetime().strftime("%H:%M:%S"),
 			"status": "Submitted",
+			"client_request_id": kwargs.get("client_request_id"),
 		}
 	)
 	movement.insert(ignore_permissions=True)

@@ -41,6 +41,8 @@ export async function clearSyncTables(): Promise<void> {
 		"pending_purchases",
 		"pos_opening_shifts",
 		"pos_closing_entries",
+		"expenses",
+		"bank_drops",
 		"sync_id_map",
 	]) {
 		await execute(`DELETE FROM \`${table}\``);
