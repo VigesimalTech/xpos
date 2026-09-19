@@ -301,6 +301,12 @@ export interface ElectronDbAPI {
 		username: string,
 		password: string,
 	) => Promise<{ success: boolean; error?: string; unreachable?: boolean }>;
+	/** Cashiers who can sign in with a till PIN (names only). */
+	getPinUsers: () => Promise<{ name: string; username: string; full_name: string }[]>;
+	verifyPin: (
+		username: string,
+		pin: string,
+	) => Promise<{ ok: boolean; attemptsLeft?: number; lockedUntil?: string; reason?: string }>;
 	createPosOpeningShift: (shift: Record<string, unknown>) => Promise<Record<string, unknown>>;
 	getOpenShift: (user: string) => Promise<Record<string, unknown> | null>;
 	checkOpenShift: (user: string) => Promise<Record<string, unknown> | null>;

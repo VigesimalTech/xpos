@@ -159,6 +159,10 @@ extend_doctype_class = {
 # Hook on document methods and events
 
 doc_events = {
+	"POS Profile": {
+		# Till PINs typed into the user rows are hashed and cleared (xpos.api.pin).
+		"validate": "xpos.api.pin.hash_new_pins",
+	},
 	"Sales Invoice": {
 		"validate": "xpos.x_pos.api.invoice.validate",
 		"before_submit": "xpos.x_pos.api.invoice.before_submit",
