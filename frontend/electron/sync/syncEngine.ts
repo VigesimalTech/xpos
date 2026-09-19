@@ -253,6 +253,15 @@ async function pullTable(config: SyncTableConfig): Promise<number> {
 	return totalPulled;
 }
 
+function isHeldOrder(record: Record<string, unknown>): boolean {
+	try {
+		const data = typeof record.data === "string" ? JSON.parse(record.data) : record.data;
+		return !!(data as { is_draft?: unknown } | null)?.is_draft;
+	} catch {
+		return false;
+	}
+}
+
 async function detectDeletions(config: SyncTableConfig): Promise<number> {
 	if (config.direction === "push" || config.deletionCheck === false) return 0;
 
@@ -399,6 +408,8 @@ async function pushTable(config: SyncTableConfig): Promise<{ synced: number; fai
 
 	for (const record of pendingRecords) {
 		if (!isOnline()) break;
+		// A held order is not a sale yet: it stays on the till until it is paid.
+		if (pendingTable === "pending_invoices" && isHeldOrder(record)) continue;
 
 		const recordId = record[idField] as number;
 		const recordLocalId = String(record[localIdField] || recordId);

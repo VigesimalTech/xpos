@@ -426,6 +426,11 @@ async function deleteDraft(draftName: string) {
 	}
 
 	try {
+		if (await cartStore.deleteHeldOrderOnTill(draftName)) {
+			showSuccess(__("Draft invoice deleted"));
+			await fetchDrafts();
+			return;
+		}
 		await call("xpos.api.invoices.delete_draft_invoice", {
 			name: draftName,
 			pos_opening_shift: posStore.posOpeningShift?.name || "",

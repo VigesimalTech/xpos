@@ -90,6 +90,25 @@ describe("pushing sales to ERPNext", () => {
 		]);
 	});
 
+	it("a held order (draft) stays on the till: it is not sent as a sale", async () => {
+		await invoke("db:add-pending-invoice", {
+			data: {
+				customer: "Walk-in Customer",
+				pos_profile: "Test POS Profile",
+				items: [{ item_code: "TEST-ITEM", qty: 1, rate: 5 }],
+				is_draft: true,
+			},
+			customer_name: "Walk-in Customer",
+			grand_total: 5,
+		});
+		const sale = await queueSale();
+
+		await runSyncCyclePublic();
+
+		expect(frappe.callsTo(CREATE_INVOICE).map((c) => c.args.local_id)).toEqual([sale]);
+		expect((await pendingInvoices()).map((r) => r.status)).toEqual(["pending", "synced"]);
+	});
+
 	it("O2: sales are sent oldest first", async () => {
 		const first = await queueSale(1);
 		const second = await queueSale(2);

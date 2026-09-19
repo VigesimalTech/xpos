@@ -4,7 +4,13 @@ import { call } from "@/services/api";
 import { usePosStore } from "./posStore";
 import { useAuthStore } from "./authStore";
 import { useSettingsStore } from "./settingsStore";
-import { getCachedItemByCode, getCachedStockForItem } from "@/services/dbBridge";
+import {
+	deletePendingInvoice,
+	getCachedItemByCode,
+	getCachedStockForItem,
+	getPendingInvoices,
+} from "@/services/dbBridge";
+import { isElectron } from "@/services/electronBridge";
 import type {
 	CartItem,
 	POSItem,
@@ -63,6 +69,48 @@ function parsePricingRules(value: unknown): string[] {
 
 function parseRuleName(value: unknown): string | undefined {
 	return parsePricingRules(value)[0];
+}
+
+const HELD_ORDER_PREFIX = "LOCAL-";
+
+interface HeldOrderData {
+	customer: string;
+	customer_name?: string;
+	items?: Array<{
+		item_code: string;
+		item_name: string;
+		local_item_name?: string;
+		qty: number;
+		rate: number;
+		uom: string;
+		stock_uom?: string;
+		discount_percentage?: number;
+		discount_amount?: number;
+		serial_no?: string;
+		batch_no?: string;
+	}>;
+	is_draft?: boolean;
+	pos_opening_shift?: string | number;
+	pos_opening_shift_local_id?: string | number;
+}
+
+interface HeldOrderRow {
+	id: number;
+	status: string;
+	data: unknown;
+	customer_name?: string;
+	grand_total?: number | string;
+	created_at?: string;
+}
+
+/** A pending invoice's data if it is a held order (a draft), else null. */
+function heldOrderData(row: HeldOrderRow): HeldOrderData | null {
+	try {
+		const data = typeof row.data === "string" ? JSON.parse(row.data) : row.data;
+		return data && (data as HeldOrderData).is_draft ? (data as HeldOrderData) : null;
+	} catch {
+		return null;
+	}
 }
 
 export const useCartStore = defineStore("cart", () => {
@@ -1133,6 +1181,7 @@ export const useCartStore = defineStore("cart", () => {
 	async function fetchDraftInvoices(scope: "shift" | "profile" = "shift"): Promise<OpenTab[]> {
 		try {
 			isLoadingDrafts.value = true;
+			if (isElectron()) return await fetchHeldOrdersOnTill(scope);
 			const result = await call<OpenTab[]>("xpos.api.invoices.get_draft_invoices", {
 				pos_opening_shift: posStore.posOpeningShift?.name || "",
 				scope,
@@ -1146,7 +1195,56 @@ export const useCartStore = defineStore("cart", () => {
 		}
 	}
 
+	// The desktop till keeps held orders in its own database (they reach ERPNext once paid),
+	// so Held Invoices lists and restores them there. Their names are LOCAL-<row id>.
+	async function fetchHeldOrdersOnTill(scope: "shift" | "profile"): Promise<OpenTab[]> {
+		const shift = String(posStore.posOpeningShift?.name || "");
+		const rows = (await getPendingInvoices()) as HeldOrderRow[];
+		return rows
+			.map((row) => ({ row, data: heldOrderData(row) }))
+			.filter(({ row, data }) => data && row.status !== "synced")
+			.filter(
+				({ data }) =>
+					scope === "profile" ||
+					!shift ||
+					String(data!.pos_opening_shift_local_id ?? data!.pos_opening_shift ?? "") === shift,
+			)
+			.map(({ row, data }) => ({
+				name: `${HELD_ORDER_PREFIX}${row.id}`,
+				customer: data!.customer,
+				customer_name: row.customer_name || data!.customer_name || data!.customer,
+				grand_total: Number(row.grand_total) || 0,
+				total_qty: (data!.items || []).reduce((sum, item) => sum + (Number(item.qty) || 0), 0),
+				creation: row.created_at,
+				pos_opening_shift: String(data!.pos_opening_shift ?? ""),
+			}))
+			.reverse();
+	}
+
+	async function loadHeldOrderOnTill(id: number): Promise<boolean> {
+		const row = ((await getPendingInvoices()) as HeldOrderRow[]).find((r) => r.id === id);
+		const data = row && heldOrderData(row);
+		if (!row || !data) return false;
+		loadFromInvoice({
+			customer: data.customer,
+			customer_name: row.customer_name || data.customer_name || data.customer,
+			items: data.items || [],
+		});
+		// It is in the cart now; holding it again saves it anew.
+		await deletePendingInvoice(id);
+		return true;
+	}
+
+	async function deleteHeldOrderOnTill(draftName: string): Promise<boolean> {
+		if (!draftName.startsWith(HELD_ORDER_PREFIX)) return false;
+		await deletePendingInvoice(Number(draftName.slice(HELD_ORDER_PREFIX.length)));
+		return true;
+	}
+
 	async function loadDraftInvoice(draftName: string): Promise<boolean> {
+		if (draftName.startsWith(HELD_ORDER_PREFIX)) {
+			return loadHeldOrderOnTill(Number(draftName.slice(HELD_ORDER_PREFIX.length)));
+		}
 		try {
 			const result = await call<any>("xpos.api.invoices.get_invoice_details", {
 				invoice_name: draftName,
@@ -1315,29 +1413,27 @@ export const useCartStore = defineStore("cart", () => {
 		const data: InvoiceData = {
 			pos_profile: posProfile,
 			customer: customer.value?.name || "",
-			items: items.value.map(
-				(item: CartItem): InvoiceItem => ({
-					item_code: item.item_code,
-					item_name: item.item_name,
-					local_item_name: item.local_item_name,
-					qty: item.qty,
-					rate: normalizeItemRate(item.rate),
-					price_list_rate: normalizeItemRate(item.rate),
-					uom: item.uom || item.stock_uom,
-					discount_percentage: item.discount_percentage,
-					discount_amount: item.discount_amount,
-					serial_no: item.serial_no,
-					batch_no: item.batch_no,
-					item_tax_template: item.item_tax_template,
-					additional_notes: item.pos_notes,
-					delivery_date: item.pos_delivery_date,
-					offers: item.pos_offers,
-					is_offer: item.pos_is_offer,
-					is_replace: item.pos_is_replace,
-					is_free_item: item.pos_is_free_item ? 1 : undefined,
-					pricing_rules: item.pos_free_item_rule,
-				}),
-			),
+			items: items.value.map((item: CartItem): InvoiceItem => ({
+				item_code: item.item_code,
+				item_name: item.item_name,
+				local_item_name: item.local_item_name,
+				qty: item.qty,
+				rate: normalizeItemRate(item.rate),
+				price_list_rate: normalizeItemRate(item.rate),
+				uom: item.uom || item.stock_uom,
+				discount_percentage: item.discount_percentage,
+				discount_amount: item.discount_amount,
+				serial_no: item.serial_no,
+				batch_no: item.batch_no,
+				item_tax_template: item.item_tax_template,
+				additional_notes: item.pos_notes,
+				delivery_date: item.pos_delivery_date,
+				offers: item.pos_offers,
+				is_offer: item.pos_is_offer,
+				is_replace: item.pos_is_replace,
+				is_free_item: item.pos_is_free_item ? 1 : undefined,
+				pricing_rules: item.pos_free_item_rule,
+			})),
 			pos_opening_shift: posOpeningShift,
 			// The till syncs as its own API user; the server checks the sale against this cashier's rights.
 			xpos_cashier: useAuthStore().userName,
@@ -1614,6 +1710,7 @@ export const useCartStore = defineStore("cart", () => {
 		loadFromInvoice,
 		fetchDraftInvoices,
 		loadDraftInvoice,
+		deleteHeldOrderOnTill,
 		openDraftDialog,
 		closeDraftDialog,
 		setDeliveryCharge,
