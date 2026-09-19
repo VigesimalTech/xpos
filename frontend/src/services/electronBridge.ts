@@ -290,12 +290,6 @@ export interface ElectronDbAPI {
 		company: string,
 	) => Promise<{ item_tax_template: string; item_tax_map: Record<string, number> } | null>;
 	getPosUser: (username: string) => Promise<Record<string, unknown> | null>;
-	createLocalUser: (user: {
-		username: string;
-		full_name: string;
-		password: string;
-		role?: string;
-	}) => Promise<{ success: boolean; error?: string }>;
 	verifyPassword: (username: string, password: string) => Promise<boolean>;
 	cachePasswordFromServer: (
 		username: string,

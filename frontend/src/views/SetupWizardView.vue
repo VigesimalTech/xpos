@@ -334,102 +334,6 @@
 
 			<template v-if="step === 4">
 				<CardHeader>
-					<CardTitle>Admin User</CardTitle>
-					<CardDescription>
-						Create the local administrator account for this installation
-					</CardDescription>
-				</CardHeader>
-				<CardContent class="space-y-4">
-					<div
-						class="p-3 rounded-lg bg-primary/5 border border-primary/20 text-sm text-muted-foreground"
-					>
-						"This account is stored locally and used to log in to X POS. It is independent of your
-						ERPNext users.",<br />
-						"Make sure to remember these credentials as they cannot be recovered. You can create
-						additional users later from the settings.",
-						<br />
-						"This account is stored locally and used to log in to X POS. It is independent of your
-						ERPNext users.",
-					</div>
-					<div class="space-y-3">
-						<div>
-							<label class="text-sm font-medium text-foreground">Username</label>
-							<Input
-								v-model="adminUser.username"
-								placeholder="admin"
-								class="mt-1"
-								autocomplete="off"
-							/>
-						</div>
-						<div>
-							<label class="text-sm font-medium text-foreground">Full Name</label>
-							<Input
-								v-model="adminUser.fullName"
-								placeholder="Administrator"
-								class="mt-1"
-								autocomplete="off"
-							/>
-						</div>
-						<div>
-							<label class="text-sm font-medium text-foreground">Password</label>
-							<div class="relative mt-1">
-								<Input
-									v-model="adminUser.password"
-									:type="showAdminPassword ? 'text' : 'password'"
-									placeholder="••••••"
-									class="pe-10"
-									autocomplete="new-password"
-								/>
-								<button
-									type="button"
-									class="absolute end-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-									@click="showAdminPassword = !showAdminPassword"
-								>
-									<component :is="showAdminPassword ? 'svg' : 'svg'" class="w-4 h-4" />
-								</button>
-							</div>
-							<p
-								v-if="adminUser.password && adminUser.password.length < 6"
-								class="text-xs text-destructive mt-1"
-							>
-								Minimum 6 characters
-							</p>
-						</div>
-						<div>
-							<label class="text-sm font-medium text-foreground">Confirm Password</label>
-							<Input
-								v-model="adminUser.confirmPassword"
-								:type="showAdminConfirm ? 'text' : 'password'"
-								placeholder="••••••"
-								class="mt-1"
-								autocomplete="new-password"
-							/>
-							<p
-								v-if="
-									adminUser.confirmPassword &&
-									adminUser.password !== adminUser.confirmPassword
-								"
-								class="text-xs text-destructive mt-1"
-							>
-								Passwords do not match
-							</p>
-						</div>
-					</div>
-				</CardContent>
-				<CardFooter class="justify-between">
-					<Button variant="outline" @click="step = 3">
-						<ChevronLeft class="w-4 h-4 me-1" />
-						Back
-					</Button>
-					<Button @click="step = 5" :disabled="!adminUser.username || !adminPasswordMatch">
-						Next
-						<ChevronRight class="w-4 h-4 ms-1" />
-					</Button>
-				</CardFooter>
-			</template>
-
-			<template v-if="step === 5">
-				<CardHeader>
 					<CardTitle>Setup Summary</CardTitle>
 					<CardDescription> Review your configuration before completing setup </CardDescription>
 				</CardHeader>
@@ -477,14 +381,10 @@
 							<span class="text-muted-foreground">Till ID</span>
 							<span class="text-foreground font-medium">{{ config.tillId }}</span>
 						</div>
-						<div class="flex items-center justify-between p-3 rounded-lg bg-muted">
-							<span class="text-muted-foreground">Admin User</span>
-							<span class="text-foreground font-medium">{{ adminUser.username }}</span>
-						</div>
 					</div>
 				</CardContent>
 				<CardFooter class="justify-between">
-					<Button variant="outline" @click="step = 4">
+					<Button variant="outline" @click="step = 3">
 						<ChevronLeft class="w-4 h-4 me-1" />
 						Back
 					</Button>
@@ -529,13 +429,12 @@ import {
 	CircleCheck,
 	AlertTriangle,
 	RefreshCw,
-	UserCog,
 } from "lucide-vue-next";
 
 const router = useRouter();
 
 const step = ref(1);
-const totalSteps = 5;
+const totalSteps = 4;
 
 const config = reactive({
 	role: "" as "" | "hub" | "till",
@@ -585,24 +484,13 @@ const erpTestError = ref("");
 const testingHub = ref(false);
 const hubTestResult = ref<boolean | null>(null);
 
-const adminUser = reactive({
-	username: "admin",
-	fullName: "Administrator",
-	password: "",
-	confirmPassword: "",
-});
-const adminPasswordMatch = computed(
-	() => adminUser.password.length >= 6 && adminUser.password === adminUser.confirmPassword,
-);
-const showAdminPassword = ref(false);
-const showAdminConfirm = ref(false);
-
 const completing = ref(false);
 const setupError = ref("");
 
 const canProceedStep3 = computed(() => {
 	if (config.role === "hub") {
-		return config.erpUrl && erpTestResult.value;
+		// The till's API key is how its cashiers arrive from ERPNext; no one could sign in without it.
+		return config.erpUrl && config.apiKey && config.apiSecret && erpTestResult.value;
 	}
 	return config.hubUrl && hubTestResult.value;
 });
@@ -684,18 +572,11 @@ async function completeSetup() {
 
 		if (config.role === "hub") {
 			await api.setServerUrl(config.erpUrl);
-			if (config.apiKey) await api.db.setMeta("api_key", config.apiKey);
-			if (config.apiSecret) await api.db.setMeta("api_secret", config.apiSecret);
+			await api.db.setMeta("api_key", config.apiKey);
+			await api.db.setMeta("api_secret", config.apiSecret);
 		} else {
 			await api.db.setMeta("hub_url", config.hubUrl);
 		}
-
-		await api.db.createLocalUser({
-			username: adminUser.username,
-			password: adminUser.password,
-			full_name: adminUser.fullName,
-			role: "Manager",
-		});
 
 		const roleResult = await api.node.setRole({
 			role: config.role,
@@ -708,6 +589,10 @@ async function completeSetup() {
 			setupError.value = `Role setup: ${roleResult.error}`;
 			return;
 		}
+
+		// Only cashiers from ERPNext sign in, so fetch them now rather than at the first sign-in.
+		if (config.role === "hub") await api.startSyncEngine();
+		else await api.node.triggerTillSync();
 
 		toast.success("Setup completed successfully!");
 

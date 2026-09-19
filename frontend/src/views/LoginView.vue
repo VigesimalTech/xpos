@@ -139,6 +139,14 @@
 			<CardContent>
 				<form @submit.prevent="handleLogin" class="space-y-4">
 					<div
+						v-if="!tillHasUsers"
+						data-no-till-users
+						class="p-3 rounded-lg bg-muted text-muted-foreground text-sm"
+					>
+						No cashiers on this till yet. They arrive from ERPNext with the next sync: the till's
+						API user must be on the shop's POS Profile, with the cashiers.
+					</div>
+					<div
 						v-if="authStore.error"
 						class="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm flex items-start gap-2"
 					>
@@ -295,15 +303,28 @@ function onPinKey(event: KeyboardEvent) {
 	else if (event.key === "Enter") submitPin();
 }
 
+// Only cashiers from ERPNext sign in on the till. A new till gets them with its first
+// sync, which may finish after this screen opens.
+const tillHasUsers = ref(true);
+
 async function loadPinUsers() {
 	if (!isElectron()) return;
+	const hadPinUsers = pinUsers.value.length > 0;
 	try {
 		pinUsers.value = (await window.electronAPI!.db.getPinUsers()) || [];
 	} catch {
 		pinUsers.value = [];
 	}
-	if (pinUsers.value.length) mode.value = "pin";
+	try {
+		const users = (await window.electronAPI!.db.getPosUsers()) as unknown[] | null;
+		tillHasUsers.value = !!users?.length;
+	} catch {
+		tillHasUsers.value = true;
+	}
+	if (!hadPinUsers && pinUsers.value.length && !username.value) mode.value = "pin";
 }
+
+let stopSyncListener: (() => void) | undefined;
 
 async function handleLogin() {
 	if (!username.value || !password.value) return;
@@ -318,11 +339,13 @@ async function handleLogin() {
 onMounted(() => {
 	authStore.clearError();
 	loadPinUsers();
+	if (isElectron()) stopSyncListener = window.electronAPI!.onSyncComplete(() => loadPinUsers());
 	window.addEventListener("keydown", onPinKey);
 });
 
 onUnmounted(() => {
 	authStore.clearError();
+	stopSyncListener?.();
 	window.removeEventListener("keydown", onPinKey);
 });
 </script>

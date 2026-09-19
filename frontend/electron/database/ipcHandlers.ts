@@ -912,36 +912,6 @@ export function registerDbHandlers(): void {
 		},
 	);
 
-	ipcMain.handle(
-		"db:create-local-user",
-		async (
-			_e,
-			user: {
-				username: string;
-				password: string;
-				fullName: string;
-				role?: string;
-			},
-		) => {
-			const { hashPassword } = await import("./passwordHash");
-			const { hash, salt } = await hashPassword(user.password);
-			await execute(
-				`INSERT INTO \`pos_users\` (\`name\`, \`username\`, \`full_name\`, \`password_hash\`, \`password_salt\`, \`role\`, \`enabled\`)
-       VALUES (?, ?, ?, ?, ?, ?, 1)
-       ON DUPLICATE KEY UPDATE \`password_hash\` = VALUES(\`password_hash\`), \`password_salt\` = VALUES(\`password_salt\`), \`full_name\` = VALUES(\`full_name\`)`,
-				[
-					user.username,
-					user.username,
-					user.fullName || user.username,
-					hash,
-					salt,
-					user.role || "Manager",
-				],
-			);
-			return true;
-		},
-	);
-
 	ipcMain.handle("db:verify-password", async (_e, username: string, password: string) => {
 		const row = await queryOne<{ name: string; password_hash: string; password_salt: string | null }>(
 			"SELECT `name`, `password_hash`, `password_salt` FROM `pos_users` WHERE `username` = ? OR `name` = ?",

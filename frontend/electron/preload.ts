@@ -311,8 +311,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
 		getPosUsers: () => ipcRenderer.invoke("db:get-pos-users"),
 		getPosUser: (username: string) => ipcRenderer.invoke("db:get-pos-user", username),
 		upsertPosUsers: (rows: Record<string, unknown>[]) => ipcRenderer.invoke("db:upsert-pos-users", rows),
-		createLocalUser: (user: { username: string; password: string; fullName: string; role?: string }) =>
-			ipcRenderer.invoke("db:create-local-user", user),
 		verifyPassword: (username: string, password: string) =>
 			ipcRenderer.invoke("db:verify-password", username, password),
 		cachePasswordFromServer: (username: string, password: string) =>
