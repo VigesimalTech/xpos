@@ -303,6 +303,11 @@ async function runMigrations(): Promise<void> {
 		["recall_other_shift_tabs", "TINYINT(1) DEFAULT 0"],
 		["settle_outstanding_invoice", "TINYINT(1) DEFAULT 0"],
 		["manage_role_permissions", "TINYINT(1) DEFAULT 0"],
+		// Till PIN: hash and salt come from ERPNext (xpos.api.pin); the lockout is local.
+		["pin_hash", "VARCHAR(255) DEFAULT NULL"],
+		["pin_salt", "VARCHAR(64) DEFAULT NULL"],
+		["pin_failures", "INT DEFAULT 0"],
+		["pin_locked_until", "DATETIME DEFAULT NULL"],
 	];
 
 	const posUserColumnExists = async (col: string): Promise<boolean> => {

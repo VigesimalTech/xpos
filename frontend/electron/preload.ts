@@ -317,6 +317,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
 			ipcRenderer.invoke("db:verify-password", username, password),
 		cachePasswordFromServer: (username: string, password: string) =>
 			ipcRenderer.invoke("db:cache-password-from-server", username, password),
+		getPinUsers: () => ipcRenderer.invoke("db:get-pin-users"),
+		verifyPin: (username: string, pin: string) => ipcRenderer.invoke("db:verify-pin", username, pin),
 
 		getSalesTaxTemplates: (company?: string) => ipcRenderer.invoke("db:get-sales-tax-templates", company),
 		upsertSalesTaxTemplates: (rows: Record<string, unknown>[]) =>

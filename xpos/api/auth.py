@@ -190,9 +190,11 @@ def get_pos_users(
 
 	profile_users = frappe.db.sql(
 		"""
-        SELECT user, pos_profile, pos_role, discount_limit, warehouse, company
+        SELECT user, pos_profile, pos_role, discount_limit, warehouse, company,
+               xpos_pin_hash, xpos_pin_salt
         FROM (
             SELECT pu.user, pu.parent AS pos_profile, pu.pos_role, pu.discount_limit,
+                   pu.xpos_pin_hash, pu.xpos_pin_salt,
                    pp.warehouse, pp.company,
                    ROW_NUMBER() OVER (
                        PARTITION BY pu.user ORDER BY pu.parent ASC, pu.idx ASC
@@ -239,6 +241,9 @@ def get_pos_users(
 			"enabled": cint(user.enabled),
 			"modified": str(user.modified) if user.modified else None,
 			"password_hash": "",
+			# The till checks a PIN against this offline (xpos.api.pin).
+			"pin_hash": pu.xpos_pin_hash or "",
+			"pin_salt": pu.xpos_pin_salt or "",
 			"role": role_name,
 			"pos_profile": pu.pos_profile or "",
 			"warehouse": pu.warehouse or "",

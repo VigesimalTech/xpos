@@ -14,6 +14,29 @@ function friendlyMessage(err: unknown, fallback: string): string {
 	return message;
 }
 
+function pinErrorMessage(result: { reason?: string; attemptsLeft?: number; lockedUntil?: string }): string {
+	switch (result.reason) {
+		case "wrong_pin":
+			return result.attemptsLeft === 1
+				? "Wrong PIN. 1 try left before this till locks you out for 5 minutes."
+				: `Wrong PIN. ${result.attemptsLeft} tries left.`;
+		case "locked": {
+			const until = result.lockedUntil ? new Date(result.lockedUntil.replace(" ", "T")) : null;
+			const at =
+				until && !Number.isNaN(until.getTime())
+					? ` until ${until.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+					: "";
+			return `Too many wrong PINs. PIN sign-in is locked${at}. You can sign in with your password.`;
+		}
+		case "no_pin":
+			return "No PIN is set for this user. Sign in with your password, or ask a manager to set a PIN.";
+		case "disabled":
+			return "This user is disabled.";
+		default:
+			return "User not found. Check your username.";
+	}
+}
+
 export const useAuthStore = defineStore("auth", () => {
 	const isLoading = ref(false);
 	const isAuthenticated = ref(false);
@@ -196,35 +219,75 @@ export const useAuthStore = defineStore("auth", () => {
 				}
 			}
 
-			// Records pushed to ERPNext name the user by its Frappe ID (usually the email),
-			// not the username typed here.
-			const userId = (userData.name as string) || username;
-			isAuthenticated.value = true;
-			isOfflineAuth.value = true;
-			user.value = {
-				user: userId,
-				user_email: (userData.email as string) || userId,
-				user_fullname: (userData.full_name as string) || userId,
-			};
-
-			await db.setSetting("last_logged_user", userId, "auth");
-			window
-				.electronAPI!.startSyncEngine()
-				.then((result) => {
-					if (!result.success) {
-						console.warn("[XPOS] Sync engine start failed:", result.error);
-					}
-				})
-				.catch((err) => {
-					console.warn("[XPOS] startSyncEngine error:", err);
-				});
-
-			await loadPermissions(userId);
+			await completeTillSignIn(userData, username);
 			return true;
 		} catch (err) {
 			console.error("Login failed:", err);
 			error.value = friendlyMessage(err, "Could not sign in. Please try again.");
 			return false;
+		}
+	}
+
+	/** Signed in on the till (password or PIN): set the session, start syncing, load rights. */
+	async function completeTillSignIn(userData: Record<string, unknown>, username: string): Promise<void> {
+		// Records pushed to ERPNext name the user by its Frappe ID (usually the email),
+		// not the username typed here.
+		const userId = (userData.name as string) || username;
+		isAuthenticated.value = true;
+		isOfflineAuth.value = true;
+		user.value = {
+			user: userId,
+			user_email: (userData.email as string) || userId,
+			user_fullname: (userData.full_name as string) || userId,
+		};
+
+		await window.electronAPI!.db.setSetting("last_logged_user", userId, "auth");
+		window
+			.electronAPI!.startSyncEngine()
+			.then((result) => {
+				if (!result.success) {
+					console.warn("[XPOS] Sync engine start failed:", result.error);
+				}
+			})
+			.catch((err) => {
+				console.warn("[XPOS] startSyncEngine error:", err);
+			});
+
+		await loadPermissions(userId);
+	}
+
+	/**
+	 * Sign in on the desktop till with a PIN, checked offline against the hash ERPNext
+	 * sends with the POS users (xpos.api.pin). Five wrong PINs lock the cashier out
+	 * for five minutes; a password still works then.
+	 */
+	async function loginWithPin(username: string, pin: string): Promise<boolean> {
+		error.value = "";
+		if (!isElectron()) {
+			error.value = "PIN sign-in is only available on the desktop till.";
+			return false;
+		}
+		try {
+			isLoading.value = true;
+			const db = window.electronAPI!.db;
+			const result = await db.verifyPin(username, pin);
+			if (!result.ok) {
+				error.value = pinErrorMessage(result);
+				return false;
+			}
+			const userData = (await db.getPosUser(username)) as Record<string, unknown> | null;
+			if (!userData) {
+				error.value = "User not found. Check your username.";
+				return false;
+			}
+			await completeTillSignIn(userData, username);
+			return true;
+		} catch (err) {
+			console.error("PIN sign-in failed:", err);
+			error.value = friendlyMessage(err, "Could not sign in. Please try again.");
+			return false;
+		} finally {
+			isLoading.value = false;
 		}
 	}
 
@@ -308,6 +371,7 @@ export const useAuthStore = defineStore("auth", () => {
 		canManagePermissions,
 		checkAuth,
 		login,
+		loginWithPin,
 		sendResetPasswordEmail,
 		logout,
 		clearError,
