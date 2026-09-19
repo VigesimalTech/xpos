@@ -604,6 +604,12 @@ export async function createPosClosingEntry(entry: Record<string, unknown>) {
 	throw new Error("POS Closing Entries require Electron mode");
 }
 
+/** The till's own summary of a shift, for closing it offline. */
+export async function getShiftClosingSummary(shiftLocalId: string) {
+	if (isElectron()) return getDb().getShiftClosingSummary(shiftLocalId);
+	return null;
+}
+
 export async function getPosClosingEntries(opts?: { user?: string; status?: string }) {
 	if (isElectron()) return getDb().getPosClosingEntries(opts);
 	return [];

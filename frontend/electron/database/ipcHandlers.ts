@@ -21,6 +21,13 @@ import {
 	type DbConfig,
 } from "./dbService";
 import { createLogger } from "../logger";
+import {
+	isHeldOrderData,
+	parseJsonColumn,
+	saleFromPending,
+	shiftOfSale,
+	summarizeShift,
+} from "./shiftSummary";
 
 const log = createLogger("DB-IPC");
 
@@ -1092,9 +1099,10 @@ export function registerDbHandlers(): void {
 
 		const result = await execute(
 			`INSERT INTO \`pos_opening_shifts\`
-       (\`pos_profile\`, \`user\`, \`company\`, \`posting_date\`, \`period_start_date\`, \`status\`)
-       VALUES (?, ?, ?, COALESCE(?, CURDATE()), COALESCE(?, NOW()), 'Open')`,
+       (\`local_id\`, \`pos_profile\`, \`user\`, \`company\`, \`posting_date\`, \`period_start_date\`, \`status\`)
+       VALUES (?, ?, ?, ?, COALESCE(?, CURDATE()), COALESCE(?, NOW()), 'Open')`,
 			[
+				crypto.randomUUID(),
 				shift.pos_profile,
 				shift.user,
 				shift.company,
@@ -1217,6 +1225,47 @@ export function registerDbHandlers(): void {
 		};
 	});
 
+	// What the cashier counts against when closing a shift on the till, from the till's own records.
+	ipcMain.handle("db:get-shift-closing-summary", async (_e, shiftId: string | number) => {
+		const shift = await queryOne<Record<string, unknown>>(
+			"SELECT * FROM `pos_opening_shifts` WHERE `id` = ?",
+			[Number(shiftId)],
+		);
+		if (!shift) return null;
+		const profile = await queryOne<{ cash_mode_of_payment: string | null; currency: string | null }>(
+			"SELECT `cash_mode_of_payment`, `currency` FROM `pos_profiles` WHERE `name` = ?",
+			[shift.pos_profile as string],
+		);
+		const openingBalances = await query<{ mode_of_payment: string; opening_amount: number }>(
+			"SELECT `mode_of_payment`, `opening_amount` FROM `pos_opening_entry_details` WHERE `parent_id` = ?",
+			[Number(shiftId)],
+		);
+		const sales = (
+			await query<{ local_id: string; data: unknown; grand_total: unknown; customer_name: unknown }>(
+				"SELECT `local_id`, `data`, `grand_total`, `customer_name` FROM `pending_invoices` ORDER BY `id`",
+			)
+		)
+			.map((row) => ({ row, data: parseJsonColumn(row.data) }))
+			.filter(({ data }) => !isHeldOrderData(data) && shiftOfSale(data) === String(shiftId))
+			.map(({ row, data }) => saleFromPending(row, data, profile?.currency || ""));
+		const [cashOut] = await query<{ total: number | null }>(
+			`SELECT (SELECT COALESCE(SUM(\`amount\`), 0) FROM \`expenses\` WHERE \`pos_opening_entry_id\` = ?)
+			      + (SELECT COALESCE(SUM(\`amount\`), 0) FROM \`bank_drops\` WHERE \`pos_opening_entry_id\` = ?) AS total`,
+			[Number(shiftId), Number(shiftId)],
+		);
+		return {
+			...summarizeShift({
+				sales,
+				openingBalances,
+				cashMode: profile?.cash_mode_of_payment || "Cash",
+				currency: profile?.currency || "",
+				cashOut: Number(cashOut?.total || 0),
+			}),
+			pos_profile: shift.pos_profile,
+			company: shift.company,
+		};
+	});
+
 	ipcMain.handle("db:close-pos-shift", async (_e, shiftId: string | number) => {
 		await execute("UPDATE `pos_opening_shifts` SET `status` = 'Closed' WHERE `id` = ?", [shiftId]);
 		return true;
@@ -1247,10 +1296,11 @@ export function registerDbHandlers(): void {
 				: null;
 		const result = await execute(
 			`INSERT INTO \`pos_closing_entries\`
-       (\`pos_profile\`, \`user\`, \`company\`, \`pos_opening_entry_id\`,
+       (\`local_id\`, \`pos_profile\`, \`user\`, \`company\`, \`pos_opening_entry_id\`,
         \`posting_date\`, \`period_end_date\`, \`sync_status\`)
-       VALUES (?, ?, ?, ?, ?, ?, 'pending')`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`,
 			[
+				crypto.randomUUID(),
 				entry.pos_profile,
 				entry.user,
 				entry.company,

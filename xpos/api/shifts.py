@@ -9,6 +9,7 @@ from frappe import _
 from frappe.utils import cint, flt, now_datetime, nowdate
 
 from xpos.api.exchange import change_leg_table_exists, payment_tender_fields_exist
+from xpos.api.till import acting_user
 from xpos.api.utilities import can_close_shift, get_invoice_type, is_pos_cashier
 from xpos.utils import row_value
 
@@ -327,6 +328,21 @@ def close_shift(opening_shift: str, closing_details: str | list[dict] | None):
 	closing_details = json.loads(closing_details) if isinstance(closing_details, str) else closing_details
 
 	opening = frappe.get_doc("POS Opening Shift", opening_shift)
+	return _close_shift(opening, closing_details, frappe.session.user)
+
+
+def _close_shift(
+	opening,
+	closing_details: list[dict] | None,
+	user: str,
+	*,
+	posting_date: str | None = None,
+	posting_time: str | None = None,
+	period_end_date=None,
+	local_id: str | None = None,
+) -> dict:
+	"""Close `opening` from ERPNext's own records of the shift: its invoices, taxes and the
+	expected amount per mode. Only the counted amounts come from `closing_details`."""
 	doctype = get_invoice_type()
 
 	filters = {
@@ -362,11 +378,11 @@ def close_shift(opening_shift: str, closing_details: str | list[dict] | None):
 		{
 			"doctype": "POS Closing Shift",
 			"period_start_date": opening.period_start_date,
-			"period_end_date": now_datetime(),
-			"posting_date": nowdate(),
-			"posting_time": now_datetime().strftime("%H:%M:%S"),
+			"period_end_date": period_end_date or now_datetime(),
+			"posting_date": posting_date or nowdate(),
+			"posting_time": posting_time or now_datetime().strftime("%H:%M:%S"),
 			"pos_profile": opening.pos_profile,
-			"user": frappe.session.user,
+			"user": user,
 			"company": opening.company,
 			"pos_opening_shift": opening.name,
 			"grand_total": grand_total,
@@ -374,6 +390,8 @@ def close_shift(opening_shift: str, closing_details: str | list[dict] | None):
 			"total_quantity": total_qty,
 		}
 	)
+	if local_id:
+		closing_shift.xpos_local_id = local_id
 
 	if closing_details:
 		expected_amounts = get_shift_expected_amounts(opening, doctype, invoices)
@@ -625,9 +643,16 @@ def create_opening_shift(data: str | dict, local_id: str | None = None) -> dict:
 	    dict with 'name' key containing the server docname
 	"""
 	data = json.loads(data) if isinstance(data, str) else data
+	user = acting_user(data.get("user"), data.get("pos_profile"))
 
 	if local_id:
-		existing = frappe.db.get_value("POS Opening Shift", {"xpos_local_id": local_id}, "name")
+		# Tills send a UUID; older ones sent their own numeric id, which every till
+		# reuses, so the match is also scoped to the profile and cashier.
+		existing = frappe.db.get_value(
+			"POS Opening Shift",
+			{"xpos_local_id": local_id, "pos_profile": data.get("pos_profile"), "user": user},
+			"name",
+		)
 		if existing:
 			return {"name": existing, "duplicate": True}
 
@@ -636,7 +661,7 @@ def create_opening_shift(data: str | dict, local_id: str | None = None) -> dict:
 			"doctype": "POS Opening Shift",
 			"period_start_date": data.get("period_start_date") or now_datetime(),
 			"posting_date": data.get("posting_date") or nowdate(),
-			"user": data.get("user") or frappe.session.user,
+			"user": user,
 			"pos_profile": data.get("pos_profile"),
 			"company": data.get("company"),
 			"xpos_local_id": local_id,
@@ -662,9 +687,11 @@ def create_opening_shift(data: str | dict, local_id: str | None = None) -> dict:
 
 @frappe.whitelist()
 def create_closing_shift(data: str | dict, local_id: str | None = None) -> dict:
-	"""Create POS Closing Shift from desktop app sync.
+	"""Close a shift a till closed, perhaps offline, when it syncs.
 
-	Used by the sync engine to push locally-created closing shifts to the server.
+	The till sends it after the shift's sales and cash movements, and ERPNext closes
+	the shift from its own records of them, as `close_shift` does: only the counted
+	amounts come from the till. The right to close is the cashier's, not the till's.
 
 	Args:
 	    data: JSON string containing closing data
@@ -673,15 +700,7 @@ def create_closing_shift(data: str | dict, local_id: str | None = None) -> dict:
 	Returns:
 	    dict with 'name' key containing the server docname
 	"""
-	if not can_close_shift():
-		frappe.throw(_("Only a Supervisor can close a shift."), frappe.PermissionError)
-
 	data = json.loads(data) if isinstance(data, str) else data
-
-	if local_id:
-		existing = frappe.db.get_value("POS Closing Shift", {"xpos_local_id": local_id}, "name")
-		if existing:
-			return {"name": existing, "duplicate": True}
 
 	opening_shift = data.get("pos_opening_shift")
 	if not opening_shift:
@@ -692,38 +711,24 @@ def create_closing_shift(data: str | dict, local_id: str | None = None) -> dict:
 	except frappe.DoesNotExistError:
 		frappe.throw(_("POS Opening Shift {0} not found").format(opening_shift))
 
-	closing_shift = frappe.get_doc(
-		{
-			"doctype": "POS Closing Shift",
-			"period_start_date": opening.period_start_date,
-			"period_end_date": data.get("period_end_date") or now_datetime(),
-			"posting_date": data.get("posting_date") or nowdate(),
-			"posting_time": data.get("posting_time") or now_datetime().strftime("%H:%M:%S"),
-			"pos_profile": data.get("pos_profile") or opening.pos_profile,
-			"user": data.get("user") or frappe.session.user,
-			"company": data.get("company") or opening.company,
-			"pos_opening_shift": opening.name,
-			"grand_total": flt(data.get("grand_total", 0)),
-			"net_total": flt(data.get("net_total", 0)),
-			"total_quantity": cint(data.get("total_quantity", 0)),
-			"xpos_local_id": local_id,
-		}
+	existing = frappe.db.get_value(
+		"POS Closing Shift", {"pos_opening_shift": opening.name, "docstatus": 1}, "name"
 	)
+	if existing:
+		return {"name": existing, "duplicate": True}
 
-	payment_details = data.get("payment_reconciliation") or data.get("closing_details") or []
-	for detail in payment_details:
-		closing_shift.append(
-			"payment_reconciliation",
-			{
-				"mode_of_payment": detail.get("mode_of_payment"),
-				"opening_amount": flt(detail.get("opening_amount", 0)),
-				"expected_amount": flt(detail.get("expected_amount", 0)),
-				"closing_amount": flt(detail.get("closing_amount", 0)),
-				"difference": flt(detail.get("difference", 0)),
-			},
-		)
+	user = acting_user(data.get("user") or opening.user, opening.pos_profile)
+	if not can_close_shift(user, opening.pos_profile):
+		frappe.throw(_("Only a Supervisor can close a shift."), frappe.PermissionError)
 
-	closing_shift.insert(ignore_permissions=True)
-	closing_shift.submit()
-
-	return {"name": closing_shift.name}
+	closing_details = data.get("payment_reconciliation") or data.get("closing_details") or []
+	result = _close_shift(
+		opening,
+		closing_details,
+		user,
+		posting_date=data.get("posting_date"),
+		posting_time=data.get("posting_time"),
+		period_end_date=data.get("period_end_date"),
+		local_id=local_id,
+	)
+	return {"name": result["name"]}

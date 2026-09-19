@@ -1,7 +1,14 @@
 import { defineStore } from "pinia";
 import { ref, computed, watch } from "vue";
 import { call } from "@/services/api";
-import { cachePOSData, getCachedPOSData, cacheReceiptContext } from "@/services/dbBridge";
+import {
+	cachePOSData,
+	getCachedPOSData,
+	cacheReceiptContext,
+	closePosShift,
+	createPosClosingEntry,
+	getShiftClosingSummary,
+} from "@/services/dbBridge";
 import { isElectron } from "@/services/electronBridge";
 import { useSettingsStore } from "./settingsStore";
 import { hasPermission, loadPermissions } from "@/services/userRights";
@@ -451,9 +458,12 @@ export const usePosStore = defineStore("pos", () => {
 	async function fetchClosingData(): Promise<ShiftSummary | undefined> {
 		if (!posOpeningShift.value?.name) return;
 		try {
-			const data = await call<ShiftSummary>("xpos.api.shifts.get_shift_summary", {
-				opening_shift: posOpeningShift.value.name,
-			});
+			// The till's shift is its own until it syncs: it is summed from the till's records.
+			const data = isElectron()
+				? ((await getShiftClosingSummary(String(posOpeningShift.value.name))) as ShiftSummary)
+				: await call<ShiftSummary>("xpos.api.shifts.get_shift_summary", {
+						opening_shift: posOpeningShift.value.name,
+					});
 			closingData.value = data;
 			return data;
 		} catch (error) {
@@ -462,13 +472,42 @@ export const usePosStore = defineStore("pos", () => {
 		}
 	}
 
+	/**
+	 * Close the shift on the till, online or not: the counted amounts are kept with the
+	 * shift, and sync sends the close once ERPNext has the shift's sales and cash movements.
+	 */
+	async function closeShiftOnTill(closingDetails: Record<string, unknown>[]): Promise<{ name: string }> {
+		const shift = posOpeningShift.value!;
+		const today = nowDate();
+		const { id } = (await createPosClosingEntry({
+			pos_opening_entry_id: Number(shift.name),
+			pos_profile: shift.pos_profile,
+			user: shift.user,
+			company: shift.company,
+			posting_date: today,
+			period_end_date: today,
+			payment_details: closingDetails.map((detail) => ({
+				mode_of_payment: detail.mode_of_payment,
+				opening_amount: detail.opening_amount,
+				expected_amount: detail.expected_amount,
+				closing_amount: detail.closing_amount,
+				difference: detail.difference,
+			})),
+		})) as { id: number };
+		await closePosShift(String(shift.name));
+		window.electronAPI?.triggerSync?.().catch(() => {});
+		return { name: `LOCAL-CLOSE-${id}` };
+	}
+
 	async function closeShift(closingDetails: Record<string, unknown>[]): Promise<unknown> {
 		if (!posOpeningShift.value?.name) return;
 		try {
-			const result = await call("xpos.api.shifts.close_shift", {
-				opening_shift: posOpeningShift.value.name,
-				closing_details: JSON.stringify(closingDetails),
-			});
+			const result = isElectron()
+				? await closeShiftOnTill(closingDetails)
+				: await call("xpos.api.shifts.close_shift", {
+						opening_shift: posOpeningShift.value.name,
+						closing_details: JSON.stringify(closingDetails),
+					});
 
 			posOpeningShift.value = null;
 			posProfile.value = null;

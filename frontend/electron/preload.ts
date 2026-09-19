@@ -375,6 +375,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
 		getSalesInvoice: (localId: string) => ipcRenderer.invoke("db:get-sales-invoice", localId),
 		getShiftSalesSummary: (shiftLocalId: string) =>
 			ipcRenderer.invoke("db:get-shift-sales-summary", shiftLocalId),
+		getShiftClosingSummary: (shiftLocalId: string) =>
+			ipcRenderer.invoke("db:get-shift-closing-summary", shiftLocalId),
 
 		createExpense: (expense: Record<string, unknown>) => ipcRenderer.invoke("db:create-expense", expense),
 		getExpenses: (opts?: {

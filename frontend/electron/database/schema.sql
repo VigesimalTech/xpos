@@ -539,6 +539,7 @@ CREATE TABLE IF NOT EXISTS `pos_users` (
 
 CREATE TABLE IF NOT EXISTS `pos_opening_shifts` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `local_id` VARCHAR(64) DEFAULT NULL,
   `name` VARCHAR(100) DEFAULT NULL,
   `period_start_date` DATETIME DEFAULT NULL,
   `posting_date` DATE DEFAULT NULL,
@@ -566,6 +567,7 @@ CREATE TABLE IF NOT EXISTS `pos_opening_entry_details` (
 
 CREATE TABLE IF NOT EXISTS `pos_closing_entries` (
   `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `local_id` VARCHAR(64) DEFAULT NULL,
   `name` VARCHAR(100) DEFAULT NULL,
   `period_start_date` DATETIME DEFAULT NULL,
   `period_end_date` DATE DEFAULT NULL,

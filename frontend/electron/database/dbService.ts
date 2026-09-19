@@ -372,6 +372,8 @@ async function runMigrations(): Promise<void> {
 		["expenses", "error", "TEXT"],
 		["bank_drops", "local_id", "VARCHAR(64) DEFAULT NULL"],
 		["bank_drops", "error", "TEXT"],
+		["pos_opening_shifts", "local_id", "VARCHAR(64) DEFAULT NULL"],
+		["pos_closing_entries", "local_id", "VARCHAR(64) DEFAULT NULL"],
 	];
 	for (const [table, col, typedef] of columnMigrations) {
 		try {
@@ -388,8 +390,9 @@ async function runMigrations(): Promise<void> {
 		}
 	}
 
-	// Expenses and bank drops sync under a UUID: the numeric id restarts on every till.
-	for (const tbl of ["expenses", "bank_drops"]) {
+	// Records sync under a UUID: the numeric id is the same on every till and restarts
+	// on a reinstall, so ERPNext would take one till's shift for another's.
+	for (const tbl of ["expenses", "bank_drops", "pos_opening_shifts", "pos_closing_entries"]) {
 		try {
 			await db.execute(`UPDATE \`${tbl}\` SET \`local_id\` = UUID() WHERE \`local_id\` IS NULL`);
 		} catch (err) {

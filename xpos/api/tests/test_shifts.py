@@ -556,5 +556,73 @@ class TestShiftAmountCalculations(unittest.TestCase):
 		self.assertEqual(returns_count, 1)
 
 
+class TestTillShiftSync(unittest.TestCase):
+	"""Shifts a till opened and closed, perhaps offline, reach ERPNext as the cashier's."""
+
+	def setUp(self):
+		self.frappe = patch("xpos.api.shifts.frappe").start()
+		self.addCleanup(patch.stopall)
+		self.frappe.throw.side_effect = lambda msg, *a, **k: (_ for _ in ()).throw(RuntimeError(msg))
+		self.acting_user = patch(
+			"xpos.api.shifts.acting_user", side_effect=lambda user, profile: user or "till@test.com"
+		).start()
+		self.can_close = patch("xpos.api.shifts.can_close_shift", return_value=True).start()
+		self.close = patch("xpos.api.shifts._close_shift", return_value={"name": "POS-CLOSE-001"}).start()
+		self.opening = MagicMock(user="cashier@test.com", pos_profile="Shop 1")
+		self.opening.name = "POS-OPEN-001"
+		self.frappe.get_doc.return_value = self.opening
+		self.frappe.db.get_value.return_value = None
+
+	def closing(self, **extra):
+		data = {
+			"pos_opening_shift": "POS-OPEN-001",
+			"user": "cashier@test.com",
+			"posting_date": "2026-09-19",
+			"payment_reconciliation": [{"mode_of_payment": "Cash", "closing_amount": 300}],
+			**extra,
+		}
+		return shifts.create_closing_shift(data, local_id="c1a0-uuid")
+
+	def test_a_tills_close_is_built_from_erpnexts_records_for_the_cashier(self):
+		self.assertEqual(self.closing(), {"name": "POS-CLOSE-001"})
+		args, kwargs = self.close.call_args
+		self.assertIs(args[0], self.opening)
+		self.assertEqual(args[1], [{"mode_of_payment": "Cash", "closing_amount": 300}])
+		self.assertEqual(args[2], "cashier@test.com")
+		self.assertEqual(kwargs["posting_date"], "2026-09-19")
+		self.assertEqual(kwargs["local_id"], "c1a0-uuid")
+
+	def test_the_right_to_close_is_the_cashiers_not_the_tills(self):
+		self.closing()
+		self.can_close.assert_called_with("cashier@test.com", "Shop 1")
+
+	def test_a_cashier_without_the_right_cannot_close(self):
+		self.can_close.return_value = False
+		with self.assertRaises(RuntimeError):
+			self.closing()
+		self.close.assert_not_called()
+
+	def test_a_shift_already_closed_is_not_closed_again(self):
+		self.frappe.db.get_value.return_value = "POS-CLOSE-000"
+		self.assertEqual(self.closing(), {"name": "POS-CLOSE-000", "duplicate": True})
+		self.close.assert_not_called()
+
+	def test_an_opening_is_matched_to_its_own_till_not_anothers(self):
+		"""Tills once sent their numeric id, which every till reuses."""
+		self.frappe.db.get_value.return_value = None
+		new_shift = MagicMock()
+		new_shift.name = "POS-OPEN-002"
+		self.frappe.get_doc.return_value = new_shift
+
+		result = shifts.create_opening_shift(
+			{"pos_profile": "Shop 2", "user": "other@test.com", "company": "C"}, local_id="3"
+		)
+
+		self.assertEqual(result, {"name": "POS-OPEN-002"})
+		filters = self.frappe.db.get_value.call_args.args[1]
+		self.assertEqual(filters, {"xpos_local_id": "3", "pos_profile": "Shop 2", "user": "other@test.com"})
+		self.acting_user.assert_called_with("other@test.com", "Shop 2")
+
+
 if __name__ == "__main__":
 	unittest.main()

@@ -666,7 +666,7 @@ export const SYNC_TABLES: SyncTableConfig[] = [
 		orderBy: "creation",
 		direction: "push",
 		idbStore: "pos_opening_shifts",
-		localIdField: "xpos_local_id",
+		localIdField: "local_id",
 		incremental: false,
 		batchSize: 50,
 		pullOrder: 97,
@@ -708,11 +708,13 @@ export const SYNC_TABLES: SyncTableConfig[] = [
 		orderBy: "creation",
 		direction: "push",
 		idbStore: "pos_closing_entries",
-		localIdField: "xpos_local_id",
+		localIdField: "local_id",
 		incremental: false,
 		batchSize: 50,
-		pullOrder: 99,
-		dependsOn: ["pos_opening_shifts"],
+		// After the shift's sales (100) and cash movements (98): ERPNext closes the shift
+		// from its own records of them.
+		pullOrder: 105,
+		dependsOn: ["pos_opening_shifts", "pending_invoices", "expenses", "bank_drops"],
 	},
 	{
 		doctype: "POS Invoice",

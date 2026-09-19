@@ -8,6 +8,7 @@ import {
 } from "./syncConfig";
 import { query, queryOne, execute, upsertBatch, getMeta, setMeta } from "../database/dbService";
 import { createLogger } from "../logger";
+import { isHeldOrderData, parseJsonColumn, shiftOfSale } from "../database/shiftSummary";
 
 const log = createLogger("SyncEngine");
 
@@ -254,12 +255,7 @@ async function pullTable(config: SyncTableConfig): Promise<number> {
 }
 
 function isHeldOrder(record: Record<string, unknown>): boolean {
-	try {
-		const data = typeof record.data === "string" ? JSON.parse(record.data) : record.data;
-		return !!(data as { is_draft?: unknown } | null)?.is_draft;
-	} catch {
-		return false;
-	}
+	return isHeldOrderData(parseJsonColumn(record.data));
 }
 
 async function detectDeletions(config: SyncTableConfig): Promise<number> {
@@ -365,7 +361,7 @@ async function pushTable(config: SyncTableConfig): Promise<{ synced: number; fai
 		pendingTable = "pos_opening_shifts";
 		statusField = "sync_status";
 		retryField = "COALESCE(retry_count, 0)";
-		localIdField = "id";
+		localIdField = "local_id";
 		statusPending = "'pending'";
 		statusFailed = "'failed'";
 		statusSyncing = "syncing";
@@ -378,7 +374,7 @@ async function pushTable(config: SyncTableConfig): Promise<{ synced: number; fai
 		pendingTable = "pos_closing_entries";
 		statusField = "sync_status";
 		retryField = "COALESCE(retry_count, 0)";
-		localIdField = "id";
+		localIdField = "local_id";
 		statusPending = "'pending'";
 		statusFailed = "'failed'";
 		statusSyncing = "syncing";
@@ -474,7 +470,8 @@ async function pushTable(config: SyncTableConfig): Promise<{ synced: number; fai
 				const openingShiftLocalId = record.pos_opening_entry_id as number;
 				const serverOpeningShiftName = await getServerShiftName(String(openingShiftLocalId));
 
-				if (!serverOpeningShiftName) {
+				// Wait until ERPNext has the shift and everything taken in it.
+				if (!serverOpeningShiftName || (await shiftHasUnsentRecords(String(openingShiftLocalId)))) {
 					await execute(
 						`UPDATE \`${pendingTable}\` SET \`${statusField}\` = 'pending' WHERE \`${idField}\` = ?`,
 						[recordId],
@@ -592,6 +589,27 @@ async function pushTable(config: SyncTableConfig): Promise<{ synced: number; fai
 	return { synced, failed };
 }
 
+/**
+ * Whether a shift still has sales or cash movements that have not reached ERPNext.
+ * A sale the server gave up on (dead letter) does not hold the close back: it needs a
+ * manager, and the close must still reach ERPNext.
+ */
+export async function shiftHasUnsentRecords(localShiftId: string): Promise<boolean> {
+	const [movements] = await query<{ n: number }>(
+		`SELECT (SELECT COUNT(*) FROM \`expenses\` WHERE \`pos_opening_entry_id\` = ? AND \`sync_status\` <> 'synced')
+		      + (SELECT COUNT(*) FROM \`bank_drops\` WHERE \`pos_opening_entry_id\` = ? AND \`sync_status\` <> 'synced') AS n`,
+		[Number(localShiftId), Number(localShiftId)],
+	);
+	if (Number(movements?.n || 0) > 0) return true;
+	const sales = await query<{ data: unknown }>(
+		"SELECT `data` FROM `pending_invoices` WHERE `status` IN ('pending', 'syncing', 'failed')",
+	);
+	return sales.some(({ data }) => {
+		const sale = parseJsonColumn(data);
+		return !isHeldOrderData(sale) && shiftOfSale(sale) === localShiftId;
+	});
+}
+
 /** What sync_cash_movement is sent for a local expense or bank drop. */
 export function cashMovementPayload(
 	table: "expenses" | "bank_drops",
@@ -643,7 +661,7 @@ async function getOpeningShiftDetails(
 	);
 	return rows.map((r) => ({
 		mode_of_payment: r.mode_of_payment,
-		opening_amount: r.opening_amount,
+		opening_amount: Number(r.opening_amount || 0),
 	}));
 }
 
@@ -667,7 +685,14 @@ async function getClosingEntryDetails(closingId: number): Promise<
      FROM \`pos_closing_entry_details\` WHERE \`parent_id\` = ?`,
 		[closingId],
 	);
-	return rows;
+	// DECIMAL columns come back as strings.
+	return rows.map((r) => ({
+		mode_of_payment: r.mode_of_payment,
+		opening_amount: Number(r.opening_amount || 0),
+		expected_amount: Number(r.expected_amount || 0),
+		closing_amount: Number(r.closing_amount || 0),
+		difference: Number(r.difference || 0),
+	}));
 }
 
 /**
