@@ -63,7 +63,7 @@
 							<Avatar class="shrink-0">
 								<img
 									v-if="cust.image"
-									:src="cust.image as string"
+									:src="imageSrc(cust.image as string)"
 									:alt="cust.customer_name"
 									class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
 									loading="lazy"
@@ -277,6 +277,7 @@
 </template>
 
 <script setup lang="ts">
+import { imageSrc } from "@/utils/imageSrc";
 import { ref, computed, watch, onMounted, nextTick } from "vue";
 import { useCartStore } from "@/stores/cartStore";
 import { useCustomerStore } from "@/stores/customerStore";

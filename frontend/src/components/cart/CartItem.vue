@@ -16,7 +16,7 @@
 		<div class="w-9 h-9 rounded-md bg-muted overflow-hidden shrink-0 flex items-center justify-center">
 			<img
 				v-if="item.image"
-				:src="item.image"
+				:src="imageSrc(item.image)"
 				:alt="item.item_name"
 				class="w-full h-full object-cover"
 			/>
@@ -228,6 +228,7 @@
 </template>
 
 <script setup lang="ts">
+import { imageSrc } from "@/utils/imageSrc";
 import { ref, computed, watch, onMounted, nextTick } from "vue";
 import { usePosStore } from "@/stores/posStore";
 import { hasPermission } from "@/services/userRights";

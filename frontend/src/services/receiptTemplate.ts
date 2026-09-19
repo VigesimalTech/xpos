@@ -1,3 +1,4 @@
+import { imageSrc } from "@/utils/imageSrc";
 import { formatFor, formatWithSymbol } from "@/composables/useCurrency";
 import type { ReceiptContext, ReceiptSnapshot } from "@/types/pos.types";
 import { formatFloat, formatQty } from "@/utils/numberFormat";
@@ -40,7 +41,7 @@ export function buildReceiptHtml(snapshot: ReceiptSnapshot, ctx: ReceiptContext)
 	const isReturn = snapshot.is_return;
 
 	const logo = ctx.company_logo
-		? `<img class="store-logo-left" src="${esc(ctx.company_logo)}" alt="${esc(ctx.company_name)}" />`
+		? `<img class="store-logo-left" src="${esc(imageSrc(ctx.company_logo))}" alt="${esc(ctx.company_name)}" />`
 		: "";
 
 	const contactLine = [

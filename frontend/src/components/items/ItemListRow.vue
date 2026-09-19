@@ -13,7 +13,7 @@
 		<div class="w-14 h-14 shrink-0 rounded-lg bg-muted overflow-hidden relative">
 			<img
 				v-if="item.image && !hideImages"
-				:src="item.image"
+				:src="imageSrc(item.image)"
 				:alt="item.item_name"
 				class="w-full h-full object-cover"
 				loading="lazy"
@@ -85,6 +85,7 @@
 </template>
 
 <script setup lang="ts">
+import { imageSrc } from "@/utils/imageSrc";
 import { computed } from "vue";
 import { usePosStore } from "@/stores/posStore";
 import { useMoney } from "@/composables/useMoney";
