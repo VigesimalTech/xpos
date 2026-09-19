@@ -1,5 +1,11 @@
 import { BrowserWindow, ipcMain, net } from "electron";
-import { SYNC_TABLES, SYNC_DEFAULTS, getPrimaryKeyForTable, type SyncTableConfig } from "./syncConfig";
+import {
+	SYNC_TABLES,
+	SYNC_DEFAULTS,
+	deletionListRequest,
+	getPrimaryKeyForTable,
+	type SyncTableConfig,
+} from "./syncConfig";
 import { query, queryOne, execute, upsertBatch, getMeta, setMeta } from "../database/dbService";
 import { createLogger } from "../logger";
 
@@ -248,16 +254,12 @@ async function pullTable(config: SyncTableConfig): Promise<number> {
 }
 
 async function detectDeletions(config: SyncTableConfig): Promise<number> {
-	if (config.direction === "push") return 0;
+	if (config.direction === "push" || config.deletionCheck === false) return 0;
 
 	const primaryKey = getPrimaryKeyForTable(config.idbStore);
 
-	const serverNames = await apiCall<{ name: string }[]>("frappe.client.get_list", {
-		doctype: config.doctype,
-		fields: ["name"],
-		filters: config.filters || {},
-		limit_page_length: 0,
-	});
+	const { method, args } = deletionListRequest(config);
+	const serverNames = await apiCall<{ name: string }[]>(method, args);
 
 	if (!serverNames || !Array.isArray(serverNames)) return 0;
 

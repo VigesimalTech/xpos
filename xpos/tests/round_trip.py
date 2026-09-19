@@ -36,6 +36,9 @@ CASHIERS = {
 # rejects out-of-policy sales rather than flagging them.
 CASHIER_DISCOUNT_LIMIT = {("rt-cashier@example.com", POS_PROFILE): 10}
 REJECT_PROFILE = POS_PROFILE_2
+# What a till's API user needs to read everything the till pulls with frappe.client.get_list.
+TILLS = {"rt-till@example.com", "rt-till-2@example.com"}
+TILL_ROLES = ["Accounts User", "Sales User", "Sales Manager", "Stock User"]
 OPENING_QTY = 50
 RATE = 100
 
@@ -73,7 +76,7 @@ def _ensure(doctype, name, values):
 	return doc
 
 
-def _ensure_user(email):
+def _ensure_user(email, roles=("Sales User",)):
 	if not frappe.db.exists("User", email):
 		frappe.get_doc(
 			{
@@ -81,7 +84,7 @@ def _ensure_user(email):
 				"email": email,
 				"first_name": email.split("@")[0],
 				"send_welcome_email": 0,
-				"roles": [{"role": "Sales User"}],
+				"roles": [{"role": role} for role in roles],
 			}
 		).insert(ignore_permissions=True)
 
@@ -156,7 +159,7 @@ def setup(out="/tmp/xpos-rt.json"):
 	)
 
 	for email in CASHIERS:
-		_ensure_user(email)
+		_ensure_user(email, TILL_ROLES if email in TILLS else ("Sales User",))
 
 	for profile_name, extra_users in (
 		(POS_PROFILE, ["Administrator"]),

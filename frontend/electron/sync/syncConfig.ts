@@ -17,6 +17,8 @@ export interface SyncTableConfig {
 	parentDoctype?: string;
 	isCompanyBased?: boolean;
 	regetAll?: boolean;
+	/** false: never delete local rows because the server's list lacks them. */
+	deletionCheck?: boolean;
 }
 
 export const SYNC_TABLES: SyncTableConfig[] = [
@@ -632,6 +634,9 @@ export const SYNC_TABLES: SyncTableConfig[] = [
 		fields: ["*"],
 		orderBy: "modified",
 		direction: "pull",
+		// There is no POS User doctype to list, and get_pos_users pages can come back
+		// short (a cashier on two profiles is listed once), so a missing name proves nothing.
+		deletionCheck: false,
 		idbStore: "pos_users",
 		localIdField: "xpos_local_id",
 		incremental: true,
@@ -720,6 +725,28 @@ const PRIMARY_KEY_BY_STORE: Record<string, string> = Object.fromEntries(
  * Both the sync engine and the hub till-client must resolve upsert keys through
  * here so the two paths can never drift (a mismatch silently corrupts upserts).
  */
+/**
+ * The call that lists every name on the server, for the deletion check. It goes
+ * through the table's pullMethod when it has one: child tables and Item Price
+ * are pulled through XPOS endpoints because a till's API user cannot list them
+ * with frappe.client.get_list (Frappe refuses a child table to anyone but a
+ * System Manager unless the parent is named).
+ */
+export function deletionListRequest(config: SyncTableConfig): {
+	method: string;
+	args: Record<string, unknown>;
+} {
+	return {
+		method: config.pullMethod || "frappe.client.get_list",
+		args: {
+			doctype: config.doctype,
+			fields: ["name"],
+			filters: config.filters || {},
+			limit_page_length: 0,
+		},
+	};
+}
+
 export function getPrimaryKeyForTable(idbStore: string): string {
 	return PRIMARY_KEY_BY_STORE[idbStore] || "name";
 }
