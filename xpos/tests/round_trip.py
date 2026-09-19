@@ -23,6 +23,15 @@ ABBR = "TS"
 ITEM = "RT-ITEM"
 CUSTOMER = "RT Customer"
 POS_PROFILE = "RT POS"
+# A second shop, and cashiers and tills in each, for "which cashiers does a till get".
+POS_PROFILE_2 = "RT POS 2"
+CASHIERS = {
+	"rt-cashier@example.com": [POS_PROFILE],
+	"rt-other@example.com": [POS_PROFILE_2],
+	"rt-both@example.com": [POS_PROFILE, POS_PROFILE_2],
+	"rt-till@example.com": [POS_PROFILE],
+	"rt-till-2@example.com": [POS_PROFILE_2],
+}
 OPENING_QTY = 50
 RATE = 100
 
@@ -58,6 +67,26 @@ def _ensure(doctype, name, values):
 	doc = frappe.get_doc({"doctype": doctype, **values})
 	doc.insert(ignore_permissions=True)
 	return doc
+
+
+def _ensure_user(email):
+	if not frappe.db.exists("User", email):
+		frappe.get_doc(
+			{
+				"doctype": "User",
+				"email": email,
+				"first_name": email.split("@")[0],
+				"send_welcome_email": 0,
+				"roles": [{"role": "Sales User"}],
+			}
+		).insert(ignore_permissions=True)
+
+
+def _keys_for(user):
+	from frappe.core.doctype.user.user import generate_keys
+
+	secret = generate_keys(user)["api_secret"]
+	return {"api_key": frappe.db.get_value("User", user, "api_key"), "api_secret": secret}
 
 
 def setup(out="/tmp/xpos-rt.json"):
@@ -122,11 +151,20 @@ def setup(out="/tmp/xpos-rt.json"):
 		},
 	)
 
-	if not frappe.db.exists("POS Profile", POS_PROFILE):
+	for email in CASHIERS:
+		_ensure_user(email)
+
+	for profile_name, extra_users in (
+		(POS_PROFILE, ["Administrator"]),
+		(POS_PROFILE_2, []),
+	):
+		if frappe.db.exists("POS Profile", profile_name):
+			continue
+		users = extra_users + [u for u, profiles in CASHIERS.items() if profile_name in profiles]
 		profile = frappe.get_doc(
 			{
 				"doctype": "POS Profile",
-				"name": POS_PROFILE,
+				"name": profile_name,
 				"company": COMPANY,
 				"warehouse": warehouse,
 				"customer": CUSTOMER,
@@ -136,7 +174,11 @@ def setup(out="/tmp/xpos-rt.json"):
 				"write_off_account": company.write_off_account or company.round_off_account,
 				"write_off_cost_center": company.cost_center,
 				"payments": [{"mode_of_payment": "Cash", "default": 1}],
-				"applicable_for_users": [{"user": "Administrator", "default": 1}],
+				# A user may have only one default POS Profile: their first.
+				"applicable_for_users": [
+					{"user": u, "default": int(CASHIERS.get(u, [profile_name])[0] == profile_name)}
+					for u in users
+				],
 				"use_offline_mode": 1,
 			}
 		)
@@ -146,6 +188,14 @@ def setup(out="/tmp/xpos-rt.json"):
 
 	api_secret = generate_keys("Administrator")["api_secret"]
 	api_key = frappe.db.get_value("User", "Administrator", "api_key")
+
+	tills = {
+		POS_PROFILE: _keys_for("rt-till@example.com"),
+		POS_PROFILE_2: _keys_for("rt-till-2@example.com"),
+	}
+	# A user on no POS Profile, like an admin or integration key.
+	_ensure_user("rt-admin@example.com")
+	unassigned = _keys_for("rt-admin@example.com")
 
 	result = {
 		"company": COMPANY,
@@ -158,9 +208,13 @@ def setup(out="/tmp/xpos-rt.json"):
 		"user": "Administrator",
 		"api_key": api_key,
 		"api_secret": api_secret,
+		"pos_profile_2": POS_PROFILE_2,
+		"cashiers": CASHIERS,
+		"tills": tills,
+		"unassigned": unassigned,
 	}
 	# A CI-only seed: `out` is the path the workflow passes. The secret goes to a
 	# file rather than the return value, which bench prints to the job log.
 	with open(out, "w") as f:  # nosemgrep
 		json.dump(result, f, indent=1)
-	return {k: v for k, v in result.items() if k != "api_secret"}
+	return {"company": COMPANY, "pos_profiles": [POS_PROFILE, POS_PROFILE_2]}
