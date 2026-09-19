@@ -174,7 +174,11 @@ def setup(out="/tmp/xpos-rt.json"):
 				"write_off_account": company.write_off_account or company.round_off_account,
 				"write_off_cost_center": company.cost_center,
 				"payments": [{"mode_of_payment": "Cash", "default": 1}],
-				"applicable_for_users": [{"user": u, "default": 1} for u in users],
+				# A user may have only one default POS Profile: their first.
+				"applicable_for_users": [
+					{"user": u, "default": int(CASHIERS.get(u, [profile_name])[0] == profile_name)}
+					for u in users
+				],
 				"use_offline_mode": 1,
 			}
 		)
