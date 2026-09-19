@@ -352,7 +352,31 @@ async function pushToHub(): Promise<{ invoices: number; purchases: number }> {
 	return { invoices, purchases };
 }
 
+/**
+ * A record is marked 'syncing' while it is sent to the hub. If the till stopped
+ * mid-send (crash, power cut) nothing moves it on, and the push only picks up
+ * 'pending' and 'failed': queue it again. The hub stores sales and purchase
+ * orders by local_id, so one that did arrive is updated, not duplicated.
+ * Expenses, bank drops and stock adjustments are left out: the hub cannot store
+ * them at all yet (their tables have no local_id column).
+ */
+async function requeueInFlightToHub(): Promise<void> {
+	for (const table of ["pending_invoices", "pending_purchases"]) {
+		try {
+			const result = await execute(
+				`UPDATE \`${table}\` SET \`status\` = 'pending' WHERE \`status\` = 'syncing'`,
+			);
+			if (result.affectedRows) {
+				log.warn(`Requeued ${result.affectedRows} ${table} record(s) left mid-send to the hub`);
+			}
+		} catch (err) {
+			log.error(`Could not requeue in-flight ${table} records`, err);
+		}
+	}
+}
+
 export async function initTillClient(hubUrl: string, tillId: string): Promise<void> {
+	await requeueInFlightToHub();
 	const hubSecret = (await getMeta("hub_api_secret")) || undefined;
 	context = { hubUrl: hubUrl.replace(/\/$/, ""), tillId, hubSecret };
 	log.info(`Initialized — hub: ${context.hubUrl}, till: ${tillId}, auth: ${hubSecret ? "yes" : "no"}`);
