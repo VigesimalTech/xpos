@@ -8,6 +8,9 @@ It completes the setup wizard for one company, then adds what a till needs:
 a stocked item with a price, a customer, a POS Profile with Cash, and API
 keys for the till to sync with. The names it created are written to `out`
 for the tests. Safe to run twice.
+
+`bench execute` connects as Administrator and commits when this returns, so
+there is no set_user or commit here.
 """
 
 import json
@@ -47,7 +50,6 @@ def _complete_setup():
 			"setup_demo": 0,
 		}
 	)
-	frappe.db.commit()
 
 
 def _ensure(doctype, name, values):
@@ -59,7 +61,6 @@ def _ensure(doctype, name, values):
 
 
 def setup(out="/tmp/xpos-rt.json"):
-	frappe.set_user("Administrator")
 	_complete_setup()
 
 	company = frappe.get_doc("Company", COMPANY)
@@ -145,7 +146,6 @@ def setup(out="/tmp/xpos-rt.json"):
 
 	api_secret = generate_keys("Administrator")["api_secret"]
 	api_key = frappe.db.get_value("User", "Administrator", "api_key")
-	frappe.db.commit()
 
 	result = {
 		"company": COMPANY,
@@ -159,6 +159,8 @@ def setup(out="/tmp/xpos-rt.json"):
 		"api_key": api_key,
 		"api_secret": api_secret,
 	}
-	with open(out, "w") as f:
+	# A CI-only seed: `out` is the path the workflow passes. The secret goes to a
+	# file rather than the return value, which bench prints to the job log.
+	with open(out, "w") as f:  # nosemgrep
 		json.dump(result, f, indent=1)
 	return {k: v for k, v in result.items() if k != "api_secret"}
