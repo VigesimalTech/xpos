@@ -144,6 +144,25 @@ export async function invoke<T = unknown>(channel: string, ...args: unknown[]): 
 	return (await handler({}, ...args)) as T;
 }
 
+// --- preload ----------------------------------------------------------------
+// Importing electron/preload.ts puts window.electronAPI in place, so renderer code (stores,
+// dbBridge) runs against the real IPC handlers and database. Arguments are structured-cloned
+// on the way, as Electron does: a live Vue object throws here as it does in the app.
+
+export const contextBridge = {
+	exposeInMainWorld: (key: string, api: unknown) => {
+		const g = globalThis as { window?: Record<string, unknown> };
+		g.window ??= {};
+		g.window[key] = api;
+	},
+};
+
+export const ipcRenderer = {
+	invoke: async (channel: string, ...args: unknown[]) => invoke(channel, ...structuredClone(args)),
+	on: () => ipcRenderer,
+	removeListener: () => ipcRenderer,
+};
+
 // --- renderer ---------------------------------------------------------------
 
 export const rendererEvents: { channel: string; data: unknown }[] = [];
