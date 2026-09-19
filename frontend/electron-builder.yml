@@ -16,6 +16,9 @@ files:
 
 extraMetadata:
   main: dist-electron/main.js
+  # Electron names the app, and its data folder, from this. Without it the
+  # installed app ran as "xpos-frontend", the development build's name.
+  productName: X POS
 
 extraResources:
   - from: electron/database/schema.sql
