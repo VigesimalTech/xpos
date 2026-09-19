@@ -50,6 +50,15 @@ mac:
   artifactName: ${productName}-${version}.${ext}
   icon: build/icon.icns
   category: public.app-category.business
+  # No Developer ID certificate yet: sign ad hoc. An unsigned Apple silicon
+  # app carries only the linker's signature, which covers none of the bundle,
+  # and Gatekeeper calls a downloaded copy "damaged". Signed ad hoc, it asks
+  # once instead (System Settings > Privacy & Security > Open Anyway).
+  # Hardened runtime is off because ad hoc signing plus hardened runtime
+  # rejects Electron's own frameworks; turn it back on with a real identity
+  # and notarization.
+  identity: "-"
+  hardenedRuntime: false
 
 linux:
   target:

@@ -2,8 +2,10 @@ name: Build Desktop App
 
 # Builds the X POS desktop installers for trying out: a Windows NSIS installer
 # and a macOS (Apple silicon) disk image, attached to the run as artifacts.
-# Nothing is published or released, and nothing is signed yet: Windows
-# SmartScreen and macOS Gatekeeper will each warn once on first open.
+# Nothing is published or released. Windows is unsigned (SmartScreen warns
+# once). macOS is signed ad hoc, not with a Developer ID: Gatekeeper refuses
+# the first open, and System Settings > Privacy & Security > Open Anyway lets
+# it run from then on. Unsigned, a downloaded copy is reported as "damaged".
 #
 # The app version comes from the release tag (v2.9.0-offline.6 -> 2.9.0-offline.6),
 # or, for a manual run, 2.9.0-dev.<short sha> so a build names its commit.
@@ -78,11 +80,23 @@ jobs:
 
       - name: Build the installer
         env:
-          # No signing certificate yet (see D4): build unsigned.
+          # No signing certificate yet (see D4). Windows builds unsigned; the
+          # Mac signs ad hoc (mac.identity "-" in electron-builder.yml).
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          # electron-builder skips Mac signing on pull requests unless told
+          # otherwise. Ad hoc signing uses no secrets, so a PR build can sign.
+          CSC_FOR_PULL_REQUEST: "true"
         run: >-
           npx electron-builder ${{ matrix.target }} --publish never
           --config.extraMetadata.version=${{ steps.version.outputs.version }}
+
+      - name: Check the Mac signature
+        if: matrix.name == 'macOS'
+        run: |
+          app="$(ls -d release/mac-arm64/*.app)"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          codesign -dv "$app" 2>&1 | grep -q 'Sealed Resources version=' \
+            || { echo "::error::$app is not sealed; Gatekeeper will call it damaged"; exit 1; }
 
       - uses: actions/upload-artifact@v7
         with:
