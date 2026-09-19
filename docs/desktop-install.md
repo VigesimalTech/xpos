@@ -44,9 +44,12 @@ The app syncs with ERPNext using one API key per PC.
      from step 2, database `xpos_local`. **Test** must pass before you continue.
    - **Server:** the ERPNext address (`https://…`), and the API key and secret
      from step 3.
-   - Finish the last step.
-3. Sign in with an ERPNext user assigned to the POS Profile. The first sign-in
-   must be online.
+   - Check the summary and press **Complete Setup**. The app then fetches the
+     POS Profile's cashiers from ERPNext. There is no local admin account:
+     only ERPNext users on the POS Profile can sign in.
+3. Sign in as one of those cashiers: with a PIN if one is set on their POS
+   Profile row, otherwise with their ERPNext password, which must be online the
+   first time.
 4. In **Settings**:
    - **Receipt Printer:** choose the receipt printer and press **Test Print**.
      Receipts then print with no print dialog.

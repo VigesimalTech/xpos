@@ -347,6 +347,19 @@ async function runMigrations(): Promise<void> {
 		}
 	}
 
+	// Setup used to create a local admin that only this till knew. Every user pulled from
+	// ERPNext carries its POS Profile; a row without one was made here, so remove it.
+	try {
+		const [result] = await db.execute<ResultSetHeader>(
+			"DELETE FROM `pos_users` WHERE `pos_profile` IS NULL OR `pos_profile` = ''",
+		);
+		if (result.affectedRows > 0) {
+			log.info(`Migration: removed ${result.affectedRows} local-only user(s) from pos_users`);
+		}
+	} catch (err) {
+		log.warn("Migration removing local-only pos_users failed", err);
+	}
+
 	const columnMigrations: [string, string, string][] = [
 		["sales_invoice_payments", "pos_tender_currency", "VARCHAR(10) DEFAULT NULL"],
 		["sales_invoice_payments", "pos_tender_amount", "DECIMAL(18,6) DEFAULT NULL"],

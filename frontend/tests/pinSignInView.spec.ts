@@ -26,6 +26,7 @@ const CASHIERS = [
 ];
 
 let db: Record<string, ReturnType<typeof vi.fn>>;
+let syncComplete: (() => void) | undefined;
 
 function mountView() {
 	return mount(LoginView, { global: { provide: { isDark: false } } });
@@ -40,13 +41,22 @@ beforeEach(() => {
 	push.mockReset();
 	db = {
 		getPinUsers: vi.fn(async () => CASHIERS),
+		getPosUsers: vi.fn(async () => CASHIERS),
 		verifyPin: vi.fn(async (_u: string, pin: string) =>
 			pin === "4821" ? { ok: true } : { ok: false, reason: "wrong_pin", attemptsLeft: 4 },
 		),
 		getPosUser: vi.fn(async (u: string) => CASHIERS.find((c) => c.username === u || c.name === u)),
 		setSetting: vi.fn(async () => undefined),
 	};
-	window.electronAPI = { db, startSyncEngine: vi.fn(async () => ({ success: true })) } as never;
+	syncComplete = undefined;
+	window.electronAPI = {
+		db,
+		startSyncEngine: vi.fn(async () => ({ success: true })),
+		onSyncComplete: vi.fn((cb: () => void) => {
+			syncComplete = cb;
+			return () => undefined;
+		}),
+	} as never;
 });
 
 describe("K6: signing in on the till with a PIN", () => {
@@ -111,5 +121,30 @@ describe("K6: signing in on the till with a PIN", () => {
 
 		expect(wrapper.find("#password").exists()).toBe(true);
 		expect(wrapper.find("[data-pin-user]").exists()).toBe(false);
+	});
+});
+
+describe("K23: a new till signs in only cashiers from ERPNext", () => {
+	it("says so while the till has no cashiers yet", async () => {
+		db.getPinUsers.mockResolvedValue([]);
+		db.getPosUsers.mockResolvedValue([]);
+		const wrapper = mountView();
+		await flushPromises();
+
+		expect(wrapper.find("[data-no-till-users]").exists()).toBe(true);
+	});
+
+	it("shows the cashiers once the first sync brings them", async () => {
+		db.getPinUsers.mockResolvedValueOnce([]);
+		db.getPosUsers.mockResolvedValueOnce([]);
+		const wrapper = mountView();
+		await flushPromises();
+		expect(wrapper.findAll("[data-pin-user]")).toHaveLength(0);
+
+		syncComplete!();
+		await flushPromises();
+
+		expect(wrapper.find("[data-no-till-users]").exists()).toBe(false);
+		expect(wrapper.findAll("[data-pin-user]")).toHaveLength(2);
 	});
 });
