@@ -22,6 +22,7 @@
     "test": "vitest",
     "test:run": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:roundtrip": "vitest run --config vitest.roundtrip.config.ts",
     "pack": "yarn build:electron && electron-builder --dir",
     "dist": "yarn build:electron && electron-builder",
     "dist:win": "yarn build:electron && node scripts/build-win.mjs",
