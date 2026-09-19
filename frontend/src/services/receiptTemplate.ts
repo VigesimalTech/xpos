@@ -297,3 +297,56 @@ export function buildReceiptHtml(snapshot: ReceiptSnapshot, ctx: ReceiptContext)
     </div>
 </div>`;
 }
+
+export interface ShiftSummaryPrint {
+	shift: string;
+	cashier: string;
+	pos_profile: string;
+	printed_at: string;
+	currency: string;
+	total_invoices: number;
+	returns_count: number;
+	grand_total: number;
+	cash_out?: number;
+	rows: Array<{
+		mode_of_payment: string;
+		currency: string;
+		opening_amount: number;
+		expected_amount: number;
+		closing_amount: number;
+		difference: number;
+	}>;
+}
+
+/** The shift close as the till prints it: its totals and the count against what was expected. */
+export function buildShiftSummaryHtml(s: ShiftSummaryPrint): string {
+	const money = (amount: number, currency = s.currency) => esc(fmtNative(amount, currency || s.currency));
+	const rows = s.rows
+		.map(
+			(r) => `<tr><th colspan="2">${esc(r.mode_of_payment)}</th></tr>
+<tr><td>Opening</td><td>${money(r.opening_amount, r.currency)}</td></tr>
+<tr><td>Expected</td><td>${money(r.expected_amount, r.currency)}</td></tr>
+<tr><td>Counted</td><td>${money(r.closing_amount, r.currency)}</td></tr>
+<tr><td>Difference</td><td>${money(r.difference, r.currency)}</td></tr>`,
+		)
+		.join("\n");
+	return `<style>
+body { font-family: monospace; font-size: 12px; width: 72mm; margin: 0; }
+h1 { font-size: 14px; text-align: center; margin: 4px 0; }
+table { width: 100%; border-collapse: collapse; }
+td:last-child { text-align: right; }
+th { text-align: left; padding-top: 6px; }
+</style>
+<h1>Shift Close</h1>
+<table>
+<tr><td>Shift</td><td>${esc(s.shift)}</td></tr>
+<tr><td>Cashier</td><td>${esc(s.cashier)}</td></tr>
+<tr><td>POS Profile</td><td>${esc(s.pos_profile)}</td></tr>
+<tr><td>Printed</td><td>${esc(s.printed_at)}</td></tr>
+<tr><td>Invoices</td><td>${esc(s.total_invoices)}</td></tr>
+<tr><td>Returns</td><td>${esc(s.returns_count)}</td></tr>
+<tr><td>Grand total</td><td>${money(s.grand_total)}</td></tr>
+${s.cash_out ? `<tr><td>Expenses and drops</td><td>${money(s.cash_out)}</td></tr>` : ""}
+${rows}
+</table>`;
+}
