@@ -8,6 +8,7 @@ import { registerDbHandlers } from "./database/ipcHandlers";
 import { initRealtimeStock, disconnectRealtime } from "./sync/realtimeStock";
 import { initSyncEngine, stopSyncEngine, updateSyncContext, runSyncCyclePublic } from "./sync/syncEngine";
 import { initAutoUpdater, stopAutoUpdater } from "./autoUpdater";
+import { printReceipt, registerPrintHandlers } from "./print/receiptPrinter";
 import { startHubServer, stopHubServer, getHubApiSecret } from "./hub/hubServer";
 import { initTillClient, runTillSync, pingHub } from "./hub/tillClient";
 import { type NodeRole } from "./hub/nodeConfig";
@@ -479,7 +480,8 @@ ipcMain.handle(
 				return { success: false, error: "No active window" };
 			}
 
-			// Generate print HTML from invoice data
+			// Generate print HTML from invoice data. Names come from user input: escape them.
+			const esc = (v: unknown) => String(v ?? "").replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 			const invoiceData = data.data as Record<string, unknown>;
 			const items = (invoiceData.items || []) as Array<{
 				item_code: string;
@@ -508,7 +510,7 @@ ipcMain.handle(
       </head>
       <body>
         <div class="header">
-          <div class="company">${data.companyName || "XPOS"}</div>
+          <div class="company">${esc(data.companyName || "XPOS")}</div>
           <div>${data.isReturn ? "RETURN" : "INVOICE"}</div>
           <div>Local #${data.localId}</div>
           <div>${new Date().toLocaleString()}</div>
@@ -516,7 +518,7 @@ ipcMain.handle(
         <div class="divider"></div>
         <div class="row">
           <span>Customer:</span>
-          <span>${data.customerName || "Walk-in Customer"}</span>
+          <span>${esc(data.customerName || "Walk-in Customer")}</span>
         </div>
         <div class="divider"></div>
         <div class="items">
@@ -527,7 +529,7 @@ ipcMain.handle(
 				.map(
 					(item) => `
             <div class="item">
-              <span>${item.item_name || item.item_code}</span>
+              <span>${esc(item.item_name || item.item_code)}</span>
               <span>${item.qty}</span>
               <span>${item.rate?.toFixed(2)}</span>
               <span>${item.amount?.toFixed(2)}</span>
@@ -549,26 +551,8 @@ ipcMain.handle(
       </html>
     `;
 
-			const printWin = new BrowserWindow({
-				show: false,
-				webPreferences: { nodeIntegration: false, contextIsolation: true },
-			});
-
-			await printWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
-
-			return new Promise((resolve) => {
-				printWin.webContents.print(
-					{ silent: false, printBackground: true },
-					(success, failureReason) => {
-						printWin.close();
-						if (success) {
-							resolve({ success: true });
-						} else {
-							resolve({ success: false, error: failureReason || "Print failed" });
-						}
-					},
-				);
-			});
+			// A receipt: straight to the receipt printer, no dialog.
+			return await printReceipt(html);
 		} catch (err) {
 			return { success: false, error: err instanceof Error ? err.message : String(err) };
 		}
@@ -679,6 +663,7 @@ app.whenReady().then(async () => {
 	installServerCors();
 
 	registerDbHandlers();
+	registerPrintHandlers();
 
 	initAutoUpdater();
 

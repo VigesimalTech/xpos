@@ -40,6 +40,13 @@ export function printHtml(html: string): HTMLIFrameElement {
 	return frame;
 }
 
+/** The sale is saved either way; say the receipt did not print, and why. */
+function receiptNotPrinted(reason?: string): string {
+	return reason
+		? __("The sale is saved, but the receipt did not print. {0} Reprint it from Order History.", [reason])
+		: __("The sale is saved, but the receipt did not print. Reprint it from Order History.");
+}
+
 /**
  * Shared invoice printing helpers used by the payment dialog (genuine receipt),
  * the terminal backup receipt, and the cashier settlement screen.
@@ -100,20 +107,21 @@ export function usePrintInvoice() {
 				return;
 			}
 			const snapshot = (invoice.data as Record<string, unknown>)?.receipt as
-				ReceiptSnapshot | undefined;
+				| ReceiptSnapshot
+				| undefined;
 			const context = await getCachedReceiptContext(posStore.profileName);
 
 			if (snapshot && context) {
 				if (!snapshot.name) snapshot.name = `LOCAL-${localId}`;
 				const html = buildReceiptHtml(snapshot, context);
-				const result = await window.electronAPI.print.printReport(html);
+				const result = await window.electronAPI.print.printReceipt(html);
 				if (!result?.success) {
-					showError(__("Failed to print invoice locally"));
+					showError(receiptNotPrinted(result?.error));
 				}
 				return;
 			}
 
-			await window.electronAPI.print.printInvoice({
+			const result = await window.electronAPI.print.printInvoice({
 				localId,
 				data: invoice.data,
 				customerName: invoice.customer_name || "",
@@ -123,6 +131,9 @@ export function usePrintInvoice() {
 				letterHead: posStore.printSettings?.letter_head || "",
 				companyName: posStore.posProfile?.company || "",
 			});
+			if (!result?.success) {
+				showError(receiptNotPrinted(result?.error));
+			}
 		} catch (error) {
 			console.error("Local print error:", error);
 			showError(__("Failed to print invoice locally"));

@@ -452,6 +452,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
 			html: string,
 			options?: { landscape?: boolean; margins?: Record<string, number> },
 		): Promise<{ success: boolean; error?: string }> => ipcRenderer.invoke("print:report", html, options),
+		printReceipt: (html: string): Promise<{ success: boolean; printer?: string; error?: string }> =>
+			ipcRenderer.invoke("print:receipt", html),
+		listPrinters: (): Promise<{ name: string; displayName: string }[]> =>
+			ipcRenderer.invoke("print:list-printers"),
 	},
 
 	fbr: {

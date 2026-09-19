@@ -88,6 +88,9 @@ export interface ElectronPrintAPI {
 			margins?: Record<string, number>;
 		},
 	) => Promise<{ success: boolean; error?: string }>;
+	/** Print a receipt with no dialog, to the receipt printer chosen in Settings. */
+	printReceipt: (html: string) => Promise<{ success: boolean; printer?: string; error?: string }>;
+	listPrinters: () => Promise<{ name: string; displayName: string }[]>;
 }
 
 export interface ElectronUpdateAPI {
