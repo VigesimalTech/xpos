@@ -144,7 +144,8 @@ export const useItemStore = defineStore("items", () => {
 				const { fields, limit } = offlineSearchConfig();
 				const results = (await window.electronAPI!.db.getItems({
 					search: searchTerm.value || undefined,
-					searchFields: fields,
+					// A plain copy: IPC cannot clone the settings store's reactive array.
+					searchFields: fields ? [...fields] : undefined,
 					group: selectedGroup.value === "All Item Groups" ? undefined : selectedGroup.value,
 					limit,
 					offset: append ? items.value.length : undefined,
