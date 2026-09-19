@@ -326,6 +326,35 @@ async function detectDeletions(config: SyncTableConfig): Promise<number> {
 	return deleted;
 }
 
+/**
+ * Reconcile local POS users against the server's full list: a cashier removed from the
+ * POS Profile or disabled in ERPNext must not stay on the till. The generic deletion
+ * check cannot run here (there is no POS User doctype to list), so this fetches the
+ * same get_pos_users endpoint unpaginated and deletes locals it does not return.
+ */
+async function reconcileUsers(): Promise<number> {
+	const config = SYNC_TABLES.find((t) => t.idbStore === "pos_users");
+	if (!config?.pullMethod) return 0;
+
+	const serverUsers = await apiCall<{ name: string }[]>(config.pullMethod, {
+		limit_start: 0,
+		limit_page_length: 0,
+	});
+	if (!serverUsers || !Array.isArray(serverUsers) || serverUsers.length === 0) return 0;
+
+	const serverNames = new Set(serverUsers.map((u) => u.name));
+	const localRows = await query<{ name: string }>("SELECT `name` FROM `pos_users`");
+	let removed = 0;
+	for (const row of localRows) {
+		if (!serverNames.has(row.name)) {
+			await execute("DELETE FROM `pos_users` WHERE `name` = ?", [row.name]);
+			log.info(`Reconcile: removed POS user ${row.name} (no longer on this till's profiles)`);
+			removed++;
+		}
+	}
+	return removed;
+}
+
 async function pushTable(config: SyncTableConfig): Promise<{ synced: number; failed: number }> {
 	if (!config.pushMethod) return { synced: 0, failed: 0 };
 
@@ -769,6 +798,17 @@ async function runSyncCycle(): Promise<void> {
 					});
 				}
 			}
+			if (isOnline()) {
+				try {
+					totalDeleted += await reconcileUsers();
+				} catch (error) {
+					const errMsg = error instanceof Error ? error.message : String(error);
+					emitToRenderer("sync-error", {
+						message: `POS user reconciliation failed: ${errMsg}`,
+						table: "POS Users",
+					});
+				}
+			}
 		}
 
 		const pushTables = SYNC_TABLES.filter((t) => t.direction === "push" || t.direction === "both").sort(
@@ -894,5 +934,7 @@ export function stopSyncEngine(): void {
 		pushIntervalId = null;
 	}
 	syncContext = null;
+	syncCycleCount = 0;
+	syncState = { isSyncing: false, lastSyncTime: null, pendingPushCount: 0 };
 	log.info("Stopped");
 }

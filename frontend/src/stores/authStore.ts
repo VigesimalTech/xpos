@@ -203,6 +203,10 @@ export const useAuthStore = defineStore("auth", () => {
 			}
 
 			const userData = posUser as Record<string, unknown>;
+			if (userData.enabled !== undefined && !Number(userData.enabled)) {
+				error.value = "This account has been disabled.";
+				return false;
+			}
 			const db = window.electronAPI!.db;
 
 			// A user pulled from ERPNext has no local password until it has been checked against

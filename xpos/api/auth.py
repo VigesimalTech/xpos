@@ -31,6 +31,10 @@ DEFAULT_ROLE = "Cashier"
 DEFAULT_DISCOUNT_LIMIT = 0  # 0 means no discount without a manager; 100 means no cap
 ROLE_CACHE_KEY = "xpos_role_permissions"
 
+# Stands in for an absent LIMIT: MariaDB has no keyword for "every row", and a
+# parameterised LIMIT keeps the query free of string formatting.
+ALL_ROWS = 2**63 - 1
+
 
 def resolve_role_permissions(role_name: str) -> dict:
 	"""Build the full permission map for a role from its POS Role Permission rows."""
@@ -227,7 +231,9 @@ def get_pos_users(
         LIMIT %(limit)s OFFSET %(offset)s
         """,
 		{
-			"limit": limit_page_length,
+			# limit_page_length 0 means "every user" — the till's reconciliation pull.
+			# MariaDB has no "no limit" keyword, so ask for more rows than can exist.
+			"limit": limit_page_length or ALL_ROWS,
 			"offset": limit_start,
 			"all_profiles": 0 if till_profiles else 1,
 			# IN () is not valid SQL; the placeholder matches nothing when all_profiles is 1.
