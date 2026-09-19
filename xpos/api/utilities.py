@@ -19,6 +19,8 @@ import subprocess
 import frappe
 from frappe.utils import cint
 
+from xpos.api.till import till_cashier
+
 BASE_ITEM_SEARCH_FIELDS = ("name", "item_name", "item_code")
 
 ITEM_SEARCH_FIELDTYPES = frozenset(
@@ -223,7 +225,7 @@ def get_item_search_settings() -> dict:
 
 def is_pos_cashier(user: str | None = None, pos_profile: str | None = None) -> bool:
 	"""Return whether ``user`` may settle (close) bills on the Cashier screen."""
-	user = user or frappe.session.user
+	user = user or till_cashier() or frappe.session.user
 
 	if user == "Administrator" or "System Manager" in frappe.get_roles(user):
 		return True

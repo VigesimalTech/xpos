@@ -130,7 +130,7 @@ export const usePaymentStore = defineStore("payment", () => {
 			remarks: data.reason,
 			posting_date: nowDate(),
 			company: data.company,
-			user: useAuthStore().userEmail,
+			user: useAuthStore().userName,
 			pos_opening_entry_id: data.pos_opening_shift ? Number(data.pos_opening_shift) : null,
 		};
 		return kind === "expense" ? createExpense(record) : createBankDrop(record);

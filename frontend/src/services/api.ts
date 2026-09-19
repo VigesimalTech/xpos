@@ -6,6 +6,7 @@ import {
 import { isOnline, isNetworkError } from "@/utils";
 import { isElectron, getApiBaseUrlSync, getApiCredentialsSync } from "@/services/electronBridge";
 import { captureError } from "@/services/errorLog";
+import { tillIdentityHeaders } from "@/services/tillIdentity";
 import { getMeta } from "./idbService";
 import { formatWithSymbol } from "@/composables/useCurrency";
 
@@ -154,6 +155,7 @@ async function postMethod(
 		if (apiKey && apiSecret) {
 			(headers as Record<string, string>)["Authorization"] = `token ${apiKey}:${apiSecret}`;
 		}
+		Object.assign(headers, tillIdentityHeaders());
 	}
 
 	const baseUrl = getApiBaseUrlSync();

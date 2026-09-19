@@ -1,6 +1,7 @@
 import { defineStore } from "pinia";
 import { ref, computed, watch } from "vue";
 import { call } from "@/services/api";
+import { setTillIdentity } from "@/services/tillIdentity";
 import {
 	cachePOSData,
 	getCachedPOSData,
@@ -53,6 +54,10 @@ export const usePosStore = defineStore("pos", () => {
 	const profileName = computed(() => posProfile.value?.name || "");
 	const warehouse = computed(() => posProfile.value?.warehouse || "");
 	const currency = computed(() => posProfile.value?.currency);
+
+	if (isElectron()) {
+		watch(profileName, (name) => setTillIdentity({ posProfile: name || undefined }), { immediate: true });
+	}
 
 	watch(profileName, async (name, prev) => {
 		if (isElectron() || !name || name === prev) return;

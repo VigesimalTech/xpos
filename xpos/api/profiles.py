@@ -5,11 +5,12 @@ import frappe
 from frappe import _
 
 from xpos.api.auth import is_superuser
+from xpos.api.till import till_cashier
 
 
 def resolve_pos_profile(pos_profile: str | None = None, user: str | None = None):
 	"""Load a POS Profile the given user is allowed to act through."""
-	user = user or frappe.session.user
+	user = user or till_cashier() or frappe.session.user
 
 	if isinstance(pos_profile, dict):
 		frappe.throw(
@@ -38,7 +39,7 @@ def resolve_pos_profile(pos_profile: str | None = None, user: str | None = None)
 
 def user_may_use_profile(profile_name: str, user: str | None = None) -> bool:
 	"""Whether `user` appears in the profile's `applicable_for_users` rows."""
-	user = user or frappe.session.user
+	user = user or till_cashier() or frappe.session.user
 
 	if user == "Guest":
 		return False
@@ -55,7 +56,7 @@ def user_may_use_profile(profile_name: str, user: str | None = None) -> bool:
 
 def get_default_pos_profile(user: str | None = None) -> str | None:
 	"""Return the enabled POS Profile assigned to `user`, preferring their default."""
-	user = user or frappe.session.user
+	user = user or till_cashier() or frappe.session.user
 
 	rows = frappe.db.sql(
 		"""

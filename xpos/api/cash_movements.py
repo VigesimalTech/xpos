@@ -13,7 +13,7 @@ from frappe.utils import cint, flt, now_datetime, nowdate
 
 from xpos.api.auth import is_pos_manager, user_has_pos_permission
 from xpos.api.profiles import resolve_pos_profile
-from xpos.api.till import acting_user, sent_by_till
+from xpos.api.till import acting_user, sent_by_till, till_cashier
 
 MOVEMENT_PERMISSION_KEYS = {"Expense": "expense", "Deposit": "bank_drop"}
 
@@ -417,7 +417,7 @@ def _create_cash_movement_record(**kwargs):
 			"docstatus": 1,
 			"pos_profile": kwargs.get("pos_profile"),
 			"pos_opening_shift": kwargs.get("pos_opening_shift"),
-			"user": kwargs.get("user") or frappe.session.user,
+			"user": kwargs.get("user") or (till_cashier() or frappe.session.user),
 			"journal_entry": kwargs.get("journal_entry"),
 			"movement_type": kwargs.get("movement_type"),
 			"amount": kwargs.get("amount"),

@@ -7,6 +7,8 @@ from frappe import _
 from frappe.sessions import get_csrf_token as session_csrf_token
 from frappe.utils import cint, flt
 
+from xpos.api.till import till_cashier
+
 ALL_PERMISSION_KEYS = (
 	"close_shift",
 	"allow_reprint_invoice",
@@ -99,7 +101,7 @@ def is_superuser(user: str) -> bool:
 
 def is_pos_manager(user: str | None = None) -> bool:
 	"""Whether ``user`` may act on POS records owned by another cashier."""
-	user = user or frappe.session.user
+	user = user or till_cashier() or frappe.session.user
 	if user == "Guest":
 		return False
 	if is_superuser(user):
@@ -109,7 +111,7 @@ def is_pos_manager(user: str | None = None) -> bool:
 
 def user_has_pos_permission(key: str, user: str | None = None, pos_profile: str | None = None) -> bool:
 	"""Whether ``user``'s POS Role grants the permission ``key``."""
-	user = user or frappe.session.user
+	user = user or till_cashier() or frappe.session.user
 	if user == "Guest":
 		return False
 	if is_superuser(user):
@@ -134,7 +136,7 @@ def require_manage_permissions() -> None:
 @frappe.whitelist()
 def get_my_pos_permissions(pos_profile: str | None = None) -> dict:
 	"""Return POS permission flags for the current logged-in user (browser mode)."""
-	user = frappe.session.user
+	user = till_cashier() or frappe.session.user
 	if user == "Guest":
 		return {key: False for key in ALL_PERMISSION_KEYS}
 
@@ -147,7 +149,7 @@ def get_my_pos_permissions(pos_profile: str | None = None) -> dict:
 
 def get_current_user_permissions() -> dict:
 	"""Return the current session user's xPOS role and permission flags."""
-	user = frappe.session.user
+	user = till_cashier() or frappe.session.user
 	if user == "Guest":
 		return {}
 

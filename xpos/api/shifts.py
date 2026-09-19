@@ -9,7 +9,7 @@ from frappe import _
 from frappe.utils import cint, flt, now_datetime, nowdate
 
 from xpos.api.exchange import change_leg_table_exists, payment_tender_fields_exist
-from xpos.api.till import acting_user
+from xpos.api.till import acting_user, till_cashier
 from xpos.api.utilities import can_close_shift, get_invoice_type, is_pos_cashier
 from xpos.utils import row_value
 
@@ -296,7 +296,7 @@ def open_shift(pos_profile: str, company: str, balance_details: str | list[dict]
 def check_open_shift(user: str | None = None):
 	"""Check if the current user has an open POS shift."""
 
-	user = user or frappe.session.user
+	user = user or till_cashier() or frappe.session.user
 
 	open_shifts = _get_open_shift_rows(user)
 
@@ -328,7 +328,7 @@ def close_shift(opening_shift: str, closing_details: str | list[dict] | None):
 	closing_details = json.loads(closing_details) if isinstance(closing_details, str) else closing_details
 
 	opening = frappe.get_doc("POS Opening Shift", opening_shift)
-	return _close_shift(opening, closing_details, frappe.session.user)
+	return _close_shift(opening, closing_details, (till_cashier() or frappe.session.user))
 
 
 def _close_shift(
@@ -562,7 +562,7 @@ def _enrich_shift_data(data: dict, pos_profile: str):
 		profile = frappe.get_doc("POS Profile", pos_profile)
 	data["pos_profile"] = profile.as_dict()
 	data["company"] = frappe.get_cached_doc("Company", profile.company).as_dict()
-	data["is_cashier"] = is_pos_cashier(frappe.session.user, pos_profile)
+	data["is_cashier"] = is_pos_cashier((till_cashier() or frappe.session.user), pos_profile)
 	attach_tender_currencies(data, profile)
 
 	allow_negative_stock = cint(frappe.db.get_single_value("Stock Settings", "allow_negative_stock") or 0)

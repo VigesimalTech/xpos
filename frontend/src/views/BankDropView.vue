@@ -719,7 +719,7 @@ function normalizeBankDrop(row: Record<string, unknown> | BankDrop): BankDrop {
 async function loadDrops() {
 	isLoading.value = true;
 	try {
-		const rows = await getBankDrops({ user: authStore.userEmail });
+		const rows = await getBankDrops({ user: authStore.userName });
 		rawDrops.value = (rows as BankDrop[]).map((drop) => normalizeBankDrop(drop));
 	} catch (error) {
 		console.error("Failed to load bank drops", error);
@@ -741,7 +741,7 @@ async function handleSave() {
 				remarks: form.value.reason,
 				posting_date: postingDate,
 				company: posStore.companyName,
-				user: authStore.userEmail,
+				user: authStore.userName,
 				pos_opening_entry_id: posStore.posOpeningShift?.name
 					? Number(posStore.posOpeningShift.name)
 					: null,

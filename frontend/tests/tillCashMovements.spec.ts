@@ -24,7 +24,7 @@ vi.mock("@/services/dbBridge", () => ({
 	cacheCashMovementContext: vi.fn(async (profile: string, ctx: unknown) => void meta.set(profile, ctx)),
 	getCachedCashMovementContext: vi.fn(async (profile: string) => meta.get(profile) ?? null),
 }));
-vi.mock("@/stores/authStore", () => ({ useAuthStore: () => ({ userEmail: "cashier@example.com" }) }));
+vi.mock("@/stores/authStore", () => ({ useAuthStore: () => ({ userName: "cashier@example.com" }) }));
 
 import { call } from "@/services/api";
 import { usePaymentStore } from "@/stores/paymentStore";

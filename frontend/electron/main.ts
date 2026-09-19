@@ -70,7 +70,7 @@ function installServerCors(): void {
 		"Access-Control-Allow-Credentials": ["true"],
 		"Access-Control-Allow-Methods": ["GET, POST, PUT, DELETE, OPTIONS"],
 		"Access-Control-Allow-Headers": [
-			"Accept, Authorization, Content-Type, X-Frappe-CSRF-Token, X-Frappe-CMD, X-Requested-With",
+			"Accept, Authorization, Content-Type, X-Frappe-CSRF-Token, X-Frappe-CMD, X-Requested-With, X-XPOS-Cashier, X-XPOS-POS-Profile",
 		],
 	};
 

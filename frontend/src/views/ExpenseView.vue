@@ -622,7 +622,7 @@ function normalizeExpense(row: Record<string, unknown> | Expense): Expense {
 async function loadExpenses() {
 	isLoading.value = true;
 	try {
-		const rows = await getExpenses({ user: authStore.userEmail });
+		const rows = await getExpenses({ user: authStore.userName });
 		rawExpenses.value = (rows as Expense[]).map((expense) => normalizeExpense(expense));
 	} catch (error) {
 		console.error("Failed to load expenses", error);
@@ -643,7 +643,7 @@ async function handleSave(values: { expense_account: string; amount: number; rea
 				remarks: values.reason,
 				posting_date: postingDate,
 				company: posStore.companyName,
-				user: authStore.userEmail,
+				user: authStore.userName,
 				pos_opening_entry_id: posStore.posOpeningShift?.name
 					? Number(posStore.posOpeningShift.name)
 					: null,

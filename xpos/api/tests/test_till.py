@@ -59,6 +59,54 @@ class TestActingUser(TillCase):
 		self.assertEqual(self.till.acting_user(None, "Shop 1"), "till@example.com")
 
 
+class TestTillCashier(TillCase):
+	"""K27: checks that ask who is doing something see the till's cashier, not its API user."""
+
+	def setUp(self):
+		super().setUp()
+		self.frappe.flags = {}
+		self.headers = {}
+		self.frappe.get_request_header.side_effect = lambda key, default=None: self.headers.get(key, default)
+
+	def till_sends(self, **headers):
+		self.headers = {"Authorization": "token key:secret", **headers}
+
+	def test_a_person_signed_in_has_no_till_cashier(self):
+		self.headers = {self.till.CASHIER_HEADER: "cashier@example.com", self.till.PROFILE_HEADER: "Shop 1"}
+		self.assertIsNone(self.till.till_cashier())
+
+	def test_a_till_names_its_cashier_and_pos_profile(self):
+		self.till_sends(
+			**{self.till.CASHIER_HEADER: "cashier@example.com", self.till.PROFILE_HEADER: "Shop 1"}
+		)
+		self.assertEqual(self.till.till_cashier(), "cashier@example.com")
+
+	def test_the_names_are_percent_decoded(self):
+		self.on_profile.add(("Café Floor", "cashier@example.com"))
+		self.till_sends(
+			**{
+				self.till.CASHIER_HEADER: "cashier%40example.com",
+				self.till.PROFILE_HEADER: "Caf%C3%A9%20Floor",
+			}
+		)
+		self.assertEqual(self.till.till_cashier(), "cashier@example.com")
+
+	def test_a_till_cannot_name_someone_off_its_pos_profile(self):
+		self.till_sends(
+			**{self.till.CASHIER_HEADER: "manager@example.com", self.till.PROFILE_HEADER: "Shop 1"}
+		)
+		with self.assertRaises(Refused):
+			self.till.till_cashier()
+
+	def test_a_till_that_has_not_said_which_pos_profile_acts_as_itself(self):
+		self.till_sends(**{self.till.CASHIER_HEADER: "cashier@example.com"})
+		self.assertIsNone(self.till.till_cashier())
+
+	def test_outside_a_request_there_is_no_till(self):
+		self.frappe.local.request = None
+		self.assertIsNone(self.till.till_cashier())
+
+
 class TestSyncCashMovement(unittest.TestCase):
 	"""Expenses and bank drops taken on a till reach ERPNext once, for the cashier."""
 
