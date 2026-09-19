@@ -126,6 +126,8 @@ describe("closing a shift on the till", () => {
 		expect(summary.opening_balances.Cash.amount).toBe(1000);
 		// 1000 float + 300 + (600 - 100 change) - 50 expense - 200 bank drop
 		expect(summary.expected_amounts.Cash.amount).toBe(1550);
+		// P9: two sales and two cash movements have not reached ERPNext; the held order is not counted.
+		expect(summary.unsent_count).toBe(4);
 		expect(frappe.calls).toHaveLength(0);
 	});
 

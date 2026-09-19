@@ -1262,7 +1262,22 @@ export function registerDbHandlers(): void {
 			      + (SELECT COALESCE(SUM(\`amount\`), 0) FROM \`bank_drops\` WHERE \`pos_opening_entry_id\` = ?) AS total`,
 			[Number(shiftId), Number(shiftId)],
 		);
+		// P9: closing is allowed with records still waiting, but the cashier is told first.
+		const unsentSales = (
+			await query<{ data: unknown }>(
+				"SELECT `data` FROM `pending_invoices` WHERE `status` IN ('pending', 'syncing', 'failed', 'dead_letter')",
+			)
+		).filter(({ data }) => {
+			const sale = parseJsonColumn(data);
+			return !isHeldOrderData(sale) && shiftOfSale(sale) === String(shiftId);
+		}).length;
+		const [unsentMovements] = await query<{ n: number }>(
+			`SELECT (SELECT COUNT(*) FROM \`expenses\` WHERE \`pos_opening_entry_id\` = ? AND \`sync_status\` <> 'synced')
+			      + (SELECT COUNT(*) FROM \`bank_drops\` WHERE \`pos_opening_entry_id\` = ? AND \`sync_status\` <> 'synced') AS n`,
+			[Number(shiftId), Number(shiftId)],
+		);
 		return {
+			unsent_count: unsentSales + Number(unsentMovements?.n || 0),
 			...summarizeShift({
 				sales,
 				openingBalances,
