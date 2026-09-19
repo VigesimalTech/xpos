@@ -31,7 +31,12 @@ CASHIERS = {
 	"rt-both@example.com": [POS_PROFILE, POS_PROFILE_2],
 	"rt-till@example.com": [POS_PROFILE],
 	"rt-till-2@example.com": [POS_PROFILE_2],
+	"rt-supervisor@example.com": [POS_PROFILE],
 }
+# The till's cash and close tests: a cashier whose POS Role may record expenses and
+# bank drops and close a shift (the installed Manager role).
+POS_ROLES = {("rt-supervisor@example.com", POS_PROFILE): "Manager"}
+BANK_ACCOUNT = "RT Bank"
 # The sale-policy tests: this cashier may give up to 10% alone; the second shop
 # rejects out-of-policy sales rather than flagging them.
 CASHIER_DISCOUNT_LIMIT = {("rt-cashier@example.com", POS_PROFILE): 10}
@@ -197,6 +202,39 @@ def setup(out="/tmp/xpos-rt.json"):
 		)
 	frappe.db.set_value("POS Profile", REJECT_PROFILE, "xpos_out_of_policy_action", "Reject")
 
+	from xpos.install import seed_default_roles, seed_pos_permissions
+
+	seed_pos_permissions()
+	seed_default_roles()
+	for (user, profile_name), role in POS_ROLES.items():
+		frappe.db.set_value("POS Profile User", {"parent": profile_name, "user": user}, "pos_role", role)
+
+	# Expenses and bank drops on the first shop.
+	expense_account = frappe.db.get_value(
+		"Account", {"company": COMPANY, "root_type": "Expense", "is_group": 0, "account_type": ""}, "name"
+	) or frappe.db.get_value("Account", {"company": COMPANY, "root_type": "Expense", "is_group": 0}, "name")
+	bank_parent = frappe.db.get_value(
+		"Account", {"company": COMPANY, "account_type": "Bank", "is_group": 1}, "name"
+	)
+	deposit_account = _ensure(
+		"Account",
+		f"{BANK_ACCOUNT} - {ABBR}",
+		{
+			"account_name": BANK_ACCOUNT,
+			"company": COMPANY,
+			"parent_account": bank_parent,
+			"account_type": "Bank",
+			"is_group": 0,
+		},
+	).name
+	cash_profile = frappe.get_doc("POS Profile", POS_PROFILE)
+	cash_profile.enable_cash_movement = 1
+	cash_profile.allow_pos_expense = 1
+	cash_profile.allow_cash_deposit = 1
+	if not any(row.account == expense_account for row in cash_profile.get("allowed_expense_accounts") or []):
+		cash_profile.append("allowed_expense_accounts", {"account": expense_account})
+	cash_profile.save(ignore_permissions=True)
+
 	from frappe.core.doctype.user.user import generate_keys
 
 	api_secret = generate_keys("Administrator")["api_secret"]
@@ -227,6 +265,9 @@ def setup(out="/tmp/xpos-rt.json"):
 		"unassigned": unassigned,
 		"discount_limits": {f"{u}|{p}": v for (u, p), v in CASHIER_DISCOUNT_LIMIT.items()},
 		"reject_profile": REJECT_PROFILE,
+		"supervisor": "rt-supervisor@example.com",
+		"expense_account": expense_account,
+		"deposit_account": deposit_account,
 	}
 	# A CI-only seed: `out` is the path the workflow passes. The secret goes to a
 	# file rather than the return value, which bench prints to the job log.
