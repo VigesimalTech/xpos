@@ -411,6 +411,7 @@ import { ref, reactive, computed } from "vue";
 import { useRouter } from "vue-router";
 import { toast } from "vue-sonner";
 import { markSetupComplete } from "@/router/index";
+import { setServerUrl, warmApiCredentials } from "@/services/electronBridge";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -571,9 +572,12 @@ async function completeSetup() {
 		}
 
 		if (config.role === "hub") {
-			await api.setServerUrl(config.erpUrl);
+			// Through the bridge: the app read the server and keys when it started, before
+			// there were any, and this session's server calls use what it read.
+			await setServerUrl(config.erpUrl);
 			await api.db.setMeta("api_key", config.apiKey);
 			await api.db.setMeta("api_secret", config.apiSecret);
+			await warmApiCredentials();
 		} else {
 			await api.db.setMeta("hub_url", config.hubUrl);
 		}

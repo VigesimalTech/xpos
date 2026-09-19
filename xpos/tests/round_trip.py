@@ -44,6 +44,9 @@ REJECT_PROFILE = POS_PROFILE_2
 # What a till's API user needs to read everything the till pulls with frappe.client.get_list.
 TILLS = {"rt-till@example.com", "rt-till-2@example.com"}
 TILL_ROLES = ["Accounts User", "Sales User", "Sales Manager", "Stock User"]
+# The desktop tests sign cashiers in on the till, and a cashier's first sign-in on a
+# till is checked against ERPNext. Test users on a throwaway site only.
+CASHIER_PASSWORD = "rt-cashier-password"
 OPENING_QTY = 50
 RATE = 100
 
@@ -95,10 +98,16 @@ def _ensure_user(email, roles=("Sales User",)):
 
 
 def _keys_for(user):
+	"""The user's API key and secret, made once: running the seed again keeps them."""
 	from frappe.core.doctype.user.user import generate_keys
+	from frappe.utils.password import get_decrypted_password
 
-	secret = generate_keys(user)["api_secret"]
-	return {"api_key": frappe.db.get_value("User", user, "api_key"), "api_secret": secret}
+	api_key = frappe.db.get_value("User", user, "api_key")
+	secret = api_key and get_decrypted_password("User", user, "api_secret", raise_exception=False)
+	if not secret:
+		secret = generate_keys(user)["api_secret"]
+		api_key = frappe.db.get_value("User", user, "api_key")
+	return {"api_key": api_key, "api_secret": secret}
 
 
 def setup(out="/tmp/xpos-rt.json"):
@@ -163,8 +172,12 @@ def setup(out="/tmp/xpos-rt.json"):
 		},
 	)
 
+	from frappe.utils.password import update_password
+
 	for email in CASHIERS:
 		_ensure_user(email, TILL_ROLES if email in TILLS else ("Sales User",))
+		if email not in TILLS:
+			update_password(email, CASHIER_PASSWORD)
 
 	for profile_name, extra_users in (
 		(POS_PROFILE, ["Administrator"]),
@@ -235,10 +248,7 @@ def setup(out="/tmp/xpos-rt.json"):
 		cash_profile.append("allowed_expense_accounts", {"account": expense_account})
 	cash_profile.save(ignore_permissions=True)
 
-	from frappe.core.doctype.user.user import generate_keys
-
-	api_secret = generate_keys("Administrator")["api_secret"]
-	api_key = frappe.db.get_value("User", "Administrator", "api_key")
+	admin = _keys_for("Administrator")
 
 	tills = {
 		POS_PROFILE: _keys_for("rt-till@example.com"),
@@ -257,8 +267,8 @@ def setup(out="/tmp/xpos-rt.json"):
 		"customer": CUSTOMER,
 		"pos_profile": POS_PROFILE,
 		"user": "Administrator",
-		"api_key": api_key,
-		"api_secret": api_secret,
+		"api_key": admin["api_key"],
+		"api_secret": admin["api_secret"],
 		"pos_profile_2": POS_PROFILE_2,
 		"cashiers": CASHIERS,
 		"tills": tills,
@@ -268,6 +278,7 @@ def setup(out="/tmp/xpos-rt.json"):
 		"supervisor": "rt-supervisor@example.com",
 		"expense_account": expense_account,
 		"deposit_account": deposit_account,
+		"cashier_password": CASHIER_PASSWORD,
 	}
 	# A CI-only seed: `out` is the path the workflow passes. The secret goes to a
 	# file rather than the return value, which bench prints to the job log.

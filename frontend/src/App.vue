@@ -177,7 +177,6 @@ import { isElectron } from "@/services/electronBridge";
 import ErrorInspector from "@/components/errors/ErrorInspector.vue";
 import { unseenCount as errorUnseenCount } from "@/services/errorLog";
 import { usePrintInvoice } from "@/composables/usePrintInvoice";
-import { getCustomer } from "./utils";
 
 const route = useRoute();
 const posStore = usePosStore();
@@ -207,10 +206,7 @@ const isFullScreen = computed(() => route.meta.fullScreen === true);
 
 async function handleClearCart() {
 	cartStore.clearCart();
-	if (!cartStore.customer && posStore.defaultCustomer) {
-		const customer = await getCustomer(posStore.defaultCustomer);
-		cartStore.setCustomer(customer as any);
-	}
+	await cartStore.applyDefaultCustomer();
 }
 
 function handleProcessPayment() {
@@ -432,12 +428,7 @@ watch(
 		if (wasReady && !ready) {
 			cartStore.clearAll();
 		}
-		if (ready && !wasReady) {
-			if (!cartStore.customer && posStore.defaultCustomer) {
-				const customer = await getCustomer(posStore.defaultCustomer);
-				cartStore.setCustomer(customer as any);
-			}
-		}
+		if (ready && !wasReady) await cartStore.applyDefaultCustomer();
 	},
 );
 

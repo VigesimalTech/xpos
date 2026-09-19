@@ -62,6 +62,8 @@ xpos/public/node_modules
 frontend/tests/e2e/videos/
 frontend/tests/e2e/screenshots/
 frontend/tests/e2e/downloads/
+frontend/test-results/
+frontend/playwright-report/
 # Added by code-review-graph
 .code-review-graph/
 .cursorrules

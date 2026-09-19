@@ -164,7 +164,8 @@ export const usePosStore = defineStore("pos", () => {
 
 	const allowZeroRatedItems = computed(() => !!posProfile.value?.allow_zero_rated_items);
 
-	const maxDiscountAllowed = computed(() => posProfile.value?.max_discount_percentage_allowed || 0);
+	// Number(): the desktop till's database hands decimals back as text.
+	const maxDiscountAllowed = computed(() => Number(posProfile.value?.max_discount_percentage_allowed) || 0);
 
 	const inputQty = computed(() => !!posProfile.value?.input_qty);
 
@@ -188,7 +189,7 @@ export const usePosStore = defineStore("pos", () => {
 
 	const enableReturnValidity = computed(() => !!posProfile.value?.enable_return_validity);
 
-	const returnValidityDays = computed(() => posProfile.value?.return_validity_days || 0);
+	const returnValidityDays = computed(() => Number(posProfile.value?.return_validity_days) || 0);
 
 	const useCustomerCredit = computed(() => !!posProfile.value?.use_customer_credit);
 
@@ -400,6 +401,8 @@ export const usePosStore = defineStore("pos", () => {
 				printSettings.value = result.print_settings || null;
 				showOpeningDialog.value = false;
 				isReady.value = true;
+				// As on the web: without it the shift's receipts wait for the next restart.
+				refreshReceiptContext(profileName);
 				return result;
 			}
 
@@ -523,7 +526,8 @@ export const usePosStore = defineStore("pos", () => {
 			disableRoundedTotal.value = false;
 			printSettings.value = null;
 			isReady.value = false;
-			showClosingDialog.value = false;
+			// The closing dialog stays open on its closed step, to print the summary; its Done
+			// button closes it. Closing it here skipped that step.
 			showOpeningDialog.value = true;
 			printFormats.value = [];
 			lastInvoiceName.value = "";

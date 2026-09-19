@@ -8,6 +8,7 @@ import {
 	deletePendingInvoice,
 	getCachedItemByCode,
 	getCachedStockForItem,
+	getCustomer as getCachedCustomer,
 	getPendingInvoices,
 } from "@/services/dbBridge";
 import { isElectron } from "@/services/electronBridge";
@@ -1170,6 +1171,24 @@ export const useCartStore = defineStore("cart", () => {
 		}
 	}
 
+	/**
+	 * The POS Profile's default customer, when the cart has none. From the till's own
+	 * records first, so it works offline and on the desktop, then from the server on the
+	 * web. A customer not on file yet is sold to by name, as clearAll does.
+	 */
+	async function applyDefaultCustomer(): Promise<void> {
+		const name = String(usePosStore().defaultCustomer || "");
+		if (customer.value || !name) return;
+		let found = (await getCachedCustomer(name).catch(() => null)) as typeof customer.value;
+		if (!found && !isElectron()) {
+			found = await call<NonNullable<typeof customer.value>>("frappe.client.get", {
+				doctype: "Customer",
+				name,
+			}).catch(() => null);
+		}
+		if (!customer.value) customer.value = found || { name, customer_name: name };
+	}
+
 	function openPaymentDialog(): void {
 		showPaymentDialog.value = true;
 	}
@@ -1681,6 +1700,7 @@ export const useCartStore = defineStore("cart", () => {
 		updateItemNotes,
 		updateItemDeliveryDate,
 		setCustomer,
+		applyDefaultCustomer,
 		setDiscount,
 		setItemTax,
 		enterReturnMode,
