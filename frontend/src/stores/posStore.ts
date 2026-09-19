@@ -3,6 +3,7 @@ import { ref, computed, watch } from "vue";
 import { call } from "@/services/api";
 import { cachePOSData, getCachedPOSData, cacheReceiptContext } from "@/services/dbBridge";
 import { isElectron } from "@/services/electronBridge";
+import { useSettingsStore } from "./settingsStore";
 import { hasPermission, loadPermissions } from "@/services/userRights";
 import {
 	type POSOpeningShift,
@@ -95,7 +96,11 @@ export const usePosStore = defineStore("pos", () => {
 
 	const sellingPriceList = computed(() => posProfile.value?.selling_price_list || "");
 
-	const invoiceType = computed(() => xpos.boot?.pos_settings?.invoice_type);
+	// window.xpos.boot exists only in the web POS, which ERPNext serves; the desktop app reads the
+	// type from the ERP settings it fetches. Without it Order History asked ERPNext for no doctype.
+	const invoiceType = computed(
+		() => xpos.boot?.pos_settings?.invoice_type || useSettingsStore().invoiceType || "Sales Invoice",
+	);
 
 	const defaultPrintFormat = computed(
 		() => posProfile.value?.default_print_format || "XPOS Thermal Receipt",
