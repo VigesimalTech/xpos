@@ -1,6 +1,17 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 import { call } from "@/services/api";
+import { isElectron } from "@/services/electronBridge";
+import {
+	cacheCashMovementContext,
+	createBankDrop,
+	createExpense,
+	getBankDrops,
+	getCachedCashMovementContext,
+	getExpenses,
+} from "@/services/dbBridge";
+import { nowDate } from "@/utils/datetime";
+import { useAuthStore } from "./authStore";
 import type {
 	OutstandingInvoice,
 	UnallocatedPayment,
@@ -88,14 +99,45 @@ export const usePaymentStore = defineStore("payment", () => {
 				{ pos_profile: posProfile },
 			);
 			cashMovementContext.value = result;
+			await cacheCashMovementContext(posProfile, result).catch(() => {});
 			return result;
 		} catch (error) {
+			// Offline, the till uses the settings it last saw.
+			const cached = await getCachedCashMovementContext<CashMovementContext>(posProfile).catch(
+				() => null,
+			);
+			if (cached) {
+				cashMovementContext.value = cached;
+				return cached;
+			}
 			console.error("Error fetching cash movement context:", error);
 			return null;
 		}
 	}
 
+	/**
+	 * On the till, an expense or deposit is kept with the shift and synced to ERPNext
+	 * (sync_cash_movement), as on the Expenses and Bank Drops screens: the shift is the
+	 * till's own until it syncs, and the till may be offline.
+	 */
+	async function recordOnTill(
+		kind: "expense" | "deposit",
+		data: Record<string, unknown>,
+	): Promise<unknown> {
+		const record = {
+			to_account: kind === "expense" ? data.expense_account : data.target_account,
+			amount: data.amount,
+			remarks: data.reason,
+			posting_date: nowDate(),
+			company: data.company,
+			user: useAuthStore().userName,
+			pos_opening_entry_id: data.pos_opening_shift ? Number(data.pos_opening_shift) : null,
+		};
+		return kind === "expense" ? createExpense(record) : createBankDrop(record);
+	}
+
 	async function createPosExpense(data: Record<string, unknown>): Promise<unknown> {
+		if (isElectron()) return recordOnTill("expense", data);
 		isLoadingCashMovement.value = true;
 		try {
 			const result = await call("xpos.api.cash_movements.create_pos_expense", {
@@ -111,6 +153,7 @@ export const usePaymentStore = defineStore("payment", () => {
 	}
 
 	async function createCashDeposit(data: Record<string, unknown>): Promise<unknown> {
+		if (isElectron()) return recordOnTill("deposit", data);
 		isLoadingCashMovement.value = true;
 		try {
 			const result = await call("xpos.api.cash_movements.create_cash_deposit", {
@@ -133,6 +176,22 @@ export const usePaymentStore = defineStore("payment", () => {
 		limit_start?: number,
 		limit_page_length?: number,
 	): Promise<{ data: POSCashMovement[]; total: number }> {
+		if (isElectron()) {
+			const rows = (await (movement_type === "deposit" ? getBankDrops : getExpenses)({
+				shiftLocalId: openingShift,
+			})) as Record<string, unknown>[];
+			shiftCashMovements.value = rows.map(
+				(row) =>
+					({
+						name: String(row.erp_id || row.id),
+						movement_type: movement_type === "deposit" ? "Deposit" : "Expense",
+						amount: Number(row.amount || 0),
+						remarks: String(row.remarks || ""),
+						posting_date: String(row.posting_date || ""),
+					}) as unknown as POSCashMovement,
+			);
+			return { data: shiftCashMovements.value, total: rows.length };
+		}
 		try {
 			const params: Record<string, string | number> = {
 				pos_opening_shift: openingShift,

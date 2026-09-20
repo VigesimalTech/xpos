@@ -269,7 +269,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from "vue";
-import { isElectron } from "@/services/electronBridge";
+import { isElectron, setServerUrl } from "@/services/electronBridge";
 import { getSetting, setSetting, countItems, clearAllData } from "@/services/dbBridge";
 import { usePosStore } from "@/stores/posStore";
 import { toast } from "vue-sonner";
@@ -450,9 +450,8 @@ async function testServerConnection() {
 }
 
 async function saveServerUrl() {
-	if (isElectronMode) {
-		await window.electronAPI!.setServerUrl(settings.serverUrl);
-	}
+	// Through the bridge, so this session's server calls go to the new server too.
+	if (isElectronMode) await setServerUrl(settings.serverUrl);
 	await setSetting("server_url", settings.serverUrl, "connection");
 	toast.success("Server URL saved");
 }

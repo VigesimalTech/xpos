@@ -31,7 +31,12 @@ CASHIERS = {
 	"rt-both@example.com": [POS_PROFILE, POS_PROFILE_2],
 	"rt-till@example.com": [POS_PROFILE],
 	"rt-till-2@example.com": [POS_PROFILE_2],
+	"rt-supervisor@example.com": [POS_PROFILE],
 }
+# The till's cash and close tests: a cashier whose POS Role may record expenses and
+# bank drops and close a shift (the installed Manager role).
+POS_ROLES = {("rt-supervisor@example.com", POS_PROFILE): "Manager"}
+BANK_ACCOUNT = "RT Bank"
 # The sale-policy tests: this cashier may give up to 10% alone; the second shop
 # rejects out-of-policy sales rather than flagging them.
 CASHIER_DISCOUNT_LIMIT = {("rt-cashier@example.com", POS_PROFILE): 10}
@@ -39,6 +44,9 @@ REJECT_PROFILE = POS_PROFILE_2
 # What a till's API user needs to read everything the till pulls with frappe.client.get_list.
 TILLS = {"rt-till@example.com", "rt-till-2@example.com"}
 TILL_ROLES = ["Accounts User", "Sales User", "Sales Manager", "Stock User"]
+# The desktop tests sign cashiers in on the till, and a cashier's first sign-in on a
+# till is checked against ERPNext. Test users on a throwaway site only.
+CASHIER_PASSWORD = "rt-cashier-password"
 OPENING_QTY = 50
 RATE = 100
 
@@ -90,10 +98,16 @@ def _ensure_user(email, roles=("Sales User",)):
 
 
 def _keys_for(user):
+	"""The user's API key and secret, made once: running the seed again keeps them."""
 	from frappe.core.doctype.user.user import generate_keys
+	from frappe.utils.password import get_decrypted_password
 
-	secret = generate_keys(user)["api_secret"]
-	return {"api_key": frappe.db.get_value("User", user, "api_key"), "api_secret": secret}
+	api_key = frappe.db.get_value("User", user, "api_key")
+	secret = api_key and get_decrypted_password("User", user, "api_secret", raise_exception=False)
+	if not secret:
+		secret = generate_keys(user)["api_secret"]
+		api_key = frappe.db.get_value("User", user, "api_key")
+	return {"api_key": api_key, "api_secret": secret}
 
 
 def setup(out="/tmp/xpos-rt.json"):
@@ -158,8 +172,12 @@ def setup(out="/tmp/xpos-rt.json"):
 		},
 	)
 
+	from frappe.utils.password import update_password
+
 	for email in CASHIERS:
 		_ensure_user(email, TILL_ROLES if email in TILLS else ("Sales User",))
+		if email not in TILLS:
+			update_password(email, CASHIER_PASSWORD)
 
 	for profile_name, extra_users in (
 		(POS_PROFILE, ["Administrator"]),
@@ -197,10 +215,40 @@ def setup(out="/tmp/xpos-rt.json"):
 		)
 	frappe.db.set_value("POS Profile", REJECT_PROFILE, "xpos_out_of_policy_action", "Reject")
 
-	from frappe.core.doctype.user.user import generate_keys
+	from xpos.install import seed_default_roles, seed_pos_permissions
 
-	api_secret = generate_keys("Administrator")["api_secret"]
-	api_key = frappe.db.get_value("User", "Administrator", "api_key")
+	seed_pos_permissions()
+	seed_default_roles()
+	for (user, profile_name), role in POS_ROLES.items():
+		frappe.db.set_value("POS Profile User", {"parent": profile_name, "user": user}, "pos_role", role)
+
+	# Expenses and bank drops on the first shop.
+	expense_account = frappe.db.get_value(
+		"Account", {"company": COMPANY, "root_type": "Expense", "is_group": 0, "account_type": ""}, "name"
+	) or frappe.db.get_value("Account", {"company": COMPANY, "root_type": "Expense", "is_group": 0}, "name")
+	bank_parent = frappe.db.get_value(
+		"Account", {"company": COMPANY, "account_type": "Bank", "is_group": 1}, "name"
+	)
+	deposit_account = _ensure(
+		"Account",
+		f"{BANK_ACCOUNT} - {ABBR}",
+		{
+			"account_name": BANK_ACCOUNT,
+			"company": COMPANY,
+			"parent_account": bank_parent,
+			"account_type": "Bank",
+			"is_group": 0,
+		},
+	).name
+	cash_profile = frappe.get_doc("POS Profile", POS_PROFILE)
+	cash_profile.enable_cash_movement = 1
+	cash_profile.allow_pos_expense = 1
+	cash_profile.allow_cash_deposit = 1
+	if not any(row.account == expense_account for row in cash_profile.get("allowed_expense_accounts") or []):
+		cash_profile.append("allowed_expense_accounts", {"account": expense_account})
+	cash_profile.save(ignore_permissions=True)
+
+	admin = _keys_for("Administrator")
 
 	tills = {
 		POS_PROFILE: _keys_for("rt-till@example.com"),
@@ -219,14 +267,18 @@ def setup(out="/tmp/xpos-rt.json"):
 		"customer": CUSTOMER,
 		"pos_profile": POS_PROFILE,
 		"user": "Administrator",
-		"api_key": api_key,
-		"api_secret": api_secret,
+		"api_key": admin["api_key"],
+		"api_secret": admin["api_secret"],
 		"pos_profile_2": POS_PROFILE_2,
 		"cashiers": CASHIERS,
 		"tills": tills,
 		"unassigned": unassigned,
 		"discount_limits": {f"{u}|{p}": v for (u, p), v in CASHIER_DISCOUNT_LIMIT.items()},
 		"reject_profile": REJECT_PROFILE,
+		"supervisor": "rt-supervisor@example.com",
+		"expense_account": expense_account,
+		"deposit_account": deposit_account,
+		"cashier_password": CASHIER_PASSWORD,
 	}
 	# A CI-only seed: `out` is the path the workflow passes. The secret goes to a
 	# file rather than the return value, which bench prints to the job log.

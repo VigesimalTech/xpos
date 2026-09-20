@@ -294,7 +294,7 @@ async function submit() {
 
 		const shift = posStore.posOpeningShift?.name;
 		if (shift) {
-			await paymentStore.fetchShiftCashMovements(posStore.profileName, shift);
+			await paymentStore.fetchShiftCashMovements(shift, paymentStore.cashMovementType);
 		}
 
 		amount.value = 0;

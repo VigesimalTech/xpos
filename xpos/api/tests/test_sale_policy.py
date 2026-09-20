@@ -133,10 +133,11 @@ class TestResolveCashier(unittest.TestCase):
 	def setUp(self):
 		from unittest.mock import patch
 
-		import xpos.api.sale_policy as sale_policy
+		from xpos.api import sale_policy, till
 
 		self.sale_policy = sale_policy
 		self.frappe = patch.object(sale_policy, "frappe").start()
+		patch.object(till, "frappe", self.frappe).start()
 		self.addCleanup(patch.stopall)
 		self.frappe.session.user = "person@example.com"
 		self.frappe.db.get_value.return_value = "shift-cashier@example.com"

@@ -19,6 +19,18 @@
 				</div>
 
 				<template v-else-if="summary">
+					<div
+						v-if="unsentCount > 0"
+						class="rounded-md border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-800 dark:text-amber-200"
+						data-testid="closing-unsent"
+					>
+						{{
+							__(
+								"{0} sales or cash movements from this shift have not reached ERPNext yet. Nothing is lost: they sync when the till is back online, and the close is sent after them.",
+								[unsentCount],
+							)
+						}}
+					</div>
 					<div class="grid grid-cols-3 gap-3">
 						<Card class="bg-primary/5 border-primary/20">
 							<CardContent class="p-4 text-center">
@@ -228,10 +240,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { computed, ref, onMounted } from "vue";
 import { usePosStore } from "@/stores/posStore";
 import { useMoney } from "@/composables/useMoney";
 import { showSuccess, showError } from "@/services/api";
+import { isElectron } from "@/services/electronBridge";
+import { buildShiftSummaryHtml, type ShiftSummaryPrint } from "@/services/receiptTemplate";
+import { nowDatetime } from "@/utils/datetime";
+import { get_full_url } from "@/utils";
 import { hasPermission } from "@/services/userRights";
 import { formatFor, precisionFor, roundFor } from "@/composables/useCurrency";
 import type { ShiftModeTotal } from "@/types/pos.types";
@@ -275,7 +291,13 @@ const isLoading = ref(true);
 const isClosing = ref(false);
 const shiftClosed = ref(false);
 const closedShiftName = ref("");
+/** What the till prints for the close; the shift is gone from the store once it closes. */
+const closedShiftPrint = ref<ShiftSummaryPrint | null>(null);
 const summary = ref<ClosingSummary | null>(null);
+/** On the till: sales and cash movements of this shift not yet in ERPNext. */
+const unsentCount = computed(() =>
+	Number((summary.value as { unsent_count?: number } | null)?.unsent_count || 0),
+);
 const closingDetails = ref<ClosingDetail[]>([]);
 
 function buildClosingDetails(data: ClosingSummary): ClosingDetail[] {
@@ -339,8 +361,26 @@ async function handleCloseShift() {
 	}
 	isClosing.value = true;
 
+	const shift = posStore.posOpeningShift;
+	const printable: ShiftSummaryPrint = {
+		shift: String(shift?.name || ""),
+		cashier: String(shift?.user || ""),
+		pos_profile: posStore.profileName,
+		printed_at: "",
+		currency: posStore.invoiceCurrency || "",
+		total_invoices: Number(summary.value?.total_invoices || 0),
+		returns_count: Number((summary.value as { returns_count?: number } | null)?.returns_count || 0),
+		grand_total: Number(summary.value?.grand_total || 0),
+		cash_out: Number((summary.value as { cash_out?: number } | null)?.cash_out || 0),
+		rows: closingDetails.value.map((d) => ({
+			...d,
+			currency: d.currency || posStore.invoiceCurrency || "",
+		})),
+	};
+
 	try {
 		const result = (await posStore.closeShift(closingDetails.value)) as { name?: string } | undefined;
+		closedShiftPrint.value = printable;
 		closedShiftName.value = result?.name || "";
 		shiftClosed.value = true;
 		showSuccess(__("Shift closed successfully!"));
@@ -351,11 +391,18 @@ async function handleCloseShift() {
 	}
 }
 
-function printShiftSummary() {
+async function printShiftSummary() {
 	const name = closedShiftName.value;
 	if (!name) return;
-	const url = `/printview?doctype=POS+Closing+Entry&name=${name}&no_letterhead=0&trigger_print=1`;
-	window.open(url, "_blank");
+	if (isElectron() && closedShiftPrint.value) {
+		// The close is the till's own until it syncs: print it from what the till counted.
+		const html = buildShiftSummaryHtml({ ...closedShiftPrint.value, printed_at: nowDatetime() });
+		const result = await window.electronAPI?.print?.printReceipt(html);
+		if (!result?.success) showError(__("The shift summary did not print. {0}", [result?.error || ""]));
+		return;
+	}
+	const url = `/printview?doctype=POS+Closing+Shift&name=${encodeURIComponent(name)}&no_letterhead=0&trigger_print=1`;
+	window.open(get_full_url(url), "_blank");
 }
 
 function close() {

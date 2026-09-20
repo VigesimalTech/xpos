@@ -9,7 +9,13 @@ export default defineConfig({
 		environment: "jsdom",
 		include: ["tests/**/*.spec.ts", "tests/**/*.test.ts"],
 		// Main-process tests need MariaDB; they run with vitest.integration.config.ts.
-		exclude: [...configDefaults.exclude, "tests/integration/**", "tests/roundtrip/**"],
+		// tests/desktop is Playwright driving the built app (playwright.desktop.config.ts).
+		exclude: [
+			...configDefaults.exclude,
+			"tests/integration/**",
+			"tests/roundtrip/**",
+			"tests/desktop/**",
+		],
 		coverage: {
 			provider: "v8",
 			reporter: ["text", "json", "html"],

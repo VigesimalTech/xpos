@@ -76,6 +76,7 @@ import { usePosStore } from "@/stores/posStore";
 import { useMoney } from "@/composables/useMoney";
 import { call, showSuccess, showError } from "@/services/api";
 import { extractErrorMessage } from "@/utils";
+import { serverShiftName } from "@/services/dbBridge";
 import {
 	Dialog,
 	DialogContent,
@@ -144,7 +145,7 @@ async function submit() {
 			invoice: props.invoice.name,
 			amount: amount.value,
 			mode_of_payment: modeOfPayment.value,
-			pos_opening_shift: shiftName,
+			pos_opening_shift: await serverShiftName(shiftName),
 			pos_profile: posStore.profileName,
 		});
 		showSuccess(__("Payment recorded against {0}", [props.invoice.name]));

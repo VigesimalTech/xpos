@@ -190,6 +190,35 @@ jobs:
           XPOS_TEST_DB_NAME: test_xpos_rt
         run: yarn test:roundtrip
 
+      # The built desktop app, driven by Playwright through a day on a new till against
+      # this site (frontend/tests/desktop). Electron's binary was skipped at install.
+      - name: Desktop app end-to-end tests
+        working-directory: xpos/frontend
+        env:
+          XPOS_RT_CONFIG: /tmp/xpos-rt.json
+          XPOS_RT_URL: http://test_site:8000
+          XPOS_TEST_DB_HOST: 127.0.0.1
+          XPOS_TEST_DB_PORT: "3306"
+          XPOS_TEST_DB_USER: root
+          XPOS_TEST_DB_PASSWORD: root
+          XPOS_TEST_DB_NAME: test_xpos_desktop
+          # Ubuntu 24.04 runners refuse Chromium's sandbox helper from node_modules.
+          ELECTRON_DISABLE_SANDBOX: "1"
+        run: |
+          node node_modules/electron/install.js
+          yarn build:electron
+          xvfb-run -a yarn test:desktop
+
+      - name: Desktop test report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-e2e
+          path: |
+            xpos/frontend/playwright-report/
+            xpos/frontend/test-results/
+          retention-days: 7
+
       - name: Server logs
         if: failure()
         run: |

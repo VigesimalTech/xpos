@@ -12,6 +12,7 @@ from frappe.utils.background_jobs import enqueue
 from xpos.api.exchange import get_currency_precision
 from xpos.api.sale_policy import apply_sale_policy
 from xpos.api.tender import build_change_legs, build_tender_legs, invoice_currency_of
+from xpos.api.till import till_cashier
 from xpos.api.utilities import can_recall_other_shift_tabs, get_invoice_type, is_pos_cashier
 
 
@@ -340,7 +341,7 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 		_guard_stale_draft(doctype, invoice_name, data.get("modified"))
 
 		if invoice_doc.get("pos_awaiting_settlement") and not is_pos_cashier(
-			frappe.session.user, pos_profile
+			(till_cashier() or frappe.session.user), pos_profile
 		):
 			frappe.throw(_("Only a cashier can settle this invoice."), frappe.PermissionError)
 
@@ -724,7 +725,9 @@ def finalize_fiscal_invoice(name: str, fbr_invoice_number: str, doctype: str | N
 	if invoice_doc.docstatus != 0:
 		return _build_invoice_response(invoice_doc)
 
-	if invoice_doc.get("pos_profile") and not is_pos_cashier(frappe.session.user, invoice_doc.pos_profile):
+	if invoice_doc.get("pos_profile") and not is_pos_cashier(
+		(till_cashier() or frappe.session.user), invoice_doc.pos_profile
+	):
 		frappe.throw(_("Only a cashier can finalize this invoice."), frappe.PermissionError)
 
 	fbr.apply_fiscal_number(invoice_doc, fbr_invoice_number)
@@ -748,7 +751,9 @@ def discard_draft_invoice(name: str, doctype: str | None = None) -> dict:
 	invoice_doc = frappe.get_doc(doctype, name)
 	if invoice_doc.docstatus != 0:
 		frappe.throw(_("Only a draft invoice can be discarded."))
-	if invoice_doc.get("pos_profile") and not is_pos_cashier(frappe.session.user, invoice_doc.pos_profile):
+	if invoice_doc.get("pos_profile") and not is_pos_cashier(
+		(till_cashier() or frappe.session.user), invoice_doc.pos_profile
+	):
 		frappe.throw(_("Only a cashier can discard this invoice."), frappe.PermissionError)
 
 	frappe.delete_doc(doctype, name, ignore_permissions=True, force=True)
@@ -968,7 +973,7 @@ def get_unsettled_invoices(pos_profile: str | None = None):
 	if not frappe.db.has_column(doctype, "pos_awaiting_settlement"):
 		return []
 
-	if not is_pos_cashier(frappe.session.user, pos_profile):
+	if not is_pos_cashier((till_cashier() or frappe.session.user), pos_profile):
 		frappe.throw(_("You are not permitted to settle invoices."), frappe.PermissionError)
 
 	filters = {"docstatus": 0, "is_pos": 1, "pos_awaiting_settlement": 1}

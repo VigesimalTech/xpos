@@ -8,6 +8,7 @@ import {
 } from "./syncConfig";
 import { query, queryOne, execute, upsertBatch, getMeta, setMeta } from "../database/dbService";
 import { createLogger } from "../logger";
+import { isHeldOrderData, parseJsonColumn, shiftOfSale } from "../database/shiftSummary";
 
 const log = createLogger("SyncEngine");
 
@@ -253,6 +254,10 @@ async function pullTable(config: SyncTableConfig): Promise<number> {
 	return totalPulled;
 }
 
+function isHeldOrder(record: Record<string, unknown>): boolean {
+	return isHeldOrderData(parseJsonColumn(record.data));
+}
+
 async function detectDeletions(config: SyncTableConfig): Promise<number> {
 	if (config.direction === "push" || config.deletionCheck === false) return 0;
 
@@ -321,6 +326,35 @@ async function detectDeletions(config: SyncTableConfig): Promise<number> {
 	return deleted;
 }
 
+/**
+ * Reconcile local POS users against the server's full list: a cashier removed from the
+ * POS Profile or disabled in ERPNext must not stay on the till. The generic deletion
+ * check cannot run here (there is no POS User doctype to list), so this fetches the
+ * same get_pos_users endpoint unpaginated and deletes locals it does not return.
+ */
+async function reconcileUsers(): Promise<number> {
+	const config = SYNC_TABLES.find((t) => t.idbStore === "pos_users");
+	if (!config?.pullMethod) return 0;
+
+	const serverUsers = await apiCall<{ name: string }[]>(config.pullMethod, {
+		limit_start: 0,
+		limit_page_length: 0,
+	});
+	if (!serverUsers || !Array.isArray(serverUsers) || serverUsers.length === 0) return 0;
+
+	const serverNames = new Set(serverUsers.map((u) => u.name));
+	const localRows = await query<{ name: string }>("SELECT `name` FROM `pos_users`");
+	let removed = 0;
+	for (const row of localRows) {
+		if (!serverNames.has(row.name)) {
+			await execute("DELETE FROM `pos_users` WHERE `name` = ?", [row.name]);
+			log.info(`Reconcile: removed POS user ${row.name} (no longer on this till's profiles)`);
+			removed++;
+		}
+	}
+	return removed;
+}
+
 async function pushTable(config: SyncTableConfig): Promise<{ synced: number; failed: number }> {
 	if (!config.pushMethod) return { synced: 0, failed: 0 };
 
@@ -356,16 +390,20 @@ async function pushTable(config: SyncTableConfig): Promise<{ synced: number; fai
 		pendingTable = "pos_opening_shifts";
 		statusField = "sync_status";
 		retryField = "COALESCE(retry_count, 0)";
-		localIdField = "id";
+		localIdField = "local_id";
 		statusPending = "'pending'";
 		statusFailed = "'failed'";
 		statusSyncing = "syncing";
 		statusSynced = "synced";
+	} else if (config.idbStore === "expenses" || config.idbStore === "bank_drops") {
+		pendingTable = config.idbStore;
+		statusField = "sync_status";
+		localIdField = "local_id";
 	} else if (config.idbStore === "pos_closing_entries") {
 		pendingTable = "pos_closing_entries";
 		statusField = "sync_status";
 		retryField = "COALESCE(retry_count, 0)";
-		localIdField = "id";
+		localIdField = "local_id";
 		statusPending = "'pending'";
 		statusFailed = "'failed'";
 		statusSyncing = "syncing";
@@ -399,6 +437,8 @@ async function pushTable(config: SyncTableConfig): Promise<{ synced: number; fai
 
 	for (const record of pendingRecords) {
 		if (!isOnline()) break;
+		// A held order is not a sale yet: it stays on the till until it is paid.
+		if (pendingTable === "pending_invoices" && isHeldOrder(record)) continue;
 
 		const recordId = record[idField] as number;
 		const recordLocalId = String(record[localIdField] || recordId);
@@ -444,11 +484,23 @@ async function pushTable(config: SyncTableConfig): Promise<{ synced: number; fai
 					company: record.company,
 					balance_details: await getOpeningShiftDetails(recordId),
 				};
+			} else if (pendingTable === "expenses" || pendingTable === "bank_drops") {
+				const serverShiftName = await getServerShiftName(String(record.pos_opening_entry_id ?? ""));
+				if (!serverShiftName) {
+					// Its shift has not reached ERPNext yet; try again next round.
+					await execute(
+						`UPDATE \`${pendingTable}\` SET \`${statusField}\` = 'pending' WHERE \`${idField}\` = ?`,
+						[recordId],
+					);
+					continue;
+				}
+				data = cashMovementPayload(pendingTable, record, serverShiftName);
 			} else if (pendingTable === "pos_closing_entries") {
 				const openingShiftLocalId = record.pos_opening_entry_id as number;
 				const serverOpeningShiftName = await getServerShiftName(String(openingShiftLocalId));
 
-				if (!serverOpeningShiftName) {
+				// Wait until ERPNext has the shift and everything taken in it.
+				if (!serverOpeningShiftName || (await shiftHasUnsentRecords(String(openingShiftLocalId)))) {
 					await execute(
 						`UPDATE \`${pendingTable}\` SET \`${statusField}\` = 'pending' WHERE \`${idField}\` = ?`,
 						[recordId],
@@ -492,6 +544,11 @@ async function pushTable(config: SyncTableConfig): Promise<{ synced: number; fai
 						`UPDATE \`${pendingTable}\` SET \`server_name\` = ?, \`${statusField}\` = '${statusSynced}' WHERE \`${idField}\` = ?`,
 						[serverResult.name, recordId],
 					);
+				} else if (pendingTable === "expenses" || pendingTable === "bank_drops") {
+					await execute(
+						`UPDATE \`${pendingTable}\` SET \`erp_id\` = ?, \`${statusField}\` = '${statusSynced}', \`error\` = NULL, \`synced_at\` = NOW() WHERE \`${idField}\` = ?`,
+						[serverResult.name, recordId],
+					);
 				} else {
 					await execute(
 						`UPDATE \`${pendingTable}\` SET \`erp_id\` = ?, \`${statusField}\` = '${statusSynced}', \`synced_at\` = NOW() WHERE \`${idField}\` = ?`,
@@ -533,6 +590,11 @@ async function pushTable(config: SyncTableConfig): Promise<{ synced: number; fai
 						error: errMsg,
 					});
 				}
+			} else if (pendingTable === "expenses" || pendingTable === "bank_drops") {
+				await execute(
+					`UPDATE \`${pendingTable}\` SET \`${statusField}\` = 'failed', \`error\` = ? WHERE \`${idField}\` = ?`,
+					[errMsg, recordId],
+				);
 			} else {
 				await execute(
 					`UPDATE \`${pendingTable}\` SET \`${statusField}\` = 'failed' WHERE \`${idField}\` = ?`,
@@ -554,6 +616,53 @@ async function pushTable(config: SyncTableConfig): Promise<{ synced: number; fai
 	}
 
 	return { synced, failed };
+}
+
+/**
+ * Whether a shift still has sales or cash movements that have not reached ERPNext.
+ * A sale the server gave up on (dead letter) does not hold the close back: it needs a
+ * manager, and the close must still reach ERPNext.
+ */
+export async function shiftHasUnsentRecords(localShiftId: string): Promise<boolean> {
+	const [movements] = await query<{ n: number }>(
+		`SELECT (SELECT COUNT(*) FROM \`expenses\` WHERE \`pos_opening_entry_id\` = ? AND \`sync_status\` <> 'synced')
+		      + (SELECT COUNT(*) FROM \`bank_drops\` WHERE \`pos_opening_entry_id\` = ? AND \`sync_status\` <> 'synced') AS n`,
+		[Number(localShiftId), Number(localShiftId)],
+	);
+	if (Number(movements?.n || 0) > 0) return true;
+	const sales = await query<{ data: unknown }>(
+		"SELECT `data` FROM `pending_invoices` WHERE `status` IN ('pending', 'syncing', 'failed')",
+	);
+	return sales.some(({ data }) => {
+		const sale = parseJsonColumn(data);
+		return !isHeldOrderData(sale) && shiftOfSale(sale) === localShiftId;
+	});
+}
+
+/** What sync_cash_movement is sent for a local expense or bank drop. */
+export function cashMovementPayload(
+	table: "expenses" | "bank_drops",
+	record: Record<string, unknown>,
+	serverShiftName: string,
+): Record<string, unknown> {
+	const postingDate =
+		record.posting_date instanceof Date
+			? localDate(record.posting_date)
+			: String(record.posting_date || "").slice(0, 10);
+	return {
+		movement_type: table === "expenses" ? "Expense" : "Deposit",
+		pos_opening_shift: serverShiftName,
+		account: record.to_account,
+		amount: Number(record.amount || 0),
+		remarks: record.remarks || "",
+		posting_date: postingDate || undefined,
+		cashier: record.owner || undefined,
+	};
+}
+
+function localDate(d: Date): string {
+	const pad = (n: number) => String(n).padStart(2, "0");
+	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 async function getServerShiftName(localShiftId: string): Promise<string | null> {
@@ -581,7 +690,7 @@ async function getOpeningShiftDetails(
 	);
 	return rows.map((r) => ({
 		mode_of_payment: r.mode_of_payment,
-		opening_amount: r.opening_amount,
+		opening_amount: Number(r.opening_amount || 0),
 	}));
 }
 
@@ -605,7 +714,14 @@ async function getClosingEntryDetails(closingId: number): Promise<
      FROM \`pos_closing_entry_details\` WHERE \`parent_id\` = ?`,
 		[closingId],
 	);
-	return rows;
+	// DECIMAL columns come back as strings.
+	return rows.map((r) => ({
+		mode_of_payment: r.mode_of_payment,
+		opening_amount: Number(r.opening_amount || 0),
+		expected_amount: Number(r.expected_amount || 0),
+		closing_amount: Number(r.closing_amount || 0),
+		difference: Number(r.difference || 0),
+	}));
 }
 
 /**
@@ -679,6 +795,17 @@ async function runSyncCycle(): Promise<void> {
 					emitToRenderer("sync-error", {
 						message: `Deletion check failed for ${table.label}: ${errMsg}`,
 						table: table.label,
+					});
+				}
+			}
+			if (isOnline()) {
+				try {
+					totalDeleted += await reconcileUsers();
+				} catch (error) {
+					const errMsg = error instanceof Error ? error.message : String(error);
+					emitToRenderer("sync-error", {
+						message: `POS user reconciliation failed: ${errMsg}`,
+						table: "POS Users",
 					});
 				}
 			}
@@ -807,5 +934,7 @@ export function stopSyncEngine(): void {
 		pushIntervalId = null;
 	}
 	syncContext = null;
+	syncCycleCount = 0;
+	syncState = { isSyncing: false, lastSyncTime: null, pendingPushCount: 0 };
 	log.info("Stopped");
 }

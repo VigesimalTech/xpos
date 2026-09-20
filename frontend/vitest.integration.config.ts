@@ -15,6 +15,7 @@ export default defineConfig({
 	resolve: {
 		alias: {
 			electron: resolve(__dirname, "./tests/integration/support/electronShim.ts"),
+			"@": resolve(__dirname, "./src"),
 		},
 	},
 });

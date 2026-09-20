@@ -289,12 +289,13 @@ import KeyboardShortcutsDialog from "@/components/dialogs/KeyboardShortcutsDialo
 import { useOfflineStore } from "@/stores/offlineStore";
 
 import { useBranding } from "@/composables/useBranding";
-import { get_full_url } from "@/utils";
+import { usePrintInvoice } from "@/composables/usePrintInvoice";
 import { cn } from "@/lib/utils";
 import { useRouter } from "vue-router";
 
 const router = useRouter();
 const posStore = usePosStore();
+const { reprint } = usePrintInvoice();
 const paymentStore = usePaymentStore();
 const authStore = useAuthStore();
 
@@ -378,12 +379,7 @@ onUnmounted(() => {
 function printLastInvoice() {
 	const name = posStore.lastInvoiceName;
 	if (!name) return;
-	window.open(
-		get_full_url(
-			`/printview?doctype=${posStore.invoiceType}&name=${name}&format=${posStore.defaultPrintFormat}&no_letterhead=0&trigger_print=1`,
-		),
-		"_blank",
-	);
+	reprint(name);
 }
 
 function handleSignOut() {

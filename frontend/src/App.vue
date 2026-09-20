@@ -176,11 +176,11 @@ import { useKeyboardShortcuts } from "@/composables/useKeyboardShortcuts";
 import { isElectron } from "@/services/electronBridge";
 import ErrorInspector from "@/components/errors/ErrorInspector.vue";
 import { unseenCount as errorUnseenCount } from "@/services/errorLog";
-import { get_full_url } from "@/utils";
-import { getCustomer } from "./utils";
+import { usePrintInvoice } from "@/composables/usePrintInvoice";
 
 const route = useRoute();
 const posStore = usePosStore();
+const { reprint } = usePrintInvoice();
 const cartStore = useCartStore();
 const customerStore = useCustomerStore();
 const itemStore = useItemStore();
@@ -206,10 +206,7 @@ const isFullScreen = computed(() => route.meta.fullScreen === true);
 
 async function handleClearCart() {
 	cartStore.clearCart();
-	if (!cartStore.customer && posStore.defaultCustomer) {
-		const customer = await getCustomer(posStore.defaultCustomer);
-		cartStore.setCustomer(customer as any);
-	}
+	await cartStore.applyDefaultCustomer();
 }
 
 function handleProcessPayment() {
@@ -281,12 +278,7 @@ function handleCashDeposit() {
 function handlePrintLast() {
 	const name = posStore.lastInvoiceName;
 	if (!name) return;
-	window.open(
-		get_full_url(
-			`/printview?doctype=${posStore.invoiceType}&name=${name}&format=${posStore.defaultPrintFormat}&no_letterhead=0&trigger_print=1`,
-		),
-		"_blank",
-	);
+	reprint(name);
 }
 
 function handleShowShortcutsDialog() {
@@ -436,12 +428,7 @@ watch(
 		if (wasReady && !ready) {
 			cartStore.clearAll();
 		}
-		if (ready && !wasReady) {
-			if (!cartStore.customer && posStore.defaultCustomer) {
-				const customer = await getCustomer(posStore.defaultCustomer);
-				cartStore.setCustomer(customer as any);
-			}
-		}
+		if (ready && !wasReady) await cartStore.applyDefaultCustomer();
 	},
 );
 

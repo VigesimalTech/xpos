@@ -45,6 +45,18 @@ const DEFAULT_CONFIG: DbConfig = {
 let pool: Pool | null = null;
 let currentConfig: DbConfig = { ...DEFAULT_CONFIG };
 
+/**
+ * Where Windows installs also keep db-config.json. Not for a profile of its own
+ * (XPOS_USER_DATA_DIR): a test or trial build must never read or write the installed till's.
+ */
+function appDataConfigPaths(): string[] {
+	if (!process.env.APPDATA || process.env.XPOS_USER_DATA_DIR) return [];
+	return [
+		path.join(process.env.APPDATA, "X POS", "db-config.json"),
+		path.join(process.env.APPDATA, "xpos-frontend", "db-config.json"),
+	];
+}
+
 function configFilePath(): string {
 	return path.join(app.getPath("userData"), "db-config.json");
 }
@@ -56,10 +68,7 @@ export function saveDbConfig(cfg: DbConfig): void {
 	} catch {
 		/* ignore */
 	}
-	if (process.env.APPDATA) {
-		pathsToWrite.push(path.join(process.env.APPDATA, "X POS", "db-config.json"));
-		pathsToWrite.push(path.join(process.env.APPDATA, "xpos-frontend", "db-config.json"));
-	}
+	pathsToWrite.push(...appDataConfigPaths());
 	let toWrite: DbConfig = cfg;
 	try {
 		toWrite = { ...cfg, password: cfg.password ? encryptSecret(cfg.password) : cfg.password };
@@ -82,10 +91,7 @@ export function loadDbConfig(): DbConfig {
 	try {
 		candidates.push(path.join(app.getPath("userData"), "db-config.json"));
 	} catch {}
-	if (process.env.APPDATA) {
-		candidates.push(path.join(process.env.APPDATA, "X POS", "db-config.json"));
-		candidates.push(path.join(process.env.APPDATA, "xpos-frontend", "db-config.json"));
-	}
+	candidates.push(...appDataConfigPaths());
 
 	for (const candidate of candidates) {
 		try {
@@ -243,7 +249,43 @@ async function runMigrations(): Promise<void> {
 		["apply_customer_discount", "TINYINT(1) NOT NULL DEFAULT 0"],
 		["allow_print_draft_invoices", "TINYINT(1) NOT NULL DEFAULT 0"],
 		["use_offline_mode", "TINYINT(1) NOT NULL DEFAULT 0"],
+		["allow_cash_deposit", "TINYINT(1) DEFAULT 0"],
+		["allow_credit_sale", "TINYINT(1) DEFAULT 0"],
+		["allow_delete_offline_invoice", "TINYINT(1) DEFAULT 0"],
+		["allow_open_tab_recall", "TINYINT(1) DEFAULT 0"],
+		["allow_outstanding_settlement", "TINYINT(1) DEFAULT 0"],
+		["allow_partial_payment", "TINYINT(1) DEFAULT 0"],
+		["allow_pos_expense", "TINYINT(1) DEFAULT 0"],
+		["allow_return", "TINYINT(1) DEFAULT 0"],
+		["allow_return_without_invoice", "TINYINT(1) DEFAULT 0"],
+		["allow_sales_order", "TINYINT(1) DEFAULT 0"],
+		["allow_write_off_change", "TINYINT(1) DEFAULT 0"],
+		["allow_zero_rated_items", "TINYINT(1) DEFAULT 0"],
+		["auto_fetch_coupons_gifts", "TINYINT(1) DEFAULT 0"],
+		["auto_set_batch", "TINYINT(1) DEFAULT 0"],
+		["auto_set_delivery_charges", "TINYINT(1) DEFAULT 0"],
+		["back_office_cash_account", "VARCHAR(255) DEFAULT NULL"],
+		["default_pos_expense_account", "VARCHAR(255) DEFAULT NULL"],
+		["default_print_format", "VARCHAR(255) DEFAULT NULL"],
+		["default_view", "VARCHAR(20) DEFAULT NULL"],
+		["display_additional_notes", "TINYINT(1) DEFAULT 0"],
+		["display_item_code", "TINYINT(1) DEFAULT 0"],
+		["enable_cash_movement", "TINYINT(1) DEFAULT 0"],
+		["enable_cashier_settlement", "TINYINT(1) DEFAULT 0"],
+		["enable_return_validity", "TINYINT(1) DEFAULT 0"],
+		["hide_closing_shift", "TINYINT(1) DEFAULT 0"],
+		["hide_variants_items", "TINYINT(1) DEFAULT 0"],
+		["input_qty", "TINYINT(1) DEFAULT 0"],
+		["max_discount_percentage_allowed", "DECIMAL(9,3) DEFAULT 100"],
+		["pos_mixed_currency_tender", "TINYINT(1) DEFAULT 0"],
+		["print_backup_receipt", "TINYINT(1) DEFAULT 0"],
+		["require_cash_movement_remarks", "TINYINT(1) DEFAULT 0"],
+		["return_validity_days", "INT DEFAULT NULL"],
+		["show_template_items", "TINYINT(1) DEFAULT 0"],
+		["tax_inclusive", "TINYINT(1) DEFAULT 0"],
+		["use_customer_credit", "TINYINT(1) DEFAULT 0"],
 	];
+	let addedPosProfileColumn = false;
 	for (const [col, typedef] of posProfileMigrations) {
 		try {
 			const [existing] = await db.execute<RowDataPacket[]>(
@@ -253,10 +295,17 @@ async function runMigrations(): Promise<void> {
 			if ((existing as RowDataPacket[]).length === 0) {
 				await db.execute(`ALTER TABLE \`pos_profiles\` ADD COLUMN \`${col}\` ${typedef}`);
 				log.info(`Migration: added pos_profiles.${col}`);
+				addedPosProfileColumn = true;
 			}
 		} catch (err) {
 			log.warn(`Migration for pos_profiles.${col} failed`, err);
 		}
+	}
+	// The profiles are pulled only when they change in ERPNext: pull them all once more so
+	// the new columns are filled rather than left at their defaults.
+	if (addedPosProfileColumn) {
+		await db.execute("DELETE FROM `sync_meta` WHERE `key` = 'last_sync_pos_profiles'");
+		log.info("Migration: POS Profiles will be pulled again in full");
 	}
 
 	const posUserMigrations: [string, string][] = [
@@ -368,6 +417,12 @@ async function runMigrations(): Promise<void> {
 		["currencies", "number_format", "VARCHAR(20) DEFAULT NULL"],
 		["currencies", "smallest_currency_fraction_value", "DECIMAL(18,6) DEFAULT 0"],
 		["currencies", "symbol_on_right", "TINYINT(1) DEFAULT 0"],
+		["expenses", "local_id", "VARCHAR(64) DEFAULT NULL"],
+		["expenses", "error", "TEXT"],
+		["bank_drops", "local_id", "VARCHAR(64) DEFAULT NULL"],
+		["bank_drops", "error", "TEXT"],
+		["pos_opening_shifts", "local_id", "VARCHAR(64) DEFAULT NULL"],
+		["pos_closing_entries", "local_id", "VARCHAR(64) DEFAULT NULL"],
 	];
 	for (const [table, col, typedef] of columnMigrations) {
 		try {
@@ -381,6 +436,16 @@ async function runMigrations(): Promise<void> {
 			}
 		} catch (err) {
 			log.warn(`Migration for ${table}.${col} failed`, err);
+		}
+	}
+
+	// Records sync under a UUID: the numeric id is the same on every till and restarts
+	// on a reinstall, so ERPNext would take one till's shift for another's.
+	for (const tbl of ["expenses", "bank_drops", "pos_opening_shifts", "pos_closing_entries"]) {
+		try {
+			await db.execute(`UPDATE \`${tbl}\` SET \`local_id\` = UUID() WHERE \`local_id\` IS NULL`);
+		} catch (err) {
+			log.warn(`Migration giving ${tbl} a local_id failed`, err);
 		}
 	}
 

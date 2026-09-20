@@ -1,5 +1,7 @@
 import { usePosStore } from "@/stores/posStore";
 import { call, showError } from "@/services/api";
+import { isElectron } from "@/services/electronBridge";
+import { get_full_url } from "@/utils";
 import { getCachedReceiptContext } from "@/services/dbBridge";
 import { buildReceiptHtml } from "@/services/receiptTemplate";
 import type { ReceiptSnapshot } from "@/types/pos.types";
@@ -55,7 +57,8 @@ export function usePrintInvoice() {
 	const posStore = usePosStore();
 
 	function resolveDoctype(): "Sales Invoice" | "POS Invoice" {
-		return xpos.boot?.pos_settings?.invoice_type === "POS Invoice" ? "POS Invoice" : "Sales Invoice";
+		// posStore reads the ERP settings on the till, where there is no boot.
+		return posStore.invoiceType === "POS Invoice" ? "POS Invoice" : "Sales Invoice";
 	}
 
 	async function printInvoice(invoiceName: string, options: PrintInvoiceOptions = {}) {
@@ -107,8 +110,7 @@ export function usePrintInvoice() {
 				return;
 			}
 			const snapshot = (invoice.data as Record<string, unknown>)?.receipt as
-				| ReceiptSnapshot
-				| undefined;
+				ReceiptSnapshot | undefined;
 			const context = await getCachedReceiptContext(posStore.profileName);
 
 			if (snapshot && context) {
@@ -164,5 +166,55 @@ export function usePrintInvoice() {
 		}
 	}
 
-	return { printInvoice, printInvoiceLocal, printReceiptOffline };
+	/**
+	 * An ERPNext invoice printed on the till. The print view is a page of ERPNext's that the
+	 * till has no browser session for, so the till asks for its HTML with its own key and
+	 * sends it to the receipt printer.
+	 */
+	async function printServerInvoiceOnTill(name: string): Promise<void> {
+		try {
+			const doctype = resolveDoctype();
+			const { html, style } = await call<{ html: string; style?: string }>(
+				"frappe.www.printview.get_html_and_style",
+				{
+					doc: doctype,
+					name,
+					print_format: posStore.defaultPrintFormat || "XPOS Thermal Receipt",
+					no_letterhead: posStore.printSettings?.letter_head ? 0 : 1,
+				},
+			);
+			const result = await window.electronAPI!.print.printReceipt(
+				`<style>${style || ""}</style>${html}`,
+			);
+			if (!result?.success) {
+				showError(__("The receipt did not print. {0}", [result?.error || ""]));
+				return;
+			}
+			call("xpos.api.print_formats.mark_invoice_printed", { doctype, name }).catch(() => {
+				/* non-fatal: reprint control is best-effort */
+			});
+		} catch (error) {
+			console.error("Print error:", error);
+			showError(__("Failed to print invoice"));
+		}
+	}
+
+	/**
+	 * Print a sale's receipt again, by the name the POS shows for it: a till's own sale
+	 * (LOCAL-n) from the till's copy, an ERPNext invoice from ERPNext.
+	 */
+	async function reprint(name: string): Promise<void> {
+		const local = /^LOCAL-(\d+)$/.exec(name);
+		if (local && isElectron()) return printInvoiceLocal(Number(local[1]));
+		if (isElectron()) return printServerInvoiceOnTill(name);
+		window.open(
+			get_full_url(
+				`/printview?doctype=${encodeURIComponent(resolveDoctype())}&name=${encodeURIComponent(name)}` +
+					`&format=${encodeURIComponent(posStore.defaultPrintFormat)}&no_letterhead=0&trigger_print=1`,
+			),
+			"_blank",
+		);
+	}
+
+	return { printInvoice, printInvoiceLocal, printReceiptOffline, reprint };
 }

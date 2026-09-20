@@ -604,6 +604,21 @@ export async function createPosClosingEntry(entry: Record<string, unknown>) {
 	throw new Error("POS Closing Entries require Electron mode");
 }
 
+/**
+ * The name ERPNext knows a shift by. On the till the open shift has the till's own id until
+ * it syncs; then this is ERPNext's name for it, and before that the till's id.
+ */
+export async function serverShiftName(shiftName: string): Promise<string> {
+	if (!isElectron() || !shiftName) return shiftName;
+	return (await getDb().getServerShiftName(shiftName)) || shiftName;
+}
+
+/** The till's own summary of a shift, for closing it offline. */
+export async function getShiftClosingSummary(shiftLocalId: string) {
+	if (isElectron()) return getDb().getShiftClosingSummary(shiftLocalId);
+	return null;
+}
+
 export async function getPosClosingEntries(opts?: { user?: string; status?: string }) {
 	if (isElectron()) return getDb().getPosClosingEntries(opts);
 	return [];
@@ -679,10 +694,12 @@ export async function getExpenses(opts?: {
 	}));
 }
 
-export async function deleteExpense(id: number | string) {
-	if (isElectron()) return getDb().deleteExpense(id as number);
+/** Returns whether it was deleted: on the till, one that has reached ERPNext is not. */
+export async function deleteExpense(id: number | string): Promise<boolean> {
+	if (isElectron()) return Boolean(await getDb().deleteExpense(Number(id)));
 	const { call } = await import("./api");
-	return call("frappe.client.cancel", { doctype: "POS Cash Movement", name: String(id) });
+	await call("frappe.client.cancel", { doctype: "POS Cash Movement", name: String(id) });
+	return true;
 }
 
 export async function getModesOfPayment() {
@@ -728,10 +745,12 @@ export async function getBankDrops(opts?: {
 	}));
 }
 
-export async function deleteBankDrop(id: number | string) {
-	if (isElectron()) return getDb().deleteBankDrop(id as number);
+/** Returns whether it was deleted: on the till, one that has reached ERPNext is not. */
+export async function deleteBankDrop(id: number | string): Promise<boolean> {
+	if (isElectron()) return Boolean(await getDb().deleteBankDrop(Number(id)));
 	const { call } = await import("./api");
-	return call("frappe.client.cancel", { doctype: "POS Cash Movement", name: String(id) });
+	await call("frappe.client.cancel", { doctype: "POS Cash Movement", name: String(id) });
+	return true;
 }
 
 export async function createStockAdjustment(adj: Record<string, unknown>) {
@@ -1058,6 +1077,17 @@ export async function cacheReceiptContext(
 	}
 	const idb = await import("./idbService");
 	await idb.cacheReceiptContext(posProfile, context);
+}
+
+/** The last cash movement settings seen for a POS Profile, so the till records expenses offline. */
+export async function cacheCashMovementContext(posProfile: string, context: unknown): Promise<void> {
+	if (isElectron()) await getDb().setMeta(`cash_movement_context::${posProfile}`, JSON.stringify(context));
+}
+
+export async function getCachedCashMovementContext<T>(posProfile: string): Promise<T | null> {
+	if (!isElectron()) return null;
+	const val = await getDb().getMeta(`cash_movement_context::${posProfile}`);
+	return val ? (JSON.parse(val) as T) : null;
 }
 
 export async function getCachedReceiptContext(

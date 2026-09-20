@@ -607,7 +607,10 @@ function normalizeExpense(row: Record<string, unknown> | Expense): Expense {
 		remarks: String(record.remarks || "") || undefined,
 		posting_date: String(record.posting_date || "") || undefined,
 		docstatus: Number(record.docstatus || 0),
-		can_delete: Boolean(record.can_delete ?? Number(record.docstatus || 0) < 2),
+		// On the till, a record can be deleted until it reaches ERPNext; after that it is cancelled there.
+		can_delete: record.sync_status
+			? record.sync_status === "pending" || record.sync_status === "failed"
+			: Boolean(record.can_delete ?? Number(record.docstatus || 0) < 2),
 		company: String(record.company || "") || undefined,
 		pos_profile: String(record.pos_profile || "") || undefined,
 		user: String(record.user || "") || undefined,
@@ -619,7 +622,7 @@ function normalizeExpense(row: Record<string, unknown> | Expense): Expense {
 async function loadExpenses() {
 	isLoading.value = true;
 	try {
-		const rows = await getExpenses({ user: authStore.userEmail });
+		const rows = await getExpenses({ user: authStore.userName });
 		rawExpenses.value = (rows as Expense[]).map((expense) => normalizeExpense(expense));
 	} catch (error) {
 		console.error("Failed to load expenses", error);
@@ -640,7 +643,7 @@ async function handleSave(values: { expense_account: string; amount: number; rea
 				remarks: values.reason,
 				posting_date: postingDate,
 				company: posStore.companyName,
-				user: authStore.userEmail,
+				user: authStore.userName,
 				pos_opening_entry_id: posStore.posOpeningShift?.name
 					? Number(posStore.posOpeningShift.name)
 					: null,
@@ -674,7 +677,11 @@ async function handleSave(values: { expense_account: string; amount: number; rea
 async function handleDelete(id: number | string) {
 	try {
 		if (isElectronMode) {
-			await deleteExpense(id);
+			if (!(await deleteExpense(id))) {
+				showError(__("This expense has reached ERPNext. Cancel it there."));
+				await loadExpenses();
+				return;
+			}
 		} else {
 			await call("frappe.client.cancel", { doctype: "POS Cash Movement", name: String(id) });
 		}

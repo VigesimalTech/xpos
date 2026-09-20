@@ -1,10 +1,11 @@
 import { call } from "@/services/api";
+import { setTillIdentity } from "@/services/tillIdentity";
 import { isElectron } from "@/services/electronBridge";
 import { loadPermissions, resetPermissions } from "@/services/userRights";
 import { forgetSession, recallSession, rememberSession } from "@/services/offlineSession";
 import { UserSession } from "@/types/pos.types";
 import { defineStore } from "pinia";
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import { isOnline, isNetworkError } from "@/utils";
 
 function friendlyMessage(err: unknown, fallback: string): string {
@@ -49,6 +50,14 @@ export const useAuthStore = defineStore("auth", () => {
 	const userEmail = computed(() => user.value?.user_email || "");
 	const userFullName = computed(() => user.value?.user_fullname || "");
 	const isGuest = computed(() => !user.value || user.value.user === "Guest");
+
+	if (isElectron()) {
+		watch(
+			() => user.value?.user,
+			(cashier) => setTillIdentity({ cashier: cashier && cashier !== "Guest" ? cashier : undefined }),
+			{ immediate: true },
+		);
+	}
 	const isSystemManager = computed(() =>
 		Boolean((window.xpos?.boot as Record<string, unknown> | undefined)?.xpos_is_system_manager),
 	);
@@ -194,6 +203,10 @@ export const useAuthStore = defineStore("auth", () => {
 			}
 
 			const userData = posUser as Record<string, unknown>;
+			if (userData.enabled !== undefined && !Number(userData.enabled)) {
+				error.value = "This account has been disabled.";
+				return false;
+			}
 			const db = window.electronAPI!.db;
 
 			// A user pulled from ERPNext has no local password until it has been checked against

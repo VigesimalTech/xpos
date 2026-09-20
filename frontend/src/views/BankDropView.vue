@@ -704,7 +704,10 @@ function normalizeBankDrop(row: Record<string, unknown> | BankDrop): BankDrop {
 		remarks: String(record.remarks || "") || undefined,
 		posting_date: String(record.posting_date || "") || undefined,
 		docstatus: Number(record.docstatus || 0),
-		can_delete: Boolean(record.can_delete ?? Number(record.docstatus || 0) < 2),
+		// On the till, a record can be deleted until it reaches ERPNext; after that it is cancelled there.
+		can_delete: record.sync_status
+			? record.sync_status === "pending" || record.sync_status === "failed"
+			: Boolean(record.can_delete ?? Number(record.docstatus || 0) < 2),
 		company: String(record.company || "") || undefined,
 		pos_profile: String(record.pos_profile || "") || undefined,
 		user: String(record.user || "") || undefined,
@@ -716,7 +719,7 @@ function normalizeBankDrop(row: Record<string, unknown> | BankDrop): BankDrop {
 async function loadDrops() {
 	isLoading.value = true;
 	try {
-		const rows = await getBankDrops({ user: authStore.userEmail });
+		const rows = await getBankDrops({ user: authStore.userName });
 		rawDrops.value = (rows as BankDrop[]).map((drop) => normalizeBankDrop(drop));
 	} catch (error) {
 		console.error("Failed to load bank drops", error);
@@ -738,7 +741,7 @@ async function handleSave() {
 				remarks: form.value.reason,
 				posting_date: postingDate,
 				company: posStore.companyName,
-				user: authStore.userEmail,
+				user: authStore.userName,
 				pos_opening_entry_id: posStore.posOpeningShift?.name
 					? Number(posStore.posOpeningShift.name)
 					: null,
@@ -772,7 +775,11 @@ async function handleSave() {
 async function handleDelete(id: number | string) {
 	try {
 		if (isElectronMode) {
-			await deleteBankDrop(id);
+			if (!(await deleteBankDrop(id))) {
+				showError(__("This deposit has reached ERPNext. Cancel it there."));
+				await loadDrops();
+				return;
+			}
 		} else {
 			await call("frappe.client.cancel", { doctype: "POS Cash Movement", name: String(id) });
 		}

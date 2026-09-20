@@ -7,6 +7,8 @@ from frappe import _
 from frappe.sessions import get_csrf_token as session_csrf_token
 from frappe.utils import cint, flt
 
+from xpos.api.till import till_cashier
+
 ALL_PERMISSION_KEYS = (
 	"close_shift",
 	"allow_reprint_invoice",
@@ -28,6 +30,10 @@ ALL_PERMISSION_KEYS = (
 DEFAULT_ROLE = "Cashier"
 DEFAULT_DISCOUNT_LIMIT = 0  # 0 means no discount without a manager; 100 means no cap
 ROLE_CACHE_KEY = "xpos_role_permissions"
+
+# Stands in for an absent LIMIT: MariaDB has no keyword for "every row", and a
+# parameterised LIMIT keeps the query free of string formatting.
+ALL_ROWS = 2**63 - 1
 
 
 def resolve_role_permissions(role_name: str) -> dict:
@@ -99,7 +105,7 @@ def is_superuser(user: str) -> bool:
 
 def is_pos_manager(user: str | None = None) -> bool:
 	"""Whether ``user`` may act on POS records owned by another cashier."""
-	user = user or frappe.session.user
+	user = user or till_cashier() or frappe.session.user
 	if user == "Guest":
 		return False
 	if is_superuser(user):
@@ -109,7 +115,7 @@ def is_pos_manager(user: str | None = None) -> bool:
 
 def user_has_pos_permission(key: str, user: str | None = None, pos_profile: str | None = None) -> bool:
 	"""Whether ``user``'s POS Role grants the permission ``key``."""
-	user = user or frappe.session.user
+	user = user or till_cashier() or frappe.session.user
 	if user == "Guest":
 		return False
 	if is_superuser(user):
@@ -134,7 +140,7 @@ def require_manage_permissions() -> None:
 @frappe.whitelist()
 def get_my_pos_permissions(pos_profile: str | None = None) -> dict:
 	"""Return POS permission flags for the current logged-in user (browser mode)."""
-	user = frappe.session.user
+	user = till_cashier() or frappe.session.user
 	if user == "Guest":
 		return {key: False for key in ALL_PERMISSION_KEYS}
 
@@ -147,7 +153,7 @@ def get_my_pos_permissions(pos_profile: str | None = None) -> dict:
 
 def get_current_user_permissions() -> dict:
 	"""Return the current session user's xPOS role and permission flags."""
-	user = frappe.session.user
+	user = till_cashier() or frappe.session.user
 	if user == "Guest":
 		return {}
 
@@ -225,7 +231,9 @@ def get_pos_users(
         LIMIT %(limit)s OFFSET %(offset)s
         """,
 		{
-			"limit": limit_page_length,
+			# limit_page_length 0 means "every user" — the till's reconciliation pull.
+			# MariaDB has no "no limit" keyword, so ask for more rows than can exist.
+			"limit": limit_page_length or ALL_ROWS,
 			"offset": limit_start,
 			"all_profiles": 0 if till_profiles else 1,
 			# IN () is not valid SQL; the placeholder matches nothing when all_profiles is 1.

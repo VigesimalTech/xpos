@@ -153,6 +153,8 @@ export interface ElectronDbAPI {
 	): unknown;
 	getSalesInvoice(localId: string): unknown;
 	getShiftSalesSummary(shiftLocalId: string): unknown;
+	getShiftClosingSummary(shiftLocalId: string): unknown;
+	getServerShiftName(shiftLocalId: string): Promise<string | null>;
 	createExpense(expense: Record<string, unknown>): unknown;
 	getExpenses(
 		opts:

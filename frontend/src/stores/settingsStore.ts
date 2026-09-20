@@ -113,6 +113,8 @@ export const useSettingsStore = defineStore("settings", () => {
 	const currencyPrecision = ref<CurrencyPrecision>({ ...emptyCurrencyPrecision });
 	const numberFormat = ref<NumberFormatSettings>({ ...emptyNumberFormat });
 	const itemSearch = ref<ItemSearchSettings>({ ...emptyItemSearchSettings });
+	// Sales Invoice or POS Invoice. The web POS also has it in window.xpos.boot; the desktop app only here.
+	const invoiceType = ref("");
 
 	const defaultSellingPriceList = computed(() => sellingSettings.value.default_selling_price_list);
 
@@ -175,6 +177,7 @@ export const useSettingsStore = defineStore("settings", () => {
 		currencyPrecision.value = { ...emptyCurrencyPrecision, ...data.currency_precision };
 		applyNumberFormat(data.number_format);
 		itemSearch.value = { ...emptyItemSearchSettings, ...data.item_search };
+		invoiceType.value = data.pos_settings?.invoice_type || "";
 		isLoaded.value = true;
 	}
 
@@ -242,6 +245,7 @@ export const useSettingsStore = defineStore("settings", () => {
 		currencyPrecision.value = { ...emptyCurrencyPrecision };
 		numberFormat.value = { ...emptyNumberFormat };
 		itemSearch.value = { ...emptyItemSearchSettings };
+		invoiceType.value = "";
 		isLoaded.value = false;
 	}
 
@@ -255,6 +259,7 @@ export const useSettingsStore = defineStore("settings", () => {
 		currencyPrecision,
 		numberFormat,
 		itemSearch,
+		invoiceType,
 		defaultSellingPriceList,
 		defaultBuyingPriceList,
 		defaultCurrency,

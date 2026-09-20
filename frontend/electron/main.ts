@@ -17,6 +17,10 @@ import { type NodeRole } from "./hub/nodeConfig";
 import { getMeta, setMeta } from "./database/dbService";
 import { createLogger, getLogDir } from "./logger";
 
+// A profile of its own (database settings, logs, single-instance lock) for tests and
+// trial builds, so they never touch an installed till's. Must be set before `ready`.
+if (process.env.XPOS_USER_DATA_DIR) app.setPath("userData", process.env.XPOS_USER_DATA_DIR);
+
 const log = createLogger("Main");
 
 const __filename = fileURLToPath(import.meta.url);
@@ -70,7 +74,7 @@ function installServerCors(): void {
 		"Access-Control-Allow-Credentials": ["true"],
 		"Access-Control-Allow-Methods": ["GET, POST, PUT, DELETE, OPTIONS"],
 		"Access-Control-Allow-Headers": [
-			"Accept, Authorization, Content-Type, X-Frappe-CSRF-Token, X-Frappe-CMD, X-Requested-With",
+			"Accept, Authorization, Content-Type, X-Frappe-CSRF-Token, X-Frappe-CMD, X-Requested-With, X-XPOS-Cashier, X-XPOS-POS-Profile",
 		],
 	};
 
@@ -484,6 +488,8 @@ ipcMain.handle(
 
 			// Generate print HTML from invoice data. Names come from user input: escape them.
 			const esc = (v: unknown) => String(v ?? "").replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+			// Amounts from MariaDB arrive as strings (DECIMAL), not numbers.
+			const money = (v: unknown) => (Number(v) || 0).toFixed(2);
 			const invoiceData = data.data as Record<string, unknown>;
 			const items = (invoiceData.items || []) as Array<{
 				item_code: string;
@@ -533,8 +539,8 @@ ipcMain.handle(
             <div class="item">
               <span>${esc(item.item_name || item.item_code)}</span>
               <span>${item.qty}</span>
-              <span>${item.rate?.toFixed(2)}</span>
-              <span>${item.amount?.toFixed(2)}</span>
+              <span>${money(item.rate)}</span>
+              <span>${money(item.amount)}</span>
             </div>
           `,
 				)
@@ -543,7 +549,7 @@ ipcMain.handle(
         <div class="divider"></div>
         <div class="row total">
           <span>Grand Total:</span>
-          <span>${data.grandTotal?.toFixed(2)}</span>
+          <span>${money(data.grandTotal)}</span>
         </div>
         <div class="footer">
           <p>Thank you for your business!</p>

@@ -658,7 +658,8 @@ async function holdOrder() {
 		if (!data.customer) {
 			const bootCustomer = (window.xpos?.boot as Record<string, unknown>)?.sysdefaults as
 				Record<string, string> | undefined;
-			data.customer = bootCustomer?.customer || "";
+			// The till has no boot; the POS Profile's customer is its default.
+			data.customer = bootCustomer?.customer || posStore.defaultCustomer || "";
 		}
 
 		if (!data.customer) {
@@ -737,7 +738,8 @@ async function sendToCashier() {
 		if (!data.customer) {
 			const bootCustomer = (window.xpos?.boot as Record<string, unknown>)?.sysdefaults as
 				Record<string, string> | undefined;
-			data.customer = bootCustomer?.customer || "";
+			// The till has no boot; the POS Profile's customer is its default.
+			data.customer = bootCustomer?.customer || posStore.defaultCustomer || "";
 		}
 
 		if (!data.customer) {
