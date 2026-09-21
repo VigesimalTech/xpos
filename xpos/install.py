@@ -23,7 +23,7 @@ POS_PERMISSIONS = (
 	("settle_outstanding_invoice", "Settle Outstanding Invoice", "Sales Operations"),
 	("void_after_payment", "Void After Payment", "Sales Operations"),
 	("return_without_receipt", "Return Without Receipt", "Sales Operations"),
-	# Deleting a line, lowering a quantity, clearing the sale or discarding a held order.
+	# Deleting a line (or lowering it to 0), clearing the sale or discarding a held order.
 	("remove_cart_items", "Remove Items From the Cart", "Sales Operations"),
 	# Cash Management
 	("expense", "Expense", "Cash Management"),

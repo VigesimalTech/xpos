@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  *
  * K19: taking something out of the customer's sale needs Remove Items From the Cart, or a
- * manager's PIN on the till: deleting a line, lowering a quantity, clearing the sale.
+ * manager's PIN on the till: deleting a line (or lowering it to 0), clearing the sale.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
@@ -80,12 +80,25 @@ describe("K19: removing items from the sale", () => {
 		expect(cart.items.map((i) => i.item_code)).toEqual(["B"]);
 	});
 
-	it("lowering a quantity is a removal too", async () => {
+	it("lowering a quantity that keeps the line needs no one", async () => {
 		const cart = cartWith("A");
 
 		await cart.requestItemQty(0, 1);
+
+		expect(approval.requestApproval).not.toHaveBeenCalled();
+		expect(cart.items[0].qty).toBe(1);
+	});
+
+	it("lowering a quantity to 0 removes the line, so it needs a manager", async () => {
+		const cart = cartWith("A");
+
+		await cart.requestItemQty(0, 0);
 		expect(approval.requestApproval).toHaveBeenCalledTimes(1);
-		expect(cart.items[0].qty).toBe(2);
+		expect(cart.items).toHaveLength(1);
+
+		approval.requestApproval.mockResolvedValue("manager@example.com");
+		await cart.requestItemQty(0, 0);
+		expect(cart.items).toHaveLength(0);
 	});
 
 	it("raising a quantity needs no one", async () => {

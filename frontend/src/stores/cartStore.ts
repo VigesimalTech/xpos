@@ -722,17 +722,14 @@ export const useCartStore = defineStore("cart", () => {
 	): Promise<{ success: boolean; message?: string }> {
 		const item = items.value[index];
 		if (!item) return { success: false };
-		// Down to nothing, the line goes: a removal, logged as one.
+		// Down to nothing, the line goes: a removal, which needs the permission or a manager.
 		if (qty === 0) return { success: await requestRemoveItem(index) };
 		const before = item.qty;
 		const lowering = Math.abs(qty) < Math.abs(before);
-		if (!lowering || item.pos_is_free_item) return updateItemQty(index, qty);
-		const allowed = await allowRemoval(
-			__("Lower {0} from {1} to {2}", [item.item_name, String(before), String(qty)]),
-		);
-		if (!allowed.ok) return { success: false };
 		const result = updateItemQty(index, qty);
-		if (result.success && allowed.logged) {
+		// A lower quantity that keeps the line needs no one; the audit log (K20) still has it.
+		const logged = lowering && !item.pos_is_free_item && !isReturnMode.value && isElectron();
+		if (result.success && logged) {
 			const taken = Math.abs(before) - Math.abs(qty);
 			recordAudit({
 				event_type: "qty_lowered",
@@ -740,7 +737,7 @@ export const useCartStore = defineStore("cart", () => {
 				item_name: item.item_name,
 				qty: taken,
 				amount: lineValue(item, taken),
-				approved_by: allowed.approvedBy,
+				approved_by: null,
 				description: `${before} to ${qty}`,
 			});
 		}
