@@ -17,6 +17,11 @@ export interface PosPermissions {
 	bank_drop: boolean;
 	current_stock_by_brand: boolean;
 	current_stock_report: boolean;
+	approve_exceptions: boolean;
+	void_after_payment: boolean;
+	no_sale_drawer: boolean;
+	return_without_receipt: boolean;
+	remove_cart_items: boolean;
 }
 
 const DEFAULT_PERMISSIONS: PosPermissions = {
@@ -34,9 +39,16 @@ const DEFAULT_PERMISSIONS: PosPermissions = {
 	bank_drop: false,
 	current_stock_by_brand: false,
 	current_stock_report: false,
+	approve_exceptions: false,
+	void_after_payment: false,
+	no_sale_drawer: false,
+	return_without_receipt: false,
+	remove_cart_items: false,
 };
 
 const currentRole = ref<string>("");
+/** The cashier's discount limit on this POS Profile: 0 means none, 100 means no cap. */
+const discountLimit = ref<number>(0);
 const permissions = ref<PosPermissions>({ ...DEFAULT_PERMISSIONS });
 const isLoaded = ref(false);
 
@@ -77,6 +89,7 @@ export async function loadPermissions(userEmail: string, posProfile?: string): P
 		if (posUser) {
 			currentRole.value = ((posUser as Record<string, unknown>).role as string) || "";
 			permissions.value = mergePermissions(posUser);
+			discountLimit.value = Number((posUser as Record<string, unknown>).discount_limit) || 0;
 		} else {
 			permissions.value = { ...DEFAULT_PERMISSIONS };
 		}
@@ -96,6 +109,18 @@ export function getPermissions(): PosPermissions {
 	return { ...permissions.value };
 }
 
+/**
+ * Whether to offer an action: the cashier's role allows it, or, on the desktop till, a
+ * manager can approve it with their PIN (K19). The web POS offers only what the role allows.
+ */
+export function canDoOrAsk(key: keyof PosPermissions): boolean {
+	return hasPermission(key) || isElectron();
+}
+
+export function getDiscountLimit(): number {
+	return discountLimit.value;
+}
+
 export function getCurrentRole(): string {
 	return currentRole.value;
 }
@@ -103,6 +128,7 @@ export function getCurrentRole(): string {
 export function resetPermissions(): void {
 	permissions.value = { ...DEFAULT_PERMISSIONS };
 	currentRole.value = "";
+	discountLimit.value = 0;
 	isLoaded.value = false;
 }
 

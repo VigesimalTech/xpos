@@ -12,6 +12,11 @@ import {
 	getPendingInvoices,
 } from "@/services/dbBridge";
 import { isElectron } from "@/services/electronBridge";
+import { getDiscountLimit, hasPermission } from "@/services/userRights";
+import { saleNeeds, type SaleNeeds } from "@/services/tillSalePolicy";
+import { useApprovalStore } from "./approvalStore";
+import { ensureAllowed } from "@/services/ensureAllowed";
+import { recordAudit } from "@/services/auditLog";
 import type {
 	CartItem,
 	POSItem,
@@ -602,7 +607,10 @@ export const useCartStore = defineStore("cart", () => {
 		serialNo?: string,
 		batchNo?: string,
 		conversionFactor?: number,
+		listRate?: number,
 	): { success: boolean; message?: string } {
+		// A price set below the list is a discount by another name (K19): keep the list price.
+		const changed = listRate !== undefined && rate > 0 && Math.abs(rate - listRate) > 0.0001;
 		if (
 			isReturnMode.value &&
 			returnItemCodes.value.length > 0 &&
@@ -629,7 +637,10 @@ export const useCartStore = defineStore("cart", () => {
 			if (existing) {
 				const addQty = isReturnMode.value ? -Math.abs(qty) : qty;
 				existing.qty += addQty;
-				if (rate) existing.rate = normalizeItemRate(rate);
+				if (rate) {
+					if (changed && existing.pos_list_rate === undefined) existing.pos_list_rate = listRate;
+					existing.rate = normalizeItemRate(rate);
+				}
 				return { success: true };
 			}
 		}
@@ -656,9 +667,113 @@ export const useCartStore = defineStore("cart", () => {
 			item_group: item.item_group,
 			brand: item.brand,
 			variant_of: item.variant_of,
+			...(changed ? { pos_list_rate: listRate, pos_rate_overridden: true } : {}),
 		});
 
 		return { success: true };
+	}
+
+	/**
+	 * K19: taking something out of the customer's sale on the desktop till needs Remove
+	 * Items From the Cart, or a manager's PIN. Not in a return (it only lowers a refund),
+	 * and not on the web POS, where no PIN can be checked. `logged` says whether the
+	 * removal goes in the audit log (K20), with who approved it.
+	 */
+	async function allowRemoval(
+		reason: string,
+	): Promise<{ ok: boolean; logged: boolean; approvedBy: string | null }> {
+		if (isReturnMode.value || !isElectron()) return { ok: true, logged: false, approvedBy: null };
+		const { ok, approvedBy } = await ensureAllowed("remove_cart_items", reason);
+		return { ok, logged: true, approvedBy: approvedBy ?? null };
+	}
+
+	/** The value of `qty` of a line at the till's price, for the audit log. */
+	function lineValue(item: CartItem, qty = item.qty): number {
+		return Math.round(Math.abs(qty) * Number(item.rate || 0) * 100) / 100;
+	}
+
+	async function requestRemoveItem(index: number): Promise<boolean> {
+		const item = items.value[index];
+		if (!item) return false;
+		if (item.pos_is_free_item) {
+			removeItem(index);
+			return true;
+		}
+		const allowed = await allowRemoval(__("Remove {0} from the sale", [item.item_name]));
+		if (!allowed.ok) return false;
+		const removed = { ...item };
+		removeItem(index);
+		if (allowed.logged) {
+			recordAudit({
+				event_type: "line_removed",
+				item_code: removed.item_code,
+				item_name: removed.item_name,
+				qty: Math.abs(removed.qty),
+				amount: lineValue(removed),
+				approved_by: allowed.approvedBy,
+			});
+		}
+		return true;
+	}
+
+	async function requestItemQty(
+		index: number,
+		qty: number,
+	): Promise<{ success: boolean; message?: string }> {
+		const item = items.value[index];
+		if (!item) return { success: false };
+		// Down to nothing, the line goes: a removal, logged as one.
+		if (qty === 0) return { success: await requestRemoveItem(index) };
+		const before = item.qty;
+		const lowering = Math.abs(qty) < Math.abs(before);
+		if (!lowering || item.pos_is_free_item) return updateItemQty(index, qty);
+		const allowed = await allowRemoval(
+			__("Lower {0} from {1} to {2}", [item.item_name, String(before), String(qty)]),
+		);
+		if (!allowed.ok) return { success: false };
+		const result = updateItemQty(index, qty);
+		if (result.success && allowed.logged) {
+			const taken = Math.abs(before) - Math.abs(qty);
+			recordAudit({
+				event_type: "qty_lowered",
+				item_code: item.item_code,
+				item_name: item.item_name,
+				qty: taken,
+				amount: lineValue(item, taken),
+				approved_by: allowed.approvedBy,
+				description: `${before} to ${qty}`,
+			});
+		}
+		return result;
+	}
+
+	/** Clear the sale on the cashier's say, not after a payment. False when not allowed. */
+	async function requestClearCart(): Promise<boolean> {
+		if (!items.value.length) {
+			clearCart();
+			return true;
+		}
+		const allowed = await allowRemoval(__("Clear the sale ({0} lines)", [String(items.value.length)]));
+		if (!allowed.ok) return false;
+		const lines = items.value.filter((item) => !item.pos_is_free_item);
+		clearCart();
+		if (allowed.logged && lines.length) {
+			recordAudit({
+				event_type: "sale_cleared",
+				qty: lines.reduce((sum, item) => sum + Math.abs(item.qty), 0),
+				amount: Math.round(lines.reduce((sum, item) => sum + lineValue(item), 0) * 100) / 100,
+				approved_by: allowed.approvedBy,
+				description: `${lines.length} lines`,
+				details: {
+					lines: lines.map((item) => ({
+						item_code: item.item_code,
+						qty: item.qty,
+						rate: item.rate,
+					})),
+				},
+			});
+		}
+		return true;
 	}
 
 	function removeItem(index: number): void {
@@ -706,8 +821,11 @@ export const useCartStore = defineStore("cart", () => {
 	}
 
 	function updateItemRate(index: number, rate: number): void {
-		items.value[index].rate = normalizeItemRate(rate);
-		items.value[index].pos_rate_overridden = true;
+		const item = items.value[index];
+		// The price before the first change: a lower price is a discount by another name (K19).
+		if (item.pos_list_rate === undefined) item.pos_list_rate = item.rate;
+		item.rate = normalizeItemRate(rate);
+		item.pos_rate_overridden = true;
 	}
 
 	function updateItemDiscount(index: number, type: "percentage" | "amount", value: number): void {
@@ -1127,6 +1245,7 @@ export const useCartStore = defineStore("cart", () => {
 	}
 
 	function clearCart(): void {
+		forgetApproval();
 		items.value = [];
 		selectedCartIndex.value = -1;
 		discountPercentage.value = 0;
@@ -1189,7 +1308,80 @@ export const useCartStore = defineStore("cart", () => {
 		if (!customer.value) customer.value = found || { name, customer_name: name };
 	}
 
-	function openPaymentDialog(): void {
+	/** Who approved, with their PIN on the till, what this sale needs beyond the cashier's rights. */
+	const approvedBy = ref<string | null>(null);
+	/** What that approval covered; a sale that goes further needs asking again. */
+	const approvedCover = ref<{ permissions: string[]; discountPct: number } | null>(null);
+
+	function forgetApproval(): void {
+		approvedBy.value = null;
+		approvedCover.value = null;
+	}
+
+	function currentSaleNeeds(): SaleNeeds {
+		const net = subtotal.value;
+		const cartPct =
+			Number(discountPercentage.value) ||
+			(net > 0 && Number(discountAmount.value) ? (Number(discountAmount.value) / net) * 100 : 0);
+		return saleNeeds(
+			{
+				lines: items.value.map((item) => ({
+					item_code: item.item_code,
+					qty: item.qty,
+					rate: item.rate,
+					list_rate: item.pos_list_rate as number | undefined,
+					discount_percentage: item.discount_percentage,
+					discount_amount: item.discount_amount,
+					is_free_item: Boolean(item.pos_is_free_item),
+				})),
+				cartDiscountPct: cartPct,
+				isReturn: isReturnMode.value,
+			},
+			{
+				rights: {
+					allow_change_price: hasPermission("allow_change_price"),
+					show_edit_discount_field: hasPermission("show_edit_discount_field"),
+					apply_additional_discount: hasPermission("apply_additional_discount"),
+					sale_return: hasPermission("sale_return"),
+				},
+				discountLimit: getDiscountLimit(),
+				profileMaxDiscount: usePosStore().posProfile?.max_discount_percentage_allowed,
+			},
+		);
+	}
+
+	/**
+	 * K19: on the desktop till, a sale beyond the cashier's rights needs a manager's PIN
+	 * before payment, once for the sale. False when it was not approved. The web POS is
+	 * left to the server, which flags or rejects the sale: no PIN is checked there.
+	 */
+	async function confirmSaleApproval(): Promise<boolean> {
+		if (!isElectron()) return true;
+		const needs = currentSaleNeeds();
+		if (!needs.reasons.length) {
+			forgetApproval();
+			return true;
+		}
+		const cover = approvedCover.value;
+		if (
+			cover &&
+			needs.discountPct <= cover.discountPct &&
+			needs.permissions.every((p) => cover.permissions.includes(p))
+		) {
+			return true;
+		}
+		const approver = await useApprovalStore().requestApproval(
+			{ permissions: needs.permissions, discountPct: needs.discountPct },
+			needs.reasons.join("; "),
+		);
+		if (!approver) return false;
+		approvedBy.value = approver;
+		approvedCover.value = { permissions: needs.permissions, discountPct: needs.discountPct };
+		return true;
+	}
+
+	async function openPaymentDialog(): Promise<void> {
+		if (!(await confirmSaleApproval())) return;
 		showPaymentDialog.value = true;
 	}
 
@@ -1432,30 +1624,34 @@ export const useCartStore = defineStore("cart", () => {
 		const data: InvoiceData = {
 			pos_profile: posProfile,
 			customer: customer.value?.name || "",
-			items: items.value.map((item: CartItem): InvoiceItem => ({
-				item_code: item.item_code,
-				item_name: item.item_name,
-				local_item_name: item.local_item_name,
-				qty: item.qty,
-				rate: normalizeItemRate(item.rate),
-				price_list_rate: normalizeItemRate(item.rate),
-				uom: item.uom || item.stock_uom,
-				discount_percentage: item.discount_percentage,
-				discount_amount: item.discount_amount,
-				serial_no: item.serial_no,
-				batch_no: item.batch_no,
-				item_tax_template: item.item_tax_template,
-				additional_notes: item.pos_notes,
-				delivery_date: item.pos_delivery_date,
-				offers: item.pos_offers,
-				is_offer: item.pos_is_offer,
-				is_replace: item.pos_is_replace,
-				is_free_item: item.pos_is_free_item ? 1 : undefined,
-				pricing_rules: item.pos_free_item_rule,
-			})),
+			items: items.value.map(
+				(item: CartItem): InvoiceItem => ({
+					item_code: item.item_code,
+					item_name: item.item_name,
+					local_item_name: item.local_item_name,
+					qty: item.qty,
+					rate: normalizeItemRate(item.rate),
+					price_list_rate: normalizeItemRate(item.rate),
+					uom: item.uom || item.stock_uom,
+					discount_percentage: item.discount_percentage,
+					discount_amount: item.discount_amount,
+					serial_no: item.serial_no,
+					batch_no: item.batch_no,
+					item_tax_template: item.item_tax_template,
+					additional_notes: item.pos_notes,
+					delivery_date: item.pos_delivery_date,
+					offers: item.pos_offers,
+					is_offer: item.pos_is_offer,
+					is_replace: item.pos_is_replace,
+					is_free_item: item.pos_is_free_item ? 1 : undefined,
+					pricing_rules: item.pos_free_item_rule,
+				}),
+			),
 			pos_opening_shift: posOpeningShift,
 			// The till syncs as its own API user; the server checks the sale against this cashier's rights.
 			xpos_cashier: useAuthStore().userName,
+			// K19: the manager who approved it on the till; the server checks the approval again.
+			...(approvedBy.value ? { xpos_approved_by: approvedBy.value } : {}),
 			posting_date: posStore.allowChangePostingDate ? postingDate.value || nowDate() : nowDate(),
 			additional_discount_percentage: discountPercentage.value,
 			discount_amount: discountAmount.value,
@@ -1724,6 +1920,10 @@ export const useCartStore = defineStore("cart", () => {
 		clearCart,
 		clearAll,
 		openPaymentDialog,
+		approvedBy,
+		requestRemoveItem,
+		requestItemQty,
+		requestClearCart,
 		closePaymentDialog,
 		getInvoiceData,
 		getReceiptSnapshot,

@@ -106,6 +106,26 @@ describe("expenses and bank drops reach ERPNext", () => {
 		expect(row.erp_id).toBeTruthy();
 	});
 
+	it("K19: a movement a manager approved on the till is sent with the approver", async () => {
+		const shift = await openShift();
+		await invoke("db:create-expense", {
+			to_account: "Travel - TC",
+			amount: 25,
+			remarks: "Taxi",
+			posting_date: "2026-09-19",
+			user: CASHIER,
+			pos_opening_entry_id: shift,
+			approved_by: "manager@example.com",
+		});
+		await recordBankDrop(shift);
+
+		await runSyncCyclePublic();
+
+		const [expense, drop] = frappe.callsTo(SYNC_CASH_MOVEMENT).map(sent);
+		expect(expense).toMatchObject({ cashier: CASHIER, xpos_approved_by: "manager@example.com" });
+		expect(drop).not.toHaveProperty("xpos_approved_by");
+	});
+
 	it("a bank drop is sent as a deposit", async () => {
 		const shift = await openShift();
 		await recordBankDrop(shift);

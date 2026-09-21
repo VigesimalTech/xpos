@@ -38,8 +38,12 @@ CASHIERS = {
 POS_ROLES = {("rt-supervisor@example.com", POS_PROFILE): "Manager"}
 BANK_ACCOUNT = "RT Bank"
 # The sale-policy tests: this cashier may give up to 10% alone; the second shop
-# rejects out-of-policy sales rather than flagging them.
-CASHIER_DISCOUNT_LIMIT = {("rt-cashier@example.com", POS_PROFILE): 10}
+# rejects out-of-policy sales rather than flagging them. The supervisor (Manager, so
+# Approve Exceptions) approves on the till up to their own 30%.
+CASHIER_DISCOUNT_LIMIT = {
+	("rt-cashier@example.com", POS_PROFILE): 10,
+	("rt-supervisor@example.com", POS_PROFILE): 30,
+}
 REJECT_PROFILE = POS_PROFILE_2
 # What a till's API user needs to read everything the till pulls with frappe.client.get_list.
 TILLS = {"rt-till@example.com", "rt-till-2@example.com"}

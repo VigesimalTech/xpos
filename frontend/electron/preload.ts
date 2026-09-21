@@ -15,6 +15,14 @@ for (const channel of SYNC_DATA_CHANNELS) {
 
 contextBridge.exposeInMainWorld("electronAPI", {
 	isFirstRun: (): Promise<boolean> => ipcRenderer.invoke("app:is-first-run"),
+	approval: {
+		approvers: (ask: Record<string, unknown>) => ipcRenderer.invoke("approval:approvers", ask),
+		verify: (approver: string, pin: string, ask: Record<string, unknown>) =>
+			ipcRenderer.invoke("approval:verify", approver, pin, ask),
+	},
+	audit: {
+		record: (event: Record<string, unknown>) => ipcRenderer.invoke("audit:record", event),
+	},
 	testErpNext: (config: {
 		url: string;
 		apiKey?: string;

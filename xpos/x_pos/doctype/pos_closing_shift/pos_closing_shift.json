@@ -17,6 +17,7 @@
   "column_break_7",
   "pos_profile",
   "user",
+  "approved_by",
   "section_break_12",
   "pos_transactions",
   "section_break_9",
@@ -104,6 +105,15 @@
    "label": "Cashier",
    "options": "User",
    "reqd": 1
+  },
+  {
+   "description": "The manager who approved closing this shift on the till with their PIN, because the cashier's POS Role does not allow it.",
+   "fieldname": "approved_by",
+   "fieldtype": "Link",
+   "label": "Approved By",
+   "no_copy": 1,
+   "options": "User",
+   "read_only": 1
   },
   {
    "fieldname": "section_break_12",
@@ -221,7 +231,7 @@
  ],
  "is_submittable": 1,
  "links": [],
- "modified": "2026-03-29 00:03:01.517664",
+ "modified": "2026-09-21 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "X POS",
  "name": "POS Closing Shift",

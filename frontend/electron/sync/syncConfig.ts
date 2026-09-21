@@ -268,6 +268,7 @@ export const SYNC_TABLES: SyncTableConfig[] = [
 			"hide_variants_items",
 			"input_qty",
 			"max_discount_percentage_allowed",
+			"xpos_allow_self_approval",
 			"pos_mixed_currency_tender",
 			"print_backup_receipt",
 			"require_cash_movement_remarks",
@@ -672,7 +673,16 @@ export const SYNC_TABLES: SyncTableConfig[] = [
 		doctype: "POS User",
 		label: "POS Users",
 		pullMethod: "xpos.api.auth.get_pos_users",
-		fields: ["*"],
+		// The server sends permission keys newer than a till knows only when asked by
+		// name (xpos.api.auth.till_permission_keys).
+		fields: [
+			"*",
+			"approve_exceptions",
+			"void_after_payment",
+			"no_sale_drawer",
+			"return_without_receipt",
+			"remove_cart_items",
+		],
 		orderBy: "modified",
 		direction: "pull",
 		// There is no POS User doctype to list, and get_pos_users pages can come back

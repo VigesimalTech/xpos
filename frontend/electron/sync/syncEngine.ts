@@ -517,6 +517,8 @@ async function pushTable(config: SyncTableConfig): Promise<{ synced: number; fai
 					user: record.user,
 					company: record.company,
 					payment_reconciliation: await getClosingEntryDetails(recordId),
+					// K19: the manager who approved closing it on the till.
+					...(record.approved_by ? { xpos_approved_by: record.approved_by } : {}),
 				};
 			} else {
 				data = record as Record<string, unknown>;
@@ -657,6 +659,8 @@ export function cashMovementPayload(
 		remarks: record.remarks || "",
 		posting_date: postingDate || undefined,
 		cashier: record.owner || undefined,
+		// K19: the manager who approved it on the till; the server checks the approval again.
+		...(record.approved_by ? { xpos_approved_by: record.approved_by } : {}),
 	};
 }
 
@@ -679,6 +683,98 @@ async function getServerShiftName(localShiftId: string): Promise<string | null> 
 	if (shiftRow?.erp_id) return shiftRow.erp_id;
 
 	return null;
+}
+
+const SYNC_AUDIT_EVENTS = "xpos.api.audit.sync_audit_events";
+/** The server stores at most this many per request (xpos.api.audit.MAX_BATCH). */
+const AUDIT_BATCH = 200;
+
+/** What sync_audit_events is sent for one row of the till's audit log (K20). */
+export function auditEventPayload(
+	record: Record<string, unknown>,
+	serverShiftName: string | null,
+): Record<string, unknown> {
+	const optional = (key: string, value: unknown) =>
+		value === null || value === undefined || value === "" ? {} : { [key]: value };
+	return {
+		local_id: record.local_id,
+		event_type: record.event_type,
+		event_time: record.event_time_text ?? record.event_time,
+		...optional("pos_profile", record.pos_profile),
+		...optional("pos_opening_shift", serverShiftName),
+		...optional("cashier", record.cashier),
+		...optional("approved_by", record.approved_by),
+		...optional("pin_user", record.pin_user),
+		...optional("item_code", record.item_code),
+		...optional("item_name", record.item_name),
+		// DECIMAL columns come back as strings.
+		...optional("qty", record.qty === null || record.qty === undefined ? null : Number(record.qty)),
+		...optional(
+			"amount",
+			record.amount === null || record.amount === undefined ? null : Number(record.amount),
+		),
+		...optional("reference", record.reference),
+		...optional("description", record.description),
+		...optional("details", record.details ? parseJsonColumn(record.details) : null),
+	};
+}
+
+/**
+ * Send the till's audit log (K20) to ERPNext, oldest first, a batch per call. Events
+ * the server accepted are marked synced; the rest stay for the next cycle, however
+ * many it takes: an audit event is never given up on. Runs after the shifts are
+ * pushed, so an event's shift usually has its server name by now; one whose shift
+ * never reached ERPNext is sent without it.
+ */
+export async function pushAuditEvents(): Promise<number> {
+	const rows = await query<Record<string, unknown>>(
+		`SELECT *, DATE_FORMAT(\`event_time\`, '%Y-%m-%d %H:%i:%s') AS \`event_time_text\`
+		   FROM \`audit_events\` WHERE \`sync_status\` IN ('pending', 'failed')
+		  ORDER BY \`id\` ASC LIMIT ${AUDIT_BATCH}`,
+	);
+	if (!rows.length) return 0;
+
+	const shifts = new Map<string, string | null>();
+	const events = [];
+	for (const row of rows) {
+		const localShift = row.pos_opening_entry_id ? String(row.pos_opening_entry_id) : "";
+		if (localShift && !shifts.has(localShift)) {
+			shifts.set(localShift, await getServerShiftName(localShift));
+		}
+		events.push(auditEventPayload(row, localShift ? (shifts.get(localShift) ?? null) : null));
+	}
+
+	const sent = rows.map((r) => String(r.local_id));
+	let accepted: string[] = [];
+	let error = "";
+	try {
+		const result = await apiCall<{ accepted?: string[] }>(
+			SYNC_AUDIT_EVENTS,
+			{ events },
+			{ httpMethod: "POST" },
+		);
+		accepted = (result?.accepted ?? []).map(String).filter((id) => sent.includes(id));
+	} catch (err) {
+		error = err instanceof Error ? err.message : String(err);
+		log.warn(`Audit log not sent: ${error}`);
+	}
+
+	if (accepted.length) {
+		await execute(
+			`UPDATE \`audit_events\` SET \`sync_status\` = 'synced', \`synced_at\` = NOW(), \`error\` = NULL
+			  WHERE \`local_id\` IN (${accepted.map(() => "?").join(", ")})`,
+			accepted,
+		);
+	}
+	const left = sent.filter((id) => !accepted.includes(id));
+	if (left.length) {
+		await execute(
+			`UPDATE \`audit_events\` SET \`sync_status\` = 'failed', \`retry_count\` = \`retry_count\` + 1, \`error\` = ?
+			  WHERE \`local_id\` IN (${left.map(() => "?").join(", ")})`,
+			[error || "Not accepted by the server", ...left],
+		);
+	}
+	return accepted.length;
 }
 
 async function getOpeningShiftDetails(
@@ -829,6 +925,18 @@ async function runSyncCycle(): Promise<void> {
 			}
 		}
 
+		if (isOnline()) {
+			try {
+				totalPushed += await pushAuditEvents();
+			} catch (error) {
+				const errMsg = error instanceof Error ? error.message : String(error);
+				emitToRenderer("sync-error", {
+					message: `Push failed for Audit Log: ${errMsg}`,
+					table: "Audit Log",
+				});
+			}
+		}
+
 		syncState.lastSyncTime = new Date().toISOString();
 		emitToRenderer("sync-complete", {
 			pulled: totalPulled,
@@ -862,6 +970,16 @@ async function runPushCycle(): Promise<void> {
 		} catch (error) {
 			log.warn(
 				`Push-only cycle failed for ${table.label}: ${error instanceof Error ? error.message : String(error)}`,
+			);
+		}
+	}
+
+	if (isOnline()) {
+		try {
+			totalPushed += await pushAuditEvents();
+		} catch (error) {
+			log.warn(
+				`Push-only cycle failed for the audit log: ${error instanceof Error ? error.message : String(error)}`,
 			);
 		}
 	}

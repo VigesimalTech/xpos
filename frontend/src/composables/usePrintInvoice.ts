@@ -1,3 +1,5 @@
+import { ensureAllowed } from "@/services/ensureAllowed";
+import { recordAudit } from "@/services/auditLog";
 import { usePosStore } from "@/stores/posStore";
 import { call, showError } from "@/services/api";
 import { isElectron } from "@/services/electronBridge";
@@ -110,7 +112,8 @@ export function usePrintInvoice() {
 				return;
 			}
 			const snapshot = (invoice.data as Record<string, unknown>)?.receipt as
-				ReceiptSnapshot | undefined;
+				| ReceiptSnapshot
+				| undefined;
 			const context = await getCachedReceiptContext(posStore.profileName);
 
 			if (snapshot && context) {
@@ -204,6 +207,11 @@ export function usePrintInvoice() {
 	 * (LOCAL-n) from the till's copy, an ERPNext invoice from ERPNext.
 	 */
 	async function reprint(name: string): Promise<void> {
+		// K19: without Reprint Invoice, a manager approves with their PIN on the till.
+		const allowed = await ensureAllowed("allow_reprint_invoice", __("A reprint of {0}", [name]));
+		if (!allowed.ok) return;
+		// K20: every reprint goes in the till's audit log.
+		recordAudit({ event_type: "reprint", reference: name, approved_by: allowed.approvedBy ?? null });
 		const local = /^LOCAL-(\d+)$/.exec(name);
 		if (local && isElectron()) return printInvoiceLocal(Number(local[1]));
 		if (isElectron()) return printServerInvoiceOnTill(name);

@@ -65,7 +65,7 @@
 							{{ __("Price") }}
 						</label>
 						<NumberInput
-							v-if="hasPermission('allow_change_price')"
+							v-if="canDoOrAsk('allow_change_price')"
 							v-model="priceInput"
 							:min="0"
 							:precision="ratePrecision"
@@ -209,7 +209,7 @@ import { useItemStore } from "@/stores/itemStore";
 import { useCartStore } from "@/stores/cartStore";
 import { usePosStore } from "@/stores/posStore";
 import { useMoney } from "@/composables/useMoney";
-import { hasPermission } from "@/services/userRights";
+import { canDoOrAsk } from "@/services/userRights";
 import { showError } from "@/services/api";
 import {
 	Dialog,
@@ -239,6 +239,8 @@ const serialSearch = ref("");
 const uomConversionFactor = ref(1);
 const uomRate = ref<number | null>(null);
 const priceInput = ref(0);
+/** The price-list price for the chosen unit: a lower price is a discount (K19). */
+const listPrice = ref(0);
 const uomContainerRef = ref<HTMLDivElement | null>(null);
 const qtyInputRef = ref<InstanceType<typeof NumberInput> | null>(null);
 
@@ -262,6 +264,7 @@ watch(detail, (d) => {
 		uomConversionFactor.value = d.conversion_factor || 1;
 		uomRate.value = null;
 		priceInput.value = d.price_list_rate || itemForDetail.value?.rate || 0;
+		listPrice.value = priceInput.value;
 		selectedBatch.value = "";
 		selectedSerials.value = [];
 		selectedQty.value = 1;
@@ -346,6 +349,7 @@ async function selectUOM(uom: string, cf: number): Promise<void> {
 	}
 	const baseRate = detail.value?.price_list_rate || itemForDetail.value?.rate || 0;
 	priceInput.value = uomRate.value !== null ? uomRate.value : baseRate * cf;
+	listPrice.value = priceInput.value;
 }
 
 function toggleSerial(sn: string): void {
@@ -375,6 +379,7 @@ function addToCart(): void {
 				sn,
 				selectedBatch.value,
 				uomConversionFactor.value,
+				listPrice.value,
 			);
 			if (!result.success) {
 				showError(result.message || "Cannot add item to cart");
@@ -390,6 +395,7 @@ function addToCart(): void {
 			"",
 			selectedBatch.value,
 			uomConversionFactor.value,
+			listPrice.value,
 		);
 		if (!result.success) {
 			showError(result.message || "Cannot add item to cart");

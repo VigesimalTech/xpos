@@ -49,57 +49,7 @@
 				</div>
 
 				<template v-else>
-					<div
-						class="flex justify-center gap-3"
-						aria-live="polite"
-						:aria-label="`${pin.length} digits entered`"
-					>
-						<span
-							v-for="i in PIN_MAX"
-							:key="i"
-							class="h-3.5 w-3.5 rounded-full border border-primary"
-							:class="
-								i <= pin.length ? 'bg-primary' : i > PIN_MIN ? 'border-dashed opacity-50' : ''
-							"
-						/>
-					</div>
-					<div class="grid grid-cols-3 gap-3">
-						<button
-							v-for="key in ['1', '2', '3', '4', '5', '6', '7', '8', '9']"
-							:key="key"
-							type="button"
-							:data-pin-key="key"
-							class="h-14 rounded-xl border border-border text-xl font-semibold hover:bg-muted"
-							:disabled="authStore.isLoading"
-							@click="pressDigit(key)"
-						>
-							{{ key }}
-						</button>
-						<button
-							type="button"
-							class="h-14 rounded-xl text-sm text-muted-foreground hover:bg-muted"
-							@click="pin = ''"
-						>
-							Clear
-						</button>
-						<button
-							type="button"
-							data-pin-key="0"
-							class="h-14 rounded-xl border border-border text-xl font-semibold hover:bg-muted"
-							:disabled="authStore.isLoading"
-							@click="pressDigit('0')"
-						>
-							0
-						</button>
-						<button
-							type="button"
-							aria-label="Delete last digit"
-							class="h-14 rounded-xl text-muted-foreground hover:bg-muted flex items-center justify-center"
-							@click="pin = pin.slice(0, -1)"
-						>
-							<Delete class="w-5 h-5" />
-						</button>
-					</div>
+					<PinPad v-model="pin" :disabled="authStore.isLoading" :min="PIN_MIN" :max="PIN_MAX" />
 					<Button
 						data-pin-submit
 						class="w-full"
@@ -239,7 +189,8 @@ import { useAuthStore } from "@/stores/authStore";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { User, Lock, Eye, EyeOff, LogIn, Loader2, AlertCircle, Delete } from "lucide-vue-next";
+import { User, Lock, Eye, EyeOff, LogIn, Loader2, AlertCircle } from "lucide-vue-next";
+import PinPad from "@/components/auth/PinPad.vue";
 import { useBranding } from "@/composables/useBranding";
 const isDark = inject("isDark")! as boolean;
 const { logoLight, logoDark } = useBranding();

@@ -215,8 +215,9 @@ import { usePosStore } from "@/stores/posStore";
 import { useMoney } from "@/composables/useMoney";
 import { useAuthStore } from "@/stores/authStore";
 import { usePaymentStore } from "@/stores/paymentStore";
-import { hasPermission } from "@/services/userRights";
+import { canDoOrAsk } from "@/services/userRights";
 import { createExpense, getExpenses, deleteExpense } from "@/services/dbBridge";
+import { approveCashMovement } from "@/services/cashApproval";
 import { isElectron } from "@/services/electronBridge";
 import { call, showSuccess, showError } from "@/services/api";
 import { Button } from "@/components/ui/button";
@@ -289,7 +290,7 @@ const sortOrder = ref("posting_date desc");
 const standardFilters = ref<Record<string, unknown>>({});
 const queryFilters = ref<QueryFilter[]>([]);
 
-const canAddExpense = computed(() => hasPermission("expense") && posStore.allowPosExpense);
+const canAddExpense = computed(() => canDoOrAsk("expense") && posStore.allowPosExpense);
 
 const allFilterableFields = computed<DocField[]>(() => [
 	{ fieldname: "name", fieldtype: "Data", label: __("ID"), in_standard_filter: 1 },
@@ -637,7 +638,11 @@ async function handleSave(values: { expense_account: string; amount: number; rea
 	try {
 		const postingDate = new Date().toISOString().slice(0, 10);
 		if (isElectronMode) {
+			// K19: beyond the cashier's role, a manager approves with their PIN.
+			const approval = await approveCashMovement("expense", values.amount);
+			if (!approval.ok) return;
 			await createExpense({
+				approved_by: approval.approvedBy,
 				to_account: values.expense_account,
 				amount: values.amount,
 				remarks: values.reason,

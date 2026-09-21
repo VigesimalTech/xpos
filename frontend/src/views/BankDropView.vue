@@ -272,8 +272,9 @@ import { usePosStore } from "@/stores/posStore";
 import { useMoney } from "@/composables/useMoney";
 import { useAuthStore } from "@/stores/authStore";
 import { usePaymentStore } from "@/stores/paymentStore";
-import { hasPermission } from "@/services/userRights";
+import { canDoOrAsk } from "@/services/userRights";
 import { createBankDrop, getBankDrops, deleteBankDrop } from "@/services/dbBridge";
+import { approveCashMovement } from "@/services/cashApproval";
 import { isElectron } from "@/services/electronBridge";
 import { call, showSuccess, showError } from "@/services/api";
 import { Button } from "@/components/ui/button";
@@ -363,7 +364,7 @@ const sortOrder = ref("posting_date desc");
 const standardFilters = ref<Record<string, unknown>>({});
 const queryFilters = ref<QueryFilter[]>([]);
 
-const canAddBankDrop = computed(() => hasPermission("bank_drop") && posStore.allowCashDeposit);
+const canAddBankDrop = computed(() => canDoOrAsk("bank_drop") && posStore.allowCashDeposit);
 
 const form = ref({
 	target_account: "",
@@ -735,7 +736,11 @@ async function handleSave() {
 	try {
 		const postingDate = new Date().toISOString().slice(0, 10);
 		if (isElectronMode) {
+			// K19: beyond the cashier's role, a manager approves with their PIN.
+			const approval = await approveCashMovement("bank_drop", form.value.amount);
+			if (!approval.ok) return;
 			await createBankDrop({
+				approved_by: approval.approvedBy,
 				to_account: form.value.target_account,
 				amount: form.value.amount,
 				remarks: form.value.reason,

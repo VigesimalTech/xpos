@@ -248,7 +248,7 @@ import { isElectron } from "@/services/electronBridge";
 import { buildShiftSummaryHtml, type ShiftSummaryPrint } from "@/services/receiptTemplate";
 import { nowDatetime } from "@/utils/datetime";
 import { get_full_url } from "@/utils";
-import { hasPermission } from "@/services/userRights";
+import { ensureAllowed } from "@/services/ensureAllowed";
 import { formatFor, precisionFor, roundFor } from "@/composables/useCurrency";
 import type { ShiftModeTotal } from "@/types/pos.types";
 import {
@@ -355,8 +355,10 @@ function calculateDifference(index: number) {
 
 async function handleCloseShift() {
 	if (isClosing.value) return;
-	if (!hasPermission("close_shift")) {
-		showError(__("Only a Supervisor can close a shift."));
+	// K19: without Close Shift, a manager approves with their PIN on the till.
+	const approval = await ensureAllowed("close_shift", __("Closing the shift"));
+	if (!approval.ok) {
+		if (!isElectron()) showError(__("Only a Supervisor can close a shift."));
 		return;
 	}
 	isClosing.value = true;
@@ -379,7 +381,9 @@ async function handleCloseShift() {
 	};
 
 	try {
-		const result = (await posStore.closeShift(closingDetails.value)) as { name?: string } | undefined;
+		const result = (await posStore.closeShift(closingDetails.value, approval.approvedBy)) as
+			| { name?: string }
+			| undefined;
 		closedShiftPrint.value = printable;
 		closedShiftName.value = result?.name || "";
 		shiftClosed.value = true;

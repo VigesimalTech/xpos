@@ -21,6 +21,7 @@ import {
 	type DbConfig,
 } from "./dbService";
 import { createLogger } from "../logger";
+import { recordPinFailure } from "../audit/auditLog";
 import {
 	isHeldOrderData,
 	parseJsonColumn,
@@ -89,6 +90,65 @@ async function resolveItemSearchColumns(requested?: string[]): Promise<string[]>
 
 const PIN_MAX_ATTEMPTS = 5;
 const PIN_LOCK_MINUTES = 5;
+
+export type PinResult = { ok: boolean; attemptsLeft?: number; lockedUntil?: string; reason?: string };
+
+/**
+ * Check a user's till PIN, offline. The hash comes from ERPNext with the POS users
+ * (xpos.api.pin), made with the same scrypt settings as passwords here. Five wrong
+ * PINs lock that user out for five minutes; a right one resets the count. The count
+ * and the lock are local to this till. Used for sign-in and for a manager's approval
+ * (K19), so both share one lockout.
+ */
+export async function checkTillPin(username: string, pin: string): Promise<PinResult> {
+	const row = await queryOne<{
+		name: string;
+		enabled: number;
+		pin_hash: string | null;
+		pin_salt: string | null;
+		pin_failures: number | null;
+		locked: number;
+		pin_locked_until: Date | string | null;
+	}>(
+		`SELECT \`name\`, \`enabled\`, \`pin_hash\`, \`pin_salt\`, \`pin_failures\`, \`pin_locked_until\`,
+                COALESCE(\`pin_locked_until\` > NOW(), 0) AS \`locked\`
+           FROM \`pos_users\` WHERE \`username\` = ? OR \`name\` = ?`,
+		[username, username],
+	);
+	if (!row) return { ok: false, reason: "unknown_user" };
+	if (!row.enabled) return { ok: false, reason: "disabled" };
+	// No salt means no PIN: never fall back to the legacy unsalted password check.
+	if (!row.pin_hash || !row.pin_salt) return { ok: false, reason: "no_pin" };
+	if (Number(row.locked)) {
+		return { ok: false, reason: "locked", lockedUntil: String(row.pin_locked_until) };
+	}
+
+	const { verifyPassword } = await import("./passwordHash");
+	const { valid } = await verifyPassword(String(pin ?? ""), row.pin_hash, row.pin_salt);
+	if (valid) {
+		await execute(
+			"UPDATE `pos_users` SET `pin_failures` = 0, `pin_locked_until` = NULL WHERE `name` = ?",
+			[row.name],
+		);
+		return { ok: true };
+	}
+
+	const failures = (Number(row.pin_failures) || 0) + 1;
+	if (failures >= PIN_MAX_ATTEMPTS) {
+		await execute(
+			"UPDATE `pos_users` SET `pin_failures` = 0, `pin_locked_until` = NOW() + INTERVAL ? MINUTE WHERE `name` = ?",
+			[PIN_LOCK_MINUTES, row.name],
+		);
+		const locked = await queryOne<{ pin_locked_until: Date | string }>(
+			"SELECT `pin_locked_until` FROM `pos_users` WHERE `name` = ?",
+			[row.name],
+		);
+		log.warn(`Till PIN locked for ${row.name} after ${failures} wrong tries`);
+		return { ok: false, reason: "locked", lockedUntil: String(locked?.pin_locked_until) };
+	}
+	await execute("UPDATE `pos_users` SET `pin_failures` = ? WHERE `name` = ?", [failures, row.name]);
+	return { ok: false, reason: "wrong_pin", attemptsLeft: PIN_MAX_ATTEMPTS - failures };
+}
 
 export function registerDbHandlers(): void {
 	ipcMain.handle("db:get-setting", async (_e, key: string) => {
@@ -856,68 +916,12 @@ export function registerDbHandlers(): void {
 		);
 	});
 
-	/**
-	 * Check a cashier's till PIN, offline. The hash comes from ERPNext with the POS
-	 * users (xpos.api.pin), made with the same scrypt settings as passwords here.
-	 * Five wrong PINs lock that cashier out for five minutes; a right one resets the
-	 * count. The count and the lock are local to this till.
-	 */
-	ipcMain.handle(
-		"db:verify-pin",
-		async (
-			_e,
-			username: string,
-			pin: string,
-		): Promise<{ ok: boolean; attemptsLeft?: number; lockedUntil?: string; reason?: string }> => {
-			const row = await queryOne<{
-				name: string;
-				enabled: number;
-				pin_hash: string | null;
-				pin_salt: string | null;
-				pin_failures: number | null;
-				locked: number;
-				pin_locked_until: Date | string | null;
-			}>(
-				`SELECT \`name\`, \`enabled\`, \`pin_hash\`, \`pin_salt\`, \`pin_failures\`, \`pin_locked_until\`,
-                COALESCE(\`pin_locked_until\` > NOW(), 0) AS \`locked\`
-           FROM \`pos_users\` WHERE \`username\` = ? OR \`name\` = ?`,
-				[username, username],
-			);
-			if (!row) return { ok: false, reason: "unknown_user" };
-			if (!row.enabled) return { ok: false, reason: "disabled" };
-			// No salt means no PIN: never fall back to the legacy unsalted password check.
-			if (!row.pin_hash || !row.pin_salt) return { ok: false, reason: "no_pin" };
-			if (Number(row.locked)) {
-				return { ok: false, reason: "locked", lockedUntil: String(row.pin_locked_until) };
-			}
-
-			const { verifyPassword } = await import("./passwordHash");
-			const { valid } = await verifyPassword(String(pin ?? ""), row.pin_hash, row.pin_salt);
-			if (valid) {
-				await execute(
-					"UPDATE `pos_users` SET `pin_failures` = 0, `pin_locked_until` = NULL WHERE `name` = ?",
-					[row.name],
-				);
-				return { ok: true };
-			}
-
-			const failures = (Number(row.pin_failures) || 0) + 1;
-			if (failures >= PIN_MAX_ATTEMPTS) {
-				await execute(
-					"UPDATE `pos_users` SET `pin_failures` = 0, `pin_locked_until` = NOW() + INTERVAL ? MINUTE WHERE `name` = ?",
-					[PIN_LOCK_MINUTES, row.name],
-				);
-				const locked = await queryOne<{ pin_locked_until: Date | string }>(
-					"SELECT `pin_locked_until` FROM `pos_users` WHERE `name` = ?",
-					[row.name],
-				);
-				log.warn(`Till PIN locked for ${row.name} after ${failures} wrong tries`);
-				return { ok: false, reason: "locked", lockedUntil: String(locked?.pin_locked_until) };
-			}
-			await execute("UPDATE `pos_users` SET `pin_failures` = ? WHERE `name` = ?", [failures, row.name]);
-			return { ok: false, reason: "wrong_pin", attemptsLeft: PIN_MAX_ATTEMPTS - failures };
-		},
-	);
+	ipcMain.handle("db:verify-pin", async (_e, username: string, pin: string) => {
+		const result = await checkTillPin(username, pin);
+		// K20: a wrong PIN at sign-in goes in the audit log.
+		if (!result.ok) await recordPinFailure(username, result, { for: "sign_in" });
+		return result;
+	});
 
 	ipcMain.handle("db:verify-password", async (_e, username: string, password: string) => {
 		const row = await queryOne<{ name: string; password_hash: string; password_salt: string | null }>(
@@ -1320,13 +1324,14 @@ export function registerDbHandlers(): void {
 				: null;
 		const result = await execute(
 			`INSERT INTO \`pos_closing_entries\`
-       (\`local_id\`, \`pos_profile\`, \`user\`, \`company\`, \`pos_opening_entry_id\`,
+       (\`local_id\`, \`pos_profile\`, \`user\`, \`approved_by\`, \`company\`, \`pos_opening_entry_id\`,
         \`posting_date\`, \`period_end_date\`, \`sync_status\`)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
 			[
 				crypto.randomUUID(),
 				entry.pos_profile,
 				entry.user,
+				entry.approved_by || null,
 				entry.company,
 				openingEntryId,
 				entry.posting_date || entry.closing_date || new Date().toISOString().slice(0, 10),
@@ -1604,8 +1609,8 @@ export function registerDbHandlers(): void {
 		const result = await execute(
 			`INSERT INTO \`expenses\`
        (\`local_id\`, \`to_account\`, \`amount\`, \`posting_date\`, \`remarks\`,
-        \`owner\`, \`pos_opening_entry_id\`, \`sync_status\`)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`,
+        \`owner\`, \`approved_by\`, \`pos_opening_entry_id\`, \`sync_status\`)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
 			[
 				crypto.randomUUID(),
 				expense.expense_type || expense.to_account || "General",
@@ -1613,6 +1618,7 @@ export function registerDbHandlers(): void {
 				expense.posting_date || new Date().toISOString().slice(0, 10),
 				expense.description || expense.remarks || null,
 				expense.user || expense.owner || null,
+				expense.approved_by || null,
 				openingEntryId,
 			],
 		);
@@ -1679,8 +1685,8 @@ export function registerDbHandlers(): void {
 		const result = await execute(
 			`INSERT INTO \`bank_drops\`
        (\`local_id\`, \`to_account\`, \`amount\`, \`posting_date\`, \`remarks\`,
-        \`owner\`, \`pos_opening_entry_id\`, \`sync_status\`)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`,
+        \`owner\`, \`approved_by\`, \`pos_opening_entry_id\`, \`sync_status\`)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
 			[
 				crypto.randomUUID(),
 				drop.mode_of_payment || drop.to_account || "Cash",
@@ -1688,6 +1694,7 @@ export function registerDbHandlers(): void {
 				drop.posting_date || new Date().toISOString().slice(0, 10),
 				drop.description || drop.remarks || null,
 				drop.user || drop.owner || null,
+				drop.approved_by || null,
 				openingEntryId,
 			],
 		);

@@ -165,7 +165,7 @@
 					@update-rate="cartStore.updateItemRate"
 					@update-discount="cartStore.updateItemDiscount"
 					@update-uom="cartStore.updateItemUOM"
-					@remove="cartStore.removeItem"
+					@remove="cartStore.requestRemoveItem"
 				/>
 			</div>
 		</div>
@@ -310,8 +310,9 @@ function handleEditCustomer() {
 	customerStore.showCustomerEditDialog = true;
 }
 
-function handleUpdateQty(index: number, qty: number) {
-	const result = cartStore.updateItemQty(index, qty);
+async function handleUpdateQty(index: number, qty: number) {
+	// K19: lowering a quantity takes something out of the sale.
+	const result = await cartStore.requestItemQty(index, qty);
 	if (!result.success && result.message) {
 		showError(result.message);
 	}

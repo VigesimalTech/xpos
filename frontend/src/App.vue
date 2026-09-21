@@ -55,6 +55,8 @@
 			<CashMovementDialog v-if="paymentStore.showCashMovementDialog" />
 
 			<DraftInvoiceDialog v-if="cartStore.showDraftDialog" />
+			<!-- K19: a manager's PIN approves what the cashier may not do alone. -->
+			<ManagerApprovalDialog v-if="isElectronEnv" />
 
 			<KeyboardShortcutsDialog :open="showShortcutsDialog" @close="showShortcutsDialog = false" />
 			<AboutDialog :open="showAboutDialog" @close="showAboutDialog = false" />
@@ -161,6 +163,7 @@ import LoyaltyDialog from "@/components/dialogs/LoyaltyDialog.vue";
 import ItemDetailDialog from "@/components/dialogs/ItemDetailDialog.vue";
 import CashMovementDialog from "@/components/dialogs/CashMovementDialog.vue";
 import DraftInvoiceDialog from "@/components/dialogs/DraftInvoiceDialog.vue";
+import ManagerApprovalDialog from "@/components/dialogs/ManagerApprovalDialog.vue";
 import KeyboardShortcutsDialog from "@/components/dialogs/KeyboardShortcutsDialog.vue";
 import AboutDialog from "@/components/dialogs/AboutDialog.vue";
 import SplashScreen from "@/components/SplashScreen.vue";
@@ -205,13 +208,15 @@ const isAuthPage = computed(() => route.meta.isAuthPage === true || route.meta.i
 const isFullScreen = computed(() => route.meta.fullScreen === true);
 
 async function handleClearCart() {
-	cartStore.clearCart();
+	// K19: clearing a sale on the till needs Remove Items From the Cart, or a manager.
+	if (!(await cartStore.requestClearCart())) return;
 	await cartStore.applyDefaultCustomer();
 }
 
 function handleProcessPayment() {
 	if (cartStore.items.length > 0 && posStore.isShiftOpen) {
-		cartStore.showPaymentDialog = true;
+		// Through the store: a sale beyond the cashier's rights needs a manager first (K19).
+		void cartStore.openPaymentDialog();
 	}
 }
 
@@ -229,7 +234,7 @@ function handleHoldInvoice() {
 	}
 }
 
-function handleRemoveLastItem() {
+async function handleRemoveLastItem() {
 	if (cartStore.items.length === 0) return;
 
 	const activeEl = document.activeElement as HTMLElement | null;
@@ -245,7 +250,7 @@ function handleRemoveLastItem() {
 				? selectedIndex
 				: cartStore.items.length - 1;
 
-	cartStore.removeItem(indexToRemove);
+	if (!(await cartStore.requestRemoveItem(indexToRemove))) return;
 
 	nextTick(() => {
 		const nextIndex = cartStore.selectedCartIndex;

@@ -1,5 +1,48 @@
+export interface ApprovalAsk {
+	cashier: string;
+	posProfile: string;
+	permission?: string;
+	permissions?: string[];
+	discountPct?: number;
+	/** For the audit log (K20). */
+	reason?: string;
+	shift?: string | number;
+}
+
+/** An event for the till's audit log (K20), as a screen records it. */
+export interface AuditRecord {
+	event_type: "line_removed" | "qty_lowered" | "sale_cleared" | "held_order_discarded" | "reprint";
+	pos_profile?: string | null;
+	shift?: string | number | null;
+	cashier?: string | null;
+	approved_by?: string | null;
+	item_code?: string | null;
+	item_name?: string | null;
+	qty?: number | null;
+	amount?: number | null;
+	reference?: string | null;
+	description?: string | null;
+	details?: unknown;
+}
+
 export interface ElectronAPI {
 	isFirstRun: () => Promise<boolean>;
+	/** K19: a manager's approval on the till (electron/approval). */
+	approval: {
+		approvers: (ask: ApprovalAsk) => Promise<{ name: string; full_name: string }[]>;
+		verify: (
+			approver: string,
+			pin: string,
+			ask: ApprovalAsk,
+		) => Promise<
+			| { ok: true; approver: string }
+			| { ok: false; reason: string; attemptsLeft?: number; lockedUntil?: string }
+		>;
+	};
+	/** K20: the till's audit log (electron/audit). Resolves to the event's local id. */
+	audit: {
+		record: (event: AuditRecord) => Promise<string | null>;
+	};
 	testErpNext: (config: {
 		url: string;
 		apiKey?: string;

@@ -260,7 +260,7 @@
 
 			<DialogFooter class="p-6 pt-4 border-t border-border gap-2 sm:gap-2">
 				<Button
-					v-if="hasPermission('allow_reprint_invoice')"
+					v-if="canDoOrAsk('allow_reprint_invoice')"
 					variant="outline"
 					size="sm"
 					@click="printInvoice(invoice!.name)"
@@ -308,7 +308,7 @@ import {
 	DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { hasPermission } from "@/services/userRights";
+import { canDoOrAsk } from "@/services/userRights";
 import { DateTimePicker } from "@/components/ui/datetime-picker";
 import { usePosStore } from "@/stores/posStore";
 import { useMoney } from "@/composables/useMoney";

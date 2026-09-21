@@ -180,3 +180,62 @@ class TestSyncCashMovement(unittest.TestCase):
 	def test_without_a_cashier_it_is_the_shifts_cashier(self):
 		self.sync(cashier=None)
 		self.assertEqual(self.post.call_args.kwargs["user"], "cashier@example.com")
+
+
+class TestCashMovementApprover(TestSyncCashMovement):
+	"""K19: the approver a till names goes with the cash movement to be checked."""
+
+	def test_the_tills_approver_is_passed_on(self):
+		with patch.object(self.cm, "resolve_approver", return_value="manager@example.com"):
+			self.sync(xpos_approved_by="manager@example.com")
+		self.assertEqual(self.post.call_args.kwargs["approver"], "manager@example.com")
+
+
+class TestCreateClosingShift(unittest.TestCase):
+	"""K19: a cashier whose role may not close a shift may close it with a manager's
+	approval on the till; the close records who approved it."""
+
+	def setUp(self):
+		from xpos.api import shifts
+
+		self.shifts = shifts
+		self.frappe = patch.object(shifts, "frappe").start()
+		self.addCleanup(patch.stopall)
+		self.frappe.throw.side_effect = _throw
+		self.frappe.db.get_value.return_value = None
+		shift = MagicMock(user="cashier@example.com", pos_profile="Shop 1")
+		shift.name = "SHIFT-1"
+		self.frappe.get_doc.return_value = shift
+		patch.object(shifts, "acting_user", side_effect=lambda user, profile: user).start()
+		self.can_close = patch.object(
+			shifts, "can_close_shift", side_effect=lambda user, profile: user != "cashier@example.com"
+		).start()
+		self.problems = patch.object(shifts, "check_approver", return_value=[]).start()
+		self.close = patch.object(shifts, "_close_shift", return_value={"name": "CLOSE-1"}).start()
+
+	def sync(self, approver=None):
+		with patch.object(self.shifts, "resolve_approver", return_value=approver):
+			return self.shifts.create_closing_shift(
+				{"pos_opening_shift": "SHIFT-1", "user": "cashier@example.com", "payment_reconciliation": []},
+				"uuid-1",
+			)
+
+	def test_without_the_right_or_an_approval_the_close_is_refused(self):
+		with self.assertRaises(Refused):
+			self.sync()
+		self.close.assert_not_called()
+
+	def test_a_managers_approval_lets_the_cashier_close_and_is_recorded(self):
+		self.assertEqual(self.sync("manager@example.com"), {"name": "CLOSE-1"})
+		self.assertEqual(self.close.call_args.kwargs["approved_by"], "manager@example.com")
+
+	def test_an_approval_that_does_not_count_is_refused_with_the_reason(self):
+		self.problems.return_value = ["Approver x does not have the Approve Exceptions permission."]
+		with self.assertRaises(Refused) as refused:
+			self.sync("x@example.com")
+		self.assertIn("Approve Exceptions", str(refused.exception))
+
+	def test_a_cashier_with_the_right_needs_no_approval(self):
+		self.can_close.side_effect = lambda user, profile: True
+		self.sync()
+		self.assertIsNone(self.close.call_args.kwargs["approved_by"])

@@ -96,7 +96,7 @@
 		</TooltipWrapper>
 
 		<TooltipWrapper
-			v-if="posStore.allowReturn && hasPermission('sale_return')"
+			v-if="posStore.allowReturn && canDoOrAsk('sale_return')"
 			:content="__('Process Return')"
 		>
 			<Button
@@ -111,7 +111,7 @@
 		</TooltipWrapper>
 
 		<TooltipWrapper
-			v-if="posStore.lastInvoiceName && hasPermission('allow_reprint_invoice')"
+			v-if="posStore.lastInvoiceName && canDoOrAsk('allow_reprint_invoice')"
 			:content="__('Print Last Invoice')"
 		>
 			<Button
@@ -249,7 +249,7 @@ import { usePosStore } from "@/stores/posStore";
 import { usePaymentStore } from "@/stores/paymentStore";
 import { useAuthStore } from "@/stores/authStore";
 import { __ } from "@/lib/translate";
-import { hasPermission } from "@/services/userRights";
+import { canDoOrAsk } from "@/services/userRights";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { TooltipWrapper } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
@@ -347,7 +347,7 @@ function handleShowRepeatDialog() {
 }
 
 function handleShowReturnDialog() {
-	if (!posStore.allowReturn || !hasPermission("sale_return")) return;
+	if (!posStore.allowReturn || !canDoOrAsk("sale_return")) return;
 	showReturnDialog.value = true;
 }
 
@@ -358,7 +358,7 @@ function handleKeyboard(e: KeyboardEvent) {
 	}
 	if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === "r") {
 		e.preventDefault();
-		if (posStore.allowReturn && hasPermission("sale_return")) showReturnDialog.value = true;
+		if (posStore.allowReturn && canDoOrAsk("sale_return")) showReturnDialog.value = true;
 	}
 }
 

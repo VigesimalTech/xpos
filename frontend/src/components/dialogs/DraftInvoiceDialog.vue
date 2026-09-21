@@ -284,6 +284,9 @@ import {
 	RefreshCw,
 } from "lucide-vue-next";
 import { __ } from "@/lib/translate";
+import { ensureAllowed } from "@/services/ensureAllowed";
+import { recordAudit } from "@/services/auditLog";
+import { isElectron } from "@/services/electronBridge";
 import { debounce } from "@/utils";
 import type { OpenTab, OutstandingInvoice } from "@/types/pos.types";
 
@@ -424,9 +427,26 @@ async function deleteDraft(draftName: string) {
 	if (!confirm(__("Are you sure you want to delete this draft?"))) {
 		return;
 	}
+	// K19: discarding a held order takes a customer's items away, as clearing a sale does.
+	let approvedBy: string | null = null;
+	if (isElectron()) {
+		const allowed = await ensureAllowed("remove_cart_items", __("Discard held order {0}", [draftName]));
+		if (!allowed.ok) return;
+		approvedBy = allowed.approvedBy ?? null;
+	}
+	// K20: a discarded held order goes in the till's audit log.
+	const draft = drafts.value.find((d) => d.name === draftName);
+	const logDiscard = () =>
+		recordAudit({
+			event_type: "held_order_discarded",
+			reference: draftName,
+			amount: Number(draft?.grand_total || 0),
+			approved_by: approvedBy,
+		});
 
 	try {
 		if (await cartStore.deleteHeldOrderOnTill(draftName)) {
+			logDiscard();
 			showSuccess(__("Draft invoice deleted"));
 			await fetchDrafts();
 			return;
@@ -435,6 +455,7 @@ async function deleteDraft(draftName: string) {
 			name: draftName,
 			pos_opening_shift: posStore.posOpeningShift?.name || "",
 		});
+		logDiscard();
 		showSuccess(__("Draft invoice deleted"));
 		await fetchDrafts();
 	} catch (error) {
