@@ -43,6 +43,7 @@ export interface ElectronAPI {
 	audit: {
 		record: (event: AuditRecord) => Promise<string | null>;
 	};
+	getSetupState: () => Promise<"ready" | "setup" | "waiting-for-database">;
 	testErpNext: (config: {
 		url: string;
 		apiKey?: string;

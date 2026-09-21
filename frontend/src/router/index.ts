@@ -8,6 +8,7 @@ import {
 import { useAuthStore } from "@/stores/authStore";
 import { isElectron } from "@/services/electronBridge";
 import routes from "./routes";
+import { checkSetupState, setupRedirect } from "./setupGuard";
 import { usePosStore } from "@/stores/posStore";
 
 const history = isElectron() ? createWebHashHistory() : createWebHistory("/xpos");
@@ -17,41 +18,13 @@ export const router: Router = createRouter({
 	routes,
 });
 
-let _firstRunChecked = false;
-let _isFirstRun = false;
-
-async function checkFirstRun(): Promise<boolean> {
-	if (_firstRunChecked) return _isFirstRun;
-	if (!isElectron()) {
-		_firstRunChecked = true;
-		_isFirstRun = false;
-		return false;
-	}
-	try {
-		_isFirstRun = await window.electronAPI!.isFirstRun();
-	} catch {
-		_isFirstRun = true;
-	}
-	_firstRunChecked = true;
-	return _isFirstRun;
-}
-
-export function markSetupComplete(): void {
-	_isFirstRun = false;
-	_firstRunChecked = true;
-}
-
 router.beforeEach(async (to, _from, next) => {
-	const firstRun = await checkFirstRun();
-	if (firstRun && to.meta.isSetupPage !== true) {
-		next({ name: "setup" });
+	const redirect = setupRedirect(await checkSetupState(), to);
+	if (redirect) {
+		next({ name: redirect });
 		return;
 	}
-	if (!firstRun && to.meta.isSetupPage === true) {
-		next({ name: "login" });
-		return;
-	}
-	if (to.meta.isSetupPage === true) {
+	if (redirect === "") {
 		next();
 		return;
 	}

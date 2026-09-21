@@ -204,7 +204,13 @@ const {
 	destroy: destroyKeyboardShortcuts,
 } = keyboardShortcuts;
 
-const isAuthPage = computed(() => route.meta.isAuthPage === true || route.meta.isSetupPage === true);
+// Pages drawn without the till's layout: sign-in, setup, and waiting for the local database.
+const isAuthPage = computed(
+	() =>
+		route.meta.isAuthPage === true ||
+		route.meta.isSetupPage === true ||
+		route.meta.isStartingPage === true,
+);
 const isFullScreen = computed(() => route.meta.fullScreen === true);
 
 async function handleClearCart() {
