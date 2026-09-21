@@ -42,28 +42,30 @@
 							<span>{{ item.label }}</span>
 						</router-link>
 
-						<p
-							class="px-3 py-2 pt-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider"
-						>
-							{{ __("Purchasing") }}
-						</p>
-						<router-link
-							v-for="item in purchaseNavItems"
-							:key="item.route"
-							:to="item.route"
-							@click="isOpen = false"
-							:class="
-								cn(
-									'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors no-underline',
-									isActive(item.route)
-										? 'bg-primary/10 text-primary'
-										: 'text-muted-foreground hover:bg-muted hover:text-foreground',
-								)
-							"
-						>
-							<component :is="item.icon" class="w-4 h-4 shrink-0" />
-							<span>{{ item.label }}</span>
-						</router-link>
+						<template v-if="canOpenScreen('purchasing')">
+							<p
+								class="px-3 py-2 pt-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider"
+							>
+								{{ __("Purchasing") }}
+							</p>
+							<router-link
+								v-for="item in purchaseNavItems"
+								:key="item.route"
+								:to="item.route"
+								@click="isOpen = false"
+								:class="
+									cn(
+										'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors no-underline',
+										isActive(item.route)
+											? 'bg-primary/10 text-primary'
+											: 'text-muted-foreground hover:bg-muted hover:text-foreground',
+									)
+								"
+							>
+								<component :is="item.icon" class="w-4 h-4 shrink-0" />
+								<span>{{ item.label }}</span>
+							</router-link>
+						</template>
 
 						<template v-if="financeNavItems.some((it) => it.show)">
 							<p
@@ -90,28 +92,30 @@
 							</router-link>
 						</template>
 
-						<p
-							class="px-3 py-2 pt-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider"
-						>
-							{{ __("Tools") }}
-						</p>
-						<router-link
-							v-for="item in toolsNavItems.filter((it) => it.show)"
-							:key="item.route"
-							:to="item.route"
-							@click="isOpen = false"
-							:class="
-								cn(
-									'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors no-underline',
-									isActive(item.route)
-										? 'bg-primary/10 text-primary'
-										: 'text-muted-foreground hover:bg-muted hover:text-foreground',
-								)
-							"
-						>
-							<component :is="item.icon" class="w-4 h-4 shrink-0" />
-							<span>{{ item.label }}</span>
-						</router-link>
+						<template v-if="toolsNavItems.some((it) => it.show)">
+							<p
+								class="px-3 py-2 pt-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider"
+							>
+								{{ __("Tools") }}
+							</p>
+							<router-link
+								v-for="item in toolsNavItems.filter((it) => it.show)"
+								:key="item.route"
+								:to="item.route"
+								@click="isOpen = false"
+								:class="
+									cn(
+										'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors no-underline',
+										isActive(item.route)
+											? 'bg-primary/10 text-primary'
+											: 'text-muted-foreground hover:bg-muted hover:text-foreground',
+									)
+								"
+							>
+								<component :is="item.icon" class="w-4 h-4 shrink-0" />
+								<span>{{ item.label }}</span>
+							</router-link>
+						</template>
 					</nav>
 				</ScrollArea>
 
@@ -132,7 +136,7 @@ import { useRoute } from "vue-router";
 import { usePosStore } from "@/stores/posStore";
 import { cn } from "@/lib/utils";
 import { __ } from "@/lib/translate";
-import { canDoOrAsk } from "@/services/userRights";
+import { canOpenScreen } from "@/services/screenAccess";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
 	LayoutGrid,
@@ -182,7 +186,7 @@ const mainNavItems = computed(() => [
 		icon: Banknote,
 		show: posStore.enableCashierSettlement && posStore.isCashier,
 	},
-	{ route: "/reports", label: __("Reports"), icon: BarChart3, show: true },
+	{ route: "/reports", label: __("Reports"), icon: BarChart3, show: canOpenScreen("reports") },
 ]);
 
 const purchaseNavItems = [
@@ -191,24 +195,34 @@ const purchaseNavItems = [
 	{ route: "/stock-receiving", label: __("Stock Receiving"), icon: PackageCheck },
 ];
 
-const toolsNavItems = [
-	{ route: "/price-checker", label: __("Price Checker"), icon: ScanBarcode, show: true },
-	{ route: "/barcode-print", label: __("Barcode Printer"), icon: Printer, show: true },
+const toolsNavItems = computed(() => [
+	{
+		route: "/price-checker",
+		label: __("Price Checker"),
+		icon: ScanBarcode,
+		show: canOpenScreen("price_checker"),
+	},
+	{
+		route: "/barcode-print",
+		label: __("Barcode Printer"),
+		icon: Printer,
+		show: canOpenScreen("barcode_printer"),
+	},
 	{ route: "/settings", label: __("Settings"), icon: Settings, show: isElectron() },
-];
+]);
 
 const financeNavItems = computed(() => [
 	{
 		route: "/expenses",
 		label: __("Expenses"),
 		icon: Wallet,
-		show: canDoOrAsk("expense") && posStore.allowPosExpense,
+		show: canOpenScreen("expenses"),
 	},
 	{
 		route: "/bank-drops",
 		label: __("Bank Drops"),
 		icon: Landmark,
-		show: canDoOrAsk("bank_drop") && posStore.allowCashDeposit,
+		show: canOpenScreen("bank_drops"),
 	},
 ]);
 

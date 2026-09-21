@@ -87,7 +87,7 @@
  * A manager approves, with their PIN, what the cashier may not do alone (K19). Opened
  * by `useApprovalStore().requestApproval`; lists only those who may approve this.
  */
-import { ref, watch } from "vue";
+import { onMounted, onUnmounted, ref, watch } from "vue";
 import { AlertCircle, Loader2, ShieldCheck } from "lucide-vue-next";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -158,6 +158,27 @@ async function submit() {
 		busy.value = false;
 	}
 }
+
+// Number keys, Backspace and Enter work on the PIN pad too, as on the sign-in screen:
+// a manager at a till with a keyboard or a number pad types the PIN.
+function onKey(event: KeyboardEvent) {
+	if (!store.open || !chosen.value || busy.value) return;
+	if (/^[0-9]$/.test(event.key)) {
+		if (pin.value.length < 6) pin.value += event.key;
+	} else if (event.key === "Backspace") {
+		pin.value = pin.value.slice(0, -1);
+	} else if (event.key === "Enter") {
+		void submit();
+	} else {
+		return;
+	}
+	event.preventDefault();
+	event.stopImmediatePropagation();
+}
+
+// Captured first, so the till's own shortcuts do not act on the same keys.
+onMounted(() => window.addEventListener("keydown", onKey, true));
+onUnmounted(() => window.removeEventListener("keydown", onKey, true));
 
 function cancel() {
 	store.finish(null);

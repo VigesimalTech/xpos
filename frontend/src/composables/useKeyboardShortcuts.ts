@@ -7,6 +7,7 @@ import { showError, showSuccess } from "@/services/api";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { usePosStore } from "@/stores/posStore";
 import { canDoOrAsk } from "@/services/userRights";
+import { canOpenScreen } from "@/services/screenAccess";
 
 export interface Shortcut {
 	id: string;
@@ -132,6 +133,7 @@ export function useKeyboardShortcuts() {
 			category: "Navigation",
 			global: true,
 			action: () => {
+				if (!canOpenScreen("purchasing")) return;
 				router.push("/purchase-order");
 			},
 		},
@@ -142,6 +144,7 @@ export function useKeyboardShortcuts() {
 			category: "Navigation",
 			global: true,
 			action: () => {
+				if (!canOpenScreen("purchasing")) return;
 				router.push("/purchase-invoices");
 			},
 		},
@@ -152,6 +155,7 @@ export function useKeyboardShortcuts() {
 			category: "Navigation",
 			global: true,
 			action: () => {
+				if (!canOpenScreen("purchasing")) return;
 				router.push("/stock-receiving");
 			},
 		},
@@ -162,6 +166,7 @@ export function useKeyboardShortcuts() {
 			category: "Navigation",
 			global: true,
 			action: () => {
+				if (!canOpenScreen("expenses")) return;
 				router.push("/expenses");
 			},
 		},
@@ -172,6 +177,7 @@ export function useKeyboardShortcuts() {
 			category: "Navigation",
 			global: true,
 			action: () => {
+				if (!canOpenScreen("bank_drops")) return;
 				router.push("/bank-drops");
 			},
 		},
@@ -182,6 +188,7 @@ export function useKeyboardShortcuts() {
 			category: "Navigation",
 			global: true,
 			action: () => {
+				if (!canOpenScreen("barcode_printer")) return;
 				router.push("/barcode-print");
 			},
 		},
@@ -192,6 +199,7 @@ export function useKeyboardShortcuts() {
 			category: "Navigation",
 			global: true,
 			action: () => {
+				if (!canOpenScreen("reports")) return;
 				router.push("/reports");
 			},
 		},

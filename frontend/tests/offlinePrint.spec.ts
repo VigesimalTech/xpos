@@ -7,7 +7,13 @@ import type { ReceiptContext, ReceiptSnapshot } from "@/types/pos.types";
 const { getCachedReceiptContext, showError, posStore } = vi.hoisted(() => ({
 	getCachedReceiptContext: vi.fn(),
 	showError: vi.fn(),
-	posStore: { profileName: "Shop Floor", defaultPrintFormat: "", printSettings: null },
+	posStore: {
+		profileName: "Shop Floor",
+		defaultPrintFormat: "",
+		printSettings: null,
+		posProfile: { company: "Acme" },
+		refreshReceiptContext: vi.fn(),
+	},
 }));
 
 vi.mock("@/services/dbBridge", () => ({
@@ -159,5 +165,45 @@ describe("printReceiptOffline", () => {
 
 		await expect(printReceiptOffline(snapshot)).resolves.toBe(false);
 		expect(showError).toHaveBeenCalledWith("Failed to print invoice");
+	});
+});
+
+describe("the first sale on a new till (the layout is still being fetched)", () => {
+	it("fetches the layout when none is cached, then prints the shop's receipt", async () => {
+		getCachedReceiptContext.mockResolvedValueOnce(null).mockResolvedValue(context);
+		const { printReceiptOffline } = usePrintInvoice();
+
+		await expect(printReceiptOffline(snapshot)).resolves.toBe(true);
+
+		expect(posStore.refreshReceiptContext).toHaveBeenCalledWith("Shop Floor");
+		expect(lastFrame()!.srcdoc).toContain("Acme Store");
+	});
+
+	it("on the till, the sale goes to the receipt printer, not the fallback page", async () => {
+		getCachedReceiptContext.mockResolvedValueOnce(null).mockResolvedValue(context);
+		const printReceipt = vi.fn().mockResolvedValue({ success: true });
+		const printInvoice = vi.fn().mockResolvedValue({ success: true });
+		(window as any).electronAPI = {
+			db: { getPendingInvoice: vi.fn().mockResolvedValue({ data: { receipt: { ...snapshot } } }) },
+			print: { printReceipt, printInvoice },
+		};
+		const { printInvoiceLocal } = usePrintInvoice();
+
+		await printInvoiceLocal(7);
+
+		expect(posStore.refreshReceiptContext).toHaveBeenCalledWith("Shop Floor");
+		expect(printReceipt).toHaveBeenCalledTimes(1);
+		expect(printReceipt.mock.calls[0][0]).toContain("Acme Store");
+		expect(printInvoice).not.toHaveBeenCalled();
+		delete (window as any).electronAPI;
+	});
+
+	it("does not fetch when the layout is already cached", async () => {
+		getCachedReceiptContext.mockResolvedValue(context);
+		const { printReceiptOffline } = usePrintInvoice();
+
+		await printReceiptOffline(snapshot);
+
+		expect(posStore.refreshReceiptContext).not.toHaveBeenCalled();
 	});
 });

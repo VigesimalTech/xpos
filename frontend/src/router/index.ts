@@ -10,6 +10,7 @@ import { isElectron } from "@/services/electronBridge";
 import routes from "./routes";
 import { checkSetupState, setupRedirect } from "./setupGuard";
 import { usePosStore } from "@/stores/posStore";
+import { openScreen, screenOfRoute } from "@/services/screenAccess";
 
 const history = isElectron() ? createWebHashHistory() : createWebHistory("/xpos");
 
@@ -18,7 +19,7 @@ export const router: Router = createRouter({
 	routes,
 });
 
-router.beforeEach(async (to, _from, next) => {
+router.beforeEach(async (to, from, next) => {
 	const redirect = setupRedirect(await checkSetupState(), to);
 	if (redirect) {
 		next({ name: redirect });
@@ -62,6 +63,15 @@ router.beforeEach(async (to, _from, next) => {
 	}
 	if (to.meta.requiresAdmin === true && (isElectron() || !authStore.canManagePermissions)) {
 		next({ name: "pos" });
+		return;
+	}
+
+	// K27: a screen the cashier's role lacks is hidden, or opens with a manager's PIN.
+	// Moving within a screen (a report from the catalog, an invoice from its list) asks once.
+	const screen = screenOfRoute(to.name);
+	if (screen && screen !== screenOfRoute(from.name) && !(await openScreen(screen))) {
+		if (from.matched.length) next(false);
+		else next({ name: "pos" });
 		return;
 	}
 

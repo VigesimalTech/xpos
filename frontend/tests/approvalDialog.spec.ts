@@ -131,4 +131,20 @@ describe("K19: the manager-approval dialog", () => {
 		expect(await useApprovalStore().requestApproval({ discountPct: 25 }, "25% off")).toBeNull();
 		expect(useApprovalStore().open).toBe(false);
 	});
+
+	it("takes the PIN from the keyboard too: digits, Backspace and Enter", async () => {
+		mountDialog();
+		const answer = useApprovalStore().requestApproval({ permission: "view_reports" }, "Open Reports");
+		await flushPromises();
+		await tap('[data-approver="manager@example.com"]');
+
+		const key = async (k: string) => {
+			$("[role=dialog]")!.dispatchEvent(new KeyboardEvent("keydown", { key: k, bubbles: true }));
+			await flushPromises();
+		};
+		for (const k of ["2", "2", "2", "9", "Backspace", "2", "Enter"]) await key(k);
+
+		expect(approval.verify).toHaveBeenCalledWith("manager@example.com", "2222", expect.anything());
+		await expect(answer).resolves.toBe("manager@example.com");
+	});
 });

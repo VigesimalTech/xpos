@@ -51,3 +51,20 @@ XPOS_USER_DATA_DIR=~/xpos-trial "/path/to/X POS.app/Contents/MacOS/X POS"
 Each failed step leaves a screenshot, a trace and the page's accessibility tree in
 `test-results/desktop/`; `npx playwright show-trace <trace.zip>` replays it. The steps share
 one till and run in order, so the steps after a failure are skipped.
+
+## Exploring by hand
+
+`tests/desktop/explore/driver.spec.ts` starts one till the same way and keeps it running,
+so it can be worked a step at a time and looked at after each step:
+
+```bash
+XPOS_RT_CONFIG=/tmp/xpos-rt.json XPOS_RT_URL=http://<site>:8000 \
+  npx playwright test -c playwright.explore.config.ts
+```
+
+It listens on `127.0.0.1:47111`: `POST /run` with the body of an async function
+`(page, till, site, h)` (`h` is `support/till.ts`), `GET /shot?name=x` for a screenshot in
+`test-results/explore/`, `GET /log` for what the page's console, the main process and the
+network said since the last call, and `POST /quit`. Every print channel is recorded, not
+printed. `XPOS_EXPLORE_FRESH=0` with `XPOS_EXPLORE_PROFILE=<dir>` reopens a till as it was left.
+What it finds becomes a step in `specs/`.

@@ -32,6 +32,12 @@ POS_PERMISSIONS = (
 	# Reports
 	("current_stock_by_brand", "Current Stock by Brand", "Reports"),
 	("current_stock_report", "Current Stock Report", "Reports"),
+	# Screens (K27): without one, the POS Profile's Screens the Role Lacks decides whether
+	# the screen is hidden or opens with a manager's PIN.
+	("view_reports", "Reports", "Screens"),
+	("barcode_printer", "Barcode Printer", "Screens"),
+	("price_checker", "Price Checker", "Screens"),
+	("purchasing", "Purchasing", "Screens"),
 	# Administration
 	("manage_role_permissions", "Manage Role Permissions", "Administration"),
 	# A manager's PIN on the till approves what the cashier's role does not allow.
@@ -41,8 +47,8 @@ POS_PERMISSIONS = (
 ALL_PERMISSION_NAMES = tuple(name for name, _label, _group in POS_PERMISSIONS)
 
 # Cashiers ring up sales out of the box; every catalog permission is an elevated
-# capability, so none are enabled by default.
-_CASHIER_ENABLED: set[str] = set()
+# capability, so none are enabled by default but the Price Checker, a cashier's tool.
+_CASHIER_ENABLED: set[str] = {"price_checker"}
 _MANAGER_DISABLED = {"manage_role_permissions"}
 
 DEFAULT_ROLES = (
@@ -57,9 +63,18 @@ def after_install():
 	seed_default_roles()
 
 
-def seed_pos_permissions():
-	"""Upsert the static POS Permission catalog. Idempotent."""
+def seed_pos_permissions(only=None):
+	"""Upsert the static POS Permission catalog, or the permissions named in `only`. Idempotent.
+
+	A patch passes the permissions it adds, and only those: saving a POS Role fills in
+	every catalog permission it lacks as disabled, so a patch that seeded the whole
+	catalog would leave a later patch's permissions already present, all off, and that
+	patch would skip them (found in K27: managers upgraded from before K19 lost every
+	screen).
+	"""
 	for permission_name, permission_label, _group in POS_PERMISSIONS:
+		if only is not None and permission_name not in only:
+			continue
 		if frappe.db.exists("POS Permission", permission_name):
 			continue
 		frappe.get_doc(

@@ -179,6 +179,11 @@ export const usePosStore = defineStore("pos", () => {
 
 	const allowCashDeposit = computed(() => !!posProfile.value?.allow_cash_deposit);
 
+	// K27: a screen the cashier's role lacks is hidden, or opens with a manager's PIN.
+	const askForScreens = computed(() => posProfile.value?.xpos_screen_access === "Show, Ask a Manager");
+
+	const allowPurchasing = computed(() => !!posProfile.value?.xpos_allow_purchasing);
+
 	const fetchCoupon = computed(() => !!posProfile.value?.auto_fetch_coupons_gifts);
 
 	const showTemplateItems = computed(() => !!posProfile.value?.show_template_items);
@@ -578,6 +583,7 @@ export const usePosStore = defineStore("pos", () => {
 
 	return {
 		isLoading,
+		refreshReceiptContext,
 		isReady,
 		isCashier,
 		currentView,
@@ -633,6 +639,8 @@ export const usePosStore = defineStore("pos", () => {
 		enableCashMovement,
 		allowPosExpense,
 		allowCashDeposit,
+		askForScreens,
+		allowPurchasing,
 		fetchCoupon,
 		showTemplateItems,
 		hideVariantsItems,

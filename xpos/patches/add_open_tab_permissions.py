@@ -11,7 +11,7 @@ NEW_PERMISSIONS = (
 
 def execute():
 	"""Backfill the open-tab permissions onto POS Roles that already exist."""
-	seed_pos_permissions()
+	seed_pos_permissions(only=NEW_PERMISSIONS)
 
 	defaults = dict(DEFAULT_ROLES)
 

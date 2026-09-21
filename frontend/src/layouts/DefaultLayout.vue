@@ -39,6 +39,7 @@
 					<span class="text-[10px] font-medium">{{ __("Orders") }}</span>
 				</router-link>
 				<router-link
+					v-if="canOpenScreen('reports')"
 					to="/reports"
 					:class="[
 						'flex flex-col items-center justify-center gap-0.5 px-4 py-1.5 rounded-xl transition-colors no-underline min-w-[4rem]',
@@ -64,6 +65,7 @@
 
 <script setup lang="ts">
 import Navbar from "@/components/Navbar.vue";
+import { canOpenScreen } from "@/services/screenAccess";
 import Sidebar from "@/components/Sidebar.vue";
 import MenuBar from "@/components/MenuBar.vue";
 import { isElectron } from "@/services/electronBridge";
