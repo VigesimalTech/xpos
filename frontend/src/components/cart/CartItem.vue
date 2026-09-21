@@ -109,15 +109,16 @@
 				</div>
 			</div>
 
-			<div class="flex items-center gap-1 mt-1 flex-wrap">
+			<div class="flex items-center gap-2 mt-1.5 flex-wrap">
 				<template v-if="item.pos_is_free_item">
 					<span class="text-[10px] font-semibold text-muted-foreground px-1">
 						{{ __("Qty") }}: {{ qty(item.qty) }}
 					</span>
 				</template>
 				<template v-else>
-					<Button variant="secondary" size="icon-sm" class="w-5 h-5" @click="decrementQty">
-						<Minus class="w-2.5 h-2.5" />
+					<!-- Sized for a finger on a touch screen: wide, so a tap does not land on the quantity. -->
+					<Button variant="secondary" size="icon-sm" class="w-14 h-10" @click="decrementQty">
+						<Minus class="w-5 h-5" />
 					</Button>
 					<input
 						ref="qtyInput"
@@ -125,7 +126,7 @@
 						type="number"
 						min="0"
 						data-testid="cart-qty"
-						class="w-9 h-5 text-center text-[10px] font-semibold text-foreground bg-muted/50 rounded border border-border focus:outline-none focus:ring-1 focus:ring-ring dark:bg-accent/50 dark:border-muted-foreground/30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none px-1"
+						class="w-12 h-10 text-center text-sm font-semibold text-foreground bg-muted/50 rounded border border-border focus:outline-none focus:ring-1 focus:ring-ring dark:bg-accent/50 dark:border-muted-foreground/30 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none px-1"
 						@change="onQtyChange"
 						@keydown.up.prevent="focusAdjacentItem(-1, 'qty')"
 						@keydown.down.prevent="focusAdjacentItem(1, 'qty')"
@@ -134,10 +135,10 @@
 					<Button
 						variant="secondary"
 						size="icon-sm"
-						class="w-5 h-5 bg-primary/10 text-primary hover:bg-primary/20"
+						class="w-14 h-10 bg-primary/10 text-primary hover:bg-primary/20"
 						@click="incrementQty"
 					>
-						<Plus class="w-2.5 h-2.5" />
+						<Plus class="w-5 h-5" />
 					</Button>
 				</template>
 

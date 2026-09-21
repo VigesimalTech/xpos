@@ -142,7 +142,10 @@
 			</div>
 		</div>
 
-		<div class="flex gap-2">
+		<!-- Touch targets: each button fills its share of the row, 44px tall, 12px apart. -->
+		<div
+			class="flex flex-wrap gap-3 [&>button]:h-11 [&>button]:min-w-11 [&>button]:flex-1 [&_svg]:w-5 [&_svg]:h-5"
+		>
 			<TooltipWrapper :content="__('Additional Discount')">
 				<Button
 					v-if="canDoOrAsk('apply_additional_discount')"

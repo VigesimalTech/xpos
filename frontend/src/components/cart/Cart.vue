@@ -147,7 +147,7 @@
 			</div>
 
 			<div v-else class="space-y-0.5 py-0.5">
-				<CartItem
+				<template
 					v-for="(item, index) in cartStore.items"
 					:key="
 						item.item_code +
@@ -158,15 +158,20 @@
 						'-' +
 						index
 					"
-					:item="item"
-					:index="index"
-					:currency-symbol="posStore.currencySymbol"
-					@update-qty="handleUpdateQty"
-					@update-rate="cartStore.updateItemRate"
-					@update-discount="cartStore.updateItemDiscount"
-					@update-uom="cartStore.updateItemUOM"
-					@remove="cartStore.requestRemoveItem"
-				/>
+				>
+					<!-- A divider between lines, so each line reads as its own on a touch screen. -->
+					<div v-if="index > 0" class="mx-2 border-t border-border" />
+					<CartItem
+						:item="item"
+						:index="index"
+						:currency-symbol="posStore.currencySymbol"
+						@update-qty="handleUpdateQty"
+						@update-rate="cartStore.updateItemRate"
+						@update-discount="cartStore.updateItemDiscount"
+						@update-uom="cartStore.updateItemUOM"
+						@remove="cartStore.requestRemoveItem"
+					/>
+				</template>
 			</div>
 		</div>
 
@@ -311,7 +316,7 @@ function handleEditCustomer() {
 }
 
 async function handleUpdateQty(index: number, qty: number) {
-	// K19: lowering a quantity takes something out of the sale.
+	// K19: a quantity of 0 removes the line, which needs the permission or a manager.
 	const result = await cartStore.requestItemQty(index, qty);
 	if (!result.success && result.message) {
 		showError(result.message);
