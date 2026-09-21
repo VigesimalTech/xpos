@@ -203,7 +203,7 @@
 					size="sm"
 					class="text-destructive hover:text-destructive dark:border-border"
 					:disabled="cartStore.isEmpty"
-					@click="cartStore.clearCart()"
+					@click="cartStore.requestClearCart()"
 				>
 					<Trash2 class="w-4 h-4" />
 				</Button>

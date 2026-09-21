@@ -359,6 +359,7 @@ async function runMigrations(): Promise<void> {
 		["void_after_payment", "TINYINT(1) DEFAULT 0"],
 		["no_sale_drawer", "TINYINT(1) DEFAULT 0"],
 		["return_without_receipt", "TINYINT(1) DEFAULT 0"],
+		["remove_cart_items", "TINYINT(1) DEFAULT 0"],
 		// Till PIN: hash and salt come from ERPNext (xpos.api.pin); the lockout is local.
 		["pin_hash", "VARCHAR(255) DEFAULT NULL"],
 		["pin_salt", "VARCHAR(64) DEFAULT NULL"],

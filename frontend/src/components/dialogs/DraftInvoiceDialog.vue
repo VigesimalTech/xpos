@@ -284,6 +284,8 @@ import {
 	RefreshCw,
 } from "lucide-vue-next";
 import { __ } from "@/lib/translate";
+import { ensureAllowed } from "@/services/ensureAllowed";
+import { isElectron } from "@/services/electronBridge";
 import { debounce } from "@/utils";
 import type { OpenTab, OutstandingInvoice } from "@/types/pos.types";
 
@@ -422,6 +424,13 @@ async function selectDraft(draft: OpenTab) {
 
 async function deleteDraft(draftName: string) {
 	if (!confirm(__("Are you sure you want to delete this draft?"))) {
+		return;
+	}
+	// K19: discarding a held order takes a customer's items away, as clearing a sale does.
+	if (
+		isElectron() &&
+		!(await ensureAllowed("remove_cart_items", __("Discard held order {0}", [draftName]))).ok
+	) {
 		return;
 	}
 

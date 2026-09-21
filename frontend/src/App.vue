@@ -208,7 +208,8 @@ const isAuthPage = computed(() => route.meta.isAuthPage === true || route.meta.i
 const isFullScreen = computed(() => route.meta.fullScreen === true);
 
 async function handleClearCart() {
-	cartStore.clearCart();
+	// K19: clearing a sale on the till needs Remove Items From the Cart, or a manager.
+	if (!(await cartStore.requestClearCart())) return;
 	await cartStore.applyDefaultCustomer();
 }
 
@@ -233,7 +234,7 @@ function handleHoldInvoice() {
 	}
 }
 
-function handleRemoveLastItem() {
+async function handleRemoveLastItem() {
 	if (cartStore.items.length === 0) return;
 
 	const activeEl = document.activeElement as HTMLElement | null;
@@ -249,7 +250,7 @@ function handleRemoveLastItem() {
 				? selectedIndex
 				: cartStore.items.length - 1;
 
-	cartStore.removeItem(indexToRemove);
+	if (!(await cartStore.requestRemoveItem(indexToRemove))) return;
 
 	nextTick(() => {
 		const nextIndex = cartStore.selectedCartIndex;

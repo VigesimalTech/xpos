@@ -31,6 +31,7 @@ ALL_PERMISSION_KEYS = (
 	"void_after_payment",
 	"no_sale_drawer",
 	"return_without_receipt",
+	"remove_cart_items",
 )
 
 # What every till gets in its cashier pull: the keys from before K19. A till stores each

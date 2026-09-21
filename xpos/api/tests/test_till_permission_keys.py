@@ -16,9 +16,10 @@ class TestTillPermissionKeys(unittest.TestCase):
 		self.assertNotIn("approve_exceptions", till_permission_keys(["*"]))
 
 	def test_a_till_that_asks_gets_the_newer_keys(self):
-		keys = till_permission_keys(["*", "approve_exceptions", "no_sale_drawer"])
+		keys = till_permission_keys(["*", "approve_exceptions", "no_sale_drawer", "remove_cart_items"])
 		self.assertIn("approve_exceptions", keys)
 		self.assertIn("no_sale_drawer", keys)
+		self.assertIn("remove_cart_items", keys)
 		self.assertNotIn("void_after_payment", keys)
 		self.assertTrue(set(TILL_BASE_PERMISSION_KEYS) <= set(keys))
 

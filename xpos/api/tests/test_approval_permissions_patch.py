@@ -29,5 +29,16 @@ class TestApprovalPermissionDefaults(unittest.TestCase):
 	def test_the_new_permissions(self):
 		self.assertEqual(
 			set(NEW_PERMISSIONS),
-			{"approve_exceptions", "void_after_payment", "no_sale_drawer", "return_without_receipt"},
+			{
+				"approve_exceptions",
+				"void_after_payment",
+				"no_sale_drawer",
+				"return_without_receipt",
+				"remove_cart_items",
+			},
 		)
+
+	def test_a_cashier_may_not_remove_items_from_the_cart_alone(self):
+		# Off for cashiers straight away (the user's call, 21 Sep): a manager approves.
+		self.assertEqual(new_permission_defaults("Cashier", set())["remove_cart_items"], 0)
+		self.assertEqual(new_permission_defaults("Manager", set())["remove_cart_items"], 1)

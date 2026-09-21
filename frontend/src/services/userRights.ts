@@ -21,6 +21,7 @@ export interface PosPermissions {
 	void_after_payment: boolean;
 	no_sale_drawer: boolean;
 	return_without_receipt: boolean;
+	remove_cart_items: boolean;
 }
 
 const DEFAULT_PERMISSIONS: PosPermissions = {
@@ -42,6 +43,7 @@ const DEFAULT_PERMISSIONS: PosPermissions = {
 	void_after_payment: false,
 	no_sale_drawer: false,
 	return_without_receipt: false,
+	remove_cart_items: false,
 };
 
 const currentRole = ref<string>("");

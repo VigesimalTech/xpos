@@ -124,6 +124,7 @@ const PERMISSION_GROUPS: { title: string; items: { key: string; label: string }[
 			{ key: "sale_return", label: "Sale Return" },
 			{ key: "return_without_receipt", label: "Return Without Receipt" },
 			{ key: "void_after_payment", label: "Void After Payment" },
+			{ key: "remove_cart_items", label: "Remove Items From the Cart" },
 		],
 	},
 	{

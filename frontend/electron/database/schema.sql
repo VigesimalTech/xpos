@@ -571,6 +571,7 @@ CREATE TABLE IF NOT EXISTS `pos_users` (
   `void_after_payment` TINYINT(1) DEFAULT 0,
   `no_sale_drawer` TINYINT(1) DEFAULT 0,
   `return_without_receipt` TINYINT(1) DEFAULT 0,
+  `remove_cart_items` TINYINT(1) DEFAULT 0,
   `modified` DATETIME DEFAULT NULL,
   `synced_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
   UNIQUE INDEX `idx_username` (`username`),

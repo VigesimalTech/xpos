@@ -5,6 +5,7 @@ NEW_PERMISSIONS = (
 	"void_after_payment",
 	"no_sale_drawer",
 	"return_without_receipt",
+	"remove_cart_items",
 )
 
 # Roles that approve out of the box: the seeded Manager and Administrator, and any role
@@ -15,9 +16,11 @@ _APPROVER_ROLES = {"Manager", "Administrator"}
 def new_permission_defaults(role_name: str, enabled: set[str]) -> dict[str, int]:
 	"""The new permissions for a role that already exists.
 
-	Approvers get all four: an approver who could not do these actions themselves could
+	Approvers get all of them: an approver who could not do these actions themselves could
 	not approve them either (an approval is held to the approver's own rights). Every
 	other role gets none, so no cashier gains a right on upgrade; they ask a manager.
+	That includes removing items from the cart, which cashiers could do freely before:
+	from this upgrade a manager approves it (decided 21 Sep 2026).
 	"""
 	approver = role_name in _APPROVER_ROLES or "manage_role_permissions" in enabled
 	return {key: 1 if approver else 0 for key in NEW_PERMISSIONS}

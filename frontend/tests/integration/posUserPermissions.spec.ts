@@ -20,6 +20,7 @@ const APPROVAL_KEYS = [
 	"void_after_payment",
 	"no_sale_drawer",
 	"return_without_receipt",
+	"remove_cart_items",
 ];
 
 const frappe = new FakeFrappe();

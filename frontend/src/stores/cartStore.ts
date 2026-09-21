@@ -15,6 +15,7 @@ import { isElectron } from "@/services/electronBridge";
 import { getDiscountLimit, hasPermission } from "@/services/userRights";
 import { saleNeeds, type SaleNeeds } from "@/services/tillSalePolicy";
 import { useApprovalStore } from "./approvalStore";
+import { ensureAllowed } from "@/services/ensureAllowed";
 import type {
 	CartItem,
 	POSItem,
@@ -669,6 +670,60 @@ export const useCartStore = defineStore("cart", () => {
 		});
 
 		return { success: true };
+	}
+
+	/**
+	 * K19: taking something out of the customer's sale on the desktop till needs Remove
+	 * Items From the Cart, or a manager's PIN. Not in a return (it only lowers a refund),
+	 * and not on the web POS, where no PIN can be checked.
+	 */
+	async function allowRemoval(reason: string): Promise<boolean> {
+		if (isReturnMode.value || !isElectron()) return true;
+		return (await ensureAllowed("remove_cart_items", reason)).ok;
+	}
+
+	async function requestRemoveItem(index: number): Promise<boolean> {
+		const item = items.value[index];
+		if (!item) return false;
+		if (
+			!item.pos_is_free_item &&
+			!(await allowRemoval(__("Remove {0} from the sale", [item.item_name])))
+		) {
+			return false;
+		}
+		removeItem(index);
+		return true;
+	}
+
+	async function requestItemQty(
+		index: number,
+		qty: number,
+	): Promise<{ success: boolean; message?: string }> {
+		const item = items.value[index];
+		if (!item) return { success: false };
+		const lowering = Math.abs(qty) < Math.abs(item.qty);
+		if (
+			lowering &&
+			!item.pos_is_free_item &&
+			!(await allowRemoval(
+				__("Lower {0} from {1} to {2}", [item.item_name, String(item.qty), String(qty)]),
+			))
+		) {
+			return { success: false };
+		}
+		return updateItemQty(index, qty);
+	}
+
+	/** Clear the sale on the cashier's say, not after a payment. False when not allowed. */
+	async function requestClearCart(): Promise<boolean> {
+		if (
+			items.value.length &&
+			!(await allowRemoval(__("Clear the sale ({0} lines)", [String(items.value.length)])))
+		) {
+			return false;
+		}
+		clearCart();
+		return true;
 	}
 
 	function removeItem(index: number): void {
@@ -1816,6 +1871,9 @@ export const useCartStore = defineStore("cart", () => {
 		clearAll,
 		openPaymentDialog,
 		approvedBy,
+		requestRemoveItem,
+		requestItemQty,
+		requestClearCart,
 		closePaymentDialog,
 		getInvoiceData,
 		getReceiptSnapshot,

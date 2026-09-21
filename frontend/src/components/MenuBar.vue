@@ -344,8 +344,9 @@ const menus = computed<Menu[]>(() => [
 				label: "New Sale",
 				icon: ShoppingCart,
 				shortcut: "Ctrl+N",
-				action: () => {
-					cartStore.clearCart();
+				action: async () => {
+					// K19: starting over takes the open sale's items out of it.
+					if (!(await cartStore.requestClearCart())) return;
 					router.push("/pos");
 				},
 			},
