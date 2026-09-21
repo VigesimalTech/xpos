@@ -63,9 +63,18 @@ def after_install():
 	seed_default_roles()
 
 
-def seed_pos_permissions():
-	"""Upsert the static POS Permission catalog. Idempotent."""
+def seed_pos_permissions(only=None):
+	"""Upsert the static POS Permission catalog, or the permissions named in `only`. Idempotent.
+
+	A patch passes the permissions it adds, and only those: saving a POS Role fills in
+	every catalog permission it lacks as disabled, so a patch that seeded the whole
+	catalog would leave a later patch's permissions already present, all off, and that
+	patch would skip them (found in K27: managers upgraded from before K19 lost every
+	screen).
+	"""
 	for permission_name, permission_label, _group in POS_PERMISSIONS:
+		if only is not None and permission_name not in only:
+			continue
 		if frappe.db.exists("POS Permission", permission_name):
 			continue
 		frappe.get_doc(

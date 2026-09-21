@@ -31,7 +31,7 @@ def execute():
 	from xpos.api.auth import clear_role_permission_cache
 	from xpos.install import seed_pos_permissions
 
-	seed_pos_permissions()
+	seed_pos_permissions(only=NEW_PERMISSIONS)
 
 	for role_name in frappe.get_all("POS Role", pluck="name"):
 		role = frappe.get_doc("POS Role", role_name)
