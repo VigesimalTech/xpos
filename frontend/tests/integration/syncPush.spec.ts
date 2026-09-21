@@ -2,6 +2,7 @@
  * Pushing sales made on the till to ERPNext: the sync engine against the
  * real local database and a fake Frappe server.
  */
+import { createServer } from "net";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { invoke, rendererEvents, setOnline } from "./support/electronShim";
 import { FakeFrappe, FrappeError } from "./support/fakeFrappe";
@@ -40,6 +41,15 @@ async function queueSale(total = 10): Promise<string> {
 		grand_total: total,
 	});
 	return local_id;
+}
+
+/** A URL nothing answers on: the till's network is up, ERPNext is not there. */
+async function deadUrl(): Promise<string> {
+	const server = createServer();
+	await new Promise<void>((r) => server.listen(0, "127.0.0.1", () => r()));
+	const { port } = server.address() as { port: number };
+	await new Promise((r) => server.close(r));
+	return `http://127.0.0.1:${port}`;
 }
 
 async function pendingInvoices() {
@@ -129,6 +139,55 @@ describe("pushing sales to ERPNext", () => {
 		setOnline(true);
 		await runSyncCyclePublic();
 		expect((await pendingInvoices())[0].status).toBe("synced");
+	});
+
+	it("O1: ERPNext not answering while the till's network is up uses none of a sale's tries", async () => {
+		// The case a till meets most: its network is up, ERPNext is not there. Before the
+		// fix every push counted a try, and a minute of it dead-lettered the sale for good.
+		await queueSale();
+		stopSyncEngine();
+		initSyncEngine({
+			serverUrl: await deadUrl(),
+			csrfToken: "",
+			sessionCookies: "",
+			apiKey: "k",
+			apiSecret: "s",
+		});
+
+		for (let i = 0; i < SYNC_DEFAULTS.maxRetries + 2; i++) await runSyncCyclePublic();
+
+		expect(await pendingInvoices()).toMatchObject([{ status: "pending", retry_count: 0 }]);
+		expect(rendererEvents.filter((e) => e.channel === "sync-dead-letter")).toEqual([]);
+		expect(rendererEvents).toContainEqual({ channel: "sync-reachability", data: { reachable: false } });
+
+		stopSyncEngine();
+		startEngine();
+		await runSyncCyclePublic();
+		expect((await pendingInvoices())[0].status).toBe("synced");
+		expect(rendererEvents).toContainEqual({ channel: "sync-reachability", data: { reachable: true } });
+	});
+
+	it("O1: a sale given up over the network before that fix is sent again after restart", async () => {
+		const lost = await queueSale(1);
+		const refused = await queueSale(2);
+		await execute(
+			"UPDATE `pending_invoices` SET `status` = 'dead_letter', `retry_count` = 3, `error` = 'net::ERR_CONNECTION_REFUSED' WHERE `local_id` = ?",
+			[lost],
+		);
+		// ERPNext's own refusal stays set aside for a person to review.
+		await execute(
+			"UPDATE `pending_invoices` SET `status` = 'dead_letter', `retry_count` = 3, `error` = 'Item TEST-ITEM is disabled' WHERE `local_id` = ?",
+			[refused],
+		);
+
+		stopSyncEngine();
+		startEngine();
+		await runSyncCyclePublic();
+
+		expect(frappe.callsTo(CREATE_INVOICE).map((c) => c.args.local_id)).toEqual([lost]);
+		const rows = await pendingInvoices();
+		expect(rows.find((r) => r.local_id === lost)?.status).toBe("synced");
+		expect(rows.find((r) => r.local_id === refused)?.status).toBe("dead_letter");
 	});
 
 	it("O3: a sale being sent when the till crashed is sent after restart", async () => {

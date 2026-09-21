@@ -66,6 +66,29 @@ function emitToRenderer(channel: string, data: unknown): void {
 	}
 }
 
+/**
+ * An error for which ERPNext never answered: the network, a timeout, or a page that is not
+ * ERPNext's (a captive portal). It says nothing about the record being sent, so it must not
+ * count as one of the record's tries (bug hunt: a minute offline dead-lettered every sale,
+ * and a dead-lettered sale is never sent again).
+ */
+export class ServerUnreachable extends Error {
+	readonly unreachable = true;
+}
+
+export function isUnreachable(error: unknown): boolean {
+	return (error as { unreachable?: boolean })?.unreachable === true;
+}
+
+let reachable: boolean | null = null;
+
+/** Tell the screen when ERPNext stops or starts answering, so it can say "Offline". */
+function setReachable(value: boolean): void {
+	if (reachable === value) return;
+	reachable = value;
+	emitToRenderer("sync-reachability", { reachable: value });
+}
+
 function isOnline(): boolean {
 	return net.isOnline();
 }
@@ -155,8 +178,9 @@ async function apiCall<T = unknown>(
 		const timer = setTimeout(() => {
 			finish(() => {
 				request.abort();
+				setReachable(false);
 				reject(
-					new Error(
+					new ServerUnreachable(
 						`No answer from ERPNext in ${Math.round(requestTimeoutMs / 1000)} s (${method})`,
 					),
 				);
@@ -170,25 +194,35 @@ async function apiCall<T = unknown>(
 
 			response.on("end", () =>
 				finish(() => {
+					let data: ReturnType<typeof JSON.parse>;
 					try {
-						const data = JSON.parse(responseBody);
-						if (response.statusCode && response.statusCode >= 400) {
-							reject(
-								new Error(
-									data.message || `HTTP ${response.statusCode}${frappeErrorDetail(data)}`,
-								),
-							);
-						} else {
-							resolve(data.message as T);
-						}
+						data = JSON.parse(responseBody);
 					} catch {
-						reject(new Error(`Invalid JSON response from ${method}`));
+						// Not ERPNext's answer (a captive portal, a proxy's error page).
+						setReachable(false);
+						reject(new ServerUnreachable(`Invalid JSON response from ${method}`));
+						return;
+					}
+					setReachable(true);
+					if (response.statusCode && response.statusCode >= 400) {
+						reject(
+							new Error(
+								data.message || `HTTP ${response.statusCode}${frappeErrorDetail(data)}`,
+							),
+						);
+					} else {
+						resolve(data.message as T);
 					}
 				}),
 			);
 		});
 
-		request.on("error", (err: Error) => finish(() => reject(err)));
+		request.on("error", (err: Error) =>
+			finish(() => {
+				setReachable(false);
+				reject(new ServerUnreachable(err.message));
+			}),
+		);
 
 		if (body !== null) {
 			request.write(body);
@@ -595,9 +629,20 @@ async function pushTable(config: SyncTableConfig): Promise<{ synced: number; fai
 
 			synced++;
 		} catch (error) {
-			failed++;
 			const errMsg = error instanceof Error ? error.message : String(error);
 
+			// ERPNext did not answer: back in the queue as it was, no try used, and no point
+			// sending the rest now.
+			if (isUnreachable(error)) {
+				await execute(
+					`UPDATE \`${pendingTable}\` SET \`${statusField}\` = 'pending' WHERE \`${idField}\` = ?`,
+					[recordId],
+				);
+				emitToRenderer("sync-error", { message: errMsg, table: config.label, unreachable: true });
+				break;
+			}
+
+			failed++;
 			if (pendingTable === "pending_invoices" || pendingTable === "pending_purchases") {
 				const newRetryCount = (Number(record.retry_count) || 0) + 1;
 				const exhausted = newRetryCount >= SYNC_DEFAULTS.maxRetries;
@@ -876,7 +921,33 @@ async function requeueInFlight(): Promise<void> {
 			log.error(`Could not requeue in-flight ${table} records`, err);
 		}
 	}
+	// Before network failures stopped counting as tries, a minute offline dead-lettered
+	// every sale. ERPNext never saw those: send them again.
+	for (const table of ["pending_invoices", "pending_purchases"]) {
+		try {
+			const result = await execute(
+				`UPDATE \`${table}\` SET \`status\` = 'pending', \`retry_count\` = 0
+				 WHERE \`status\` IN ('dead_letter', 'failed') AND (${NETWORK_ERROR_SQL})`,
+			);
+			if (result.affectedRows) {
+				log.warn(`Requeued ${result.affectedRows} ${table} record(s) given up over network errors`);
+			}
+		} catch (err) {
+			log.error(`Could not requeue ${table} records given up over network errors`, err);
+		}
+	}
 }
+
+/** Errors from the network, not from ERPNext, as the till recorded them. */
+const NETWORK_ERROR_SQL = [
+	"`error` LIKE 'net::%'",
+	"`error` LIKE 'No answer from ERPNext%'",
+	"`error` LIKE 'Invalid JSON response from%'",
+	"`error` LIKE '%ECONNREFUSED%'",
+	"`error` LIKE '%ETIMEDOUT%'",
+	"`error` LIKE '%ENOTFOUND%'",
+	"`error` LIKE '%socket hang up%'",
+].join(" OR ");
 
 async function runSyncCycle(): Promise<void> {
 	await inFlightRecovery;
@@ -905,7 +976,10 @@ async function runSyncCycle(): Promise<void> {
 				emitToRenderer("sync-error", {
 					message: `Pull failed for ${table.label}: ${errMsg}`,
 					table: table.label,
+					unreachable: isUnreachable(error),
 				});
+				// ERPNext is not answering: the other tables would each wait out the same limit.
+				if (isUnreachable(error)) break;
 			}
 		}
 
