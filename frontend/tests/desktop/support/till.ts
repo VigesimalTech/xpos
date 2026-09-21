@@ -4,7 +4,7 @@
  */
 import { _electron as electron, expect, type ElectronApplication, type Page } from "@playwright/test";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "fs";
-import { createServer } from "net";
+import { connect, createServer, type Server, type Socket } from "net";
 import { tmpdir } from "os";
 import { join, resolve } from "path";
 import mysql from "mysql2/promise";
@@ -75,7 +75,7 @@ async function freshDatabase(): Promise<void> {
 	}
 }
 
-function freePort(): Promise<number> {
+export function freePort(): Promise<number> {
 	return new Promise((done, fail) => {
 		const server = createServer();
 		server.once("error", fail);
@@ -97,8 +97,12 @@ export interface Till {
 /**
  * Start the app on a profile of its own. With `fresh`, a new database and profile, so
  * the setup wizard shows; without, the till reopens where the last one left off.
+ * `dbPort` points the till at another port for its database (see `databaseRelay`).
  */
-export async function launchTill(profile: string, { fresh = true } = {}): Promise<Till> {
+export async function launchTill(
+	profile: string,
+	{ fresh = true, dbPort }: { fresh?: boolean; dbPort?: number } = {},
+): Promise<Till> {
 	if (fresh) {
 		rmSync(profile, { recursive: true, force: true });
 		await freshDatabase();
@@ -106,7 +110,7 @@ export async function launchTill(profile: string, { fresh = true } = {}): Promis
 	// Point the app at the test database from the start: without this it opens the
 	// default xpos_local before the wizard has asked.
 	mkdirSync(profile, { recursive: true });
-	writeFileSync(join(profile, "db-config.json"), JSON.stringify(db));
+	writeFileSync(join(profile, "db-config.json"), JSON.stringify({ ...db, port: dbPort ?? db.port }));
 	// Playwright runs from frontend/ (yarn test:desktop).
 	const frontend = resolve(process.cwd());
 	const app = await electron.launch({
@@ -226,4 +230,45 @@ export async function eventually<T>(
 		await syncNow(page).catch(() => undefined);
 		await page.waitForTimeout(3000);
 	}
+}
+
+export interface DatabaseRelay {
+	port: number;
+	/** The database answers on `port`. */
+	start: () => Promise<void>;
+	/** Nothing answers on `port`, as before MariaDB has started. */
+	stop: () => Promise<void>;
+}
+
+/**
+ * A port that forwards to the test MariaDB while started and refuses connections while
+ * stopped: a till's database that is not up yet, then is.
+ */
+export async function databaseRelay(): Promise<DatabaseRelay> {
+	const port = await freePort();
+	let server: Server | null = null;
+	const open = new Set<Socket>();
+	return {
+		port,
+		start: () =>
+			new Promise((done) => {
+				server = createServer((client) => {
+					const upstream = connect(db.port, db.host);
+					for (const s of [client, upstream]) {
+						open.add(s);
+						s.on("error", () => undefined);
+						s.on("close", () => open.delete(s));
+					}
+					client.pipe(upstream).pipe(client);
+				});
+				server.listen(port, "127.0.0.1", () => done());
+			}),
+		stop: () =>
+			new Promise((done) => {
+				for (const s of open) s.destroy();
+				if (!server) return done();
+				server.close(() => done());
+				server = null;
+			}),
+	};
 }

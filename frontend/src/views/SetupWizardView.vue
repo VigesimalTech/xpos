@@ -410,7 +410,7 @@
 import { ref, reactive, computed } from "vue";
 import { useRouter } from "vue-router";
 import { toast } from "vue-sonner";
-import { markSetupComplete } from "@/router/index";
+import { markSetupComplete } from "@/router/setupGuard";
 import { setServerUrl, warmApiCredentials } from "@/services/electronBridge";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";

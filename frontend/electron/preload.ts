@@ -15,6 +15,8 @@ for (const channel of SYNC_DATA_CHANNELS) {
 
 contextBridge.exposeInMainWorld("electronAPI", {
 	isFirstRun: (): Promise<boolean> => ipcRenderer.invoke("app:is-first-run"),
+	getSetupState: (): Promise<"ready" | "setup" | "waiting-for-database"> =>
+		ipcRenderer.invoke("app:setup-state"),
 	testErpNext: (config: {
 		url: string;
 		apiKey?: string;

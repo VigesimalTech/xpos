@@ -1,5 +1,6 @@
 export interface ElectronAPI {
 	isFirstRun: () => Promise<boolean>;
+	getSetupState: () => Promise<"ready" | "setup" | "waiting-for-database">;
 	testErpNext: (config: {
 		url: string;
 		apiKey?: string;

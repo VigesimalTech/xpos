@@ -16,6 +16,7 @@ const LoginView = () => import("@/views/LoginView.vue");
 const ResetPasswordView = () => import("@/views/ResetPasswordView.vue");
 const BarcodePrintView = () => import("@/views/BarcodePrintView.vue");
 const SetupWizardView = () => import("@/views/SetupWizardView.vue");
+const WaitingForDatabaseView = () => import("@/views/WaitingForDatabaseView.vue");
 const RolePermissionsView = () => import("@/views/RolePermissionsView.vue");
 import { RouteRecordRaw } from "vue-router";
 
@@ -25,6 +26,12 @@ const routes: RouteRecordRaw[] = [
 		name: "setup",
 		component: SetupWizardView,
 		meta: { title: "Setup", requiresAuth: false, isSetupPage: true },
+	},
+	{
+		path: "/starting",
+		name: "starting",
+		component: WaitingForDatabaseView,
+		meta: { title: "Starting", requiresAuth: false, isStartingPage: true },
 	},
 	{
 		path: "/login",
