@@ -6500,7 +6500,7 @@
    "creation": "2026-09-19 00:00:00.000000",
    "default": "Flag",
    "depends_on": null,
-   "description": "What the server does with a synced sale that goes beyond the cashier's rights. Flag records it and lists why on the invoice (the till may already have taken payment); Reject refuses it, and the till keeps it for review.",
+   "description": "What the server does with a sale that goes beyond the cashier's rights. Flag records it and lists why on the invoice. Reject refuses a sale being made on the web POS; a sale already paid at a till (or offline) is flagged instead, since refusing it would strand money already taken.",
    "docstatus": 0,
    "dt": "POS Profile",
    "fetch_from": null,

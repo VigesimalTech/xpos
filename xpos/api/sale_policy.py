@@ -221,8 +221,16 @@ def apply_sale_policy(invoice_doc, data: dict, pos) -> None:
 		invoice_doc.xpos_policy_flags = None
 		return
 	if (pos.get("xpos_out_of_policy_action") or "Flag") == "Reject":
-		frappe.throw(
-			_("This sale is outside the POS Profile's policy: {0}").format(" ".join(flags)),
-			title=_("Sale outside policy"),
-		)
+		# Reject stops a sale the cashier is still making (the web POS online). A sale with a
+		# till's local id was paid at the till before ERPNext saw it: refusing it would strand
+		# money already taken, and leave the shift's close short of it. Flag it for review.
+		if not invoice_doc.get("xpos_local_id"):
+			frappe.throw(
+				_("This sale is outside the POS Profile's policy: {0}").format(" ".join(flags)),
+				title=_("Sale outside policy"),
+			)
+		flags = [
+			*flags,
+			_("Outside policy and the POS Profile says Reject, but it was already paid at the till."),
+		]
 	invoice_doc.xpos_policy_flags = "\n".join(flags)

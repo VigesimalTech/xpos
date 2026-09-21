@@ -159,3 +159,46 @@ class TestResolveCashier(unittest.TestCase):
 		self.signed_in_with("token key:secret")
 		cashier = self.sale_policy.resolve_cashier({"pos_opening_shift": "SHIFT-1"})
 		self.assertEqual(cashier, "shift-cashier@example.com")
+
+
+class TestRejectOnlyWhatIsNotPaidYet(unittest.TestCase):
+	"""Reject stops a sale being made on the web POS. A sale with a till's local id was paid
+	at the till before ERPNext saw it: it is booked and flagged, not refused (21 Sep 2026)."""
+
+	def run_policy(self, local_id):
+		from unittest.mock import patch
+
+		from xpos.api import sale_policy
+
+		doc = {"xpos_local_id": local_id}
+
+		class Doc(dict):
+			def get(self, key, default=None):
+				return dict.get(self, key, default)
+
+			def __setattr__(self, key, value):
+				self[key] = value
+
+		invoice = Doc(doc)
+		pos = {"xpos_out_of_policy_action": "Reject"}
+		with (
+			patch.object(sale_policy, "resolve_cashier", return_value="cashier@example.com"),
+			patch.object(sale_policy, "check_sale_policy", return_value=["Discount 5% is over the limit."]),
+			patch("xpos.api.approval.resolve_approver", return_value=None),
+		):
+			sale_policy.apply_sale_policy(invoice, {}, pos)
+		return invoice
+
+	def test_a_web_sale_being_made_is_refused(self):
+		from unittest.mock import patch
+
+		import frappe
+
+		with patch.object(frappe, "throw", side_effect=RuntimeError("refused"), create=True):
+			with self.assertRaises(RuntimeError):
+				self.run_policy(None)
+
+	def test_a_sale_paid_at_the_till_is_booked_and_flagged(self):
+		invoice = self.run_policy("inv_1")
+		self.assertIn("Discount 5% is over the limit.", invoice["xpos_policy_flags"])
+		self.assertIn("already paid at the till", invoice["xpos_policy_flags"])
