@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import { call, showSuccess, showError, showInfo } from "@/services/api";
 import { usePosStore } from "@/stores/posStore";
+import { isElectron } from "@/services/electronBridge";
 import {
 	addPendingInvoice,
 	getAllPendingInvoices,
@@ -219,7 +220,20 @@ export const useOfflineStore = defineStore("offline", () => {
 		}
 	}
 
+	/**
+	 * On the till the main process's sync engine sends sales, and keeps each one's record
+	 * for Order History and the shift's close. This store sending them too raced it: it
+	 * re-sent sales already synced and then deleted the till's records of them (bug hunt).
+	 * Here it only asks the engine to run.
+	 */
+	async function syncOnTheTill(): Promise<void> {
+		await window.electronAPI?.triggerSync?.();
+		await loadPendingInvoices();
+		await refreshDeadLetterCount();
+	}
+
 	async function syncPendingInvoices(): Promise<void> {
+		if (isElectron()) return syncOnTheTill();
 		if (isSyncing.value || !isOnline.value) return;
 
 		isSyncing.value = true;
@@ -320,6 +334,12 @@ export const useOfflineStore = defineStore("offline", () => {
 	}
 
 	async function retrySingle(id: number): Promise<boolean> {
+		if (isElectron()) {
+			// Back in the queue for the sync engine, which sends it (see syncOnTheTill).
+			await updatePendingInvoice(id, { status: "pending", retry_count: 0, error: null });
+			await syncOnTheTill();
+			return true;
+		}
 		if (!isOnline.value) {
 			showError(__("Cannot sync while offline"));
 			return false;

@@ -15,6 +15,12 @@ export interface Reconciliation {
 
 const close = (a: unknown, b: unknown) => Math.abs(Number(a) - Number(b)) < 0.005;
 
+/**
+ * Every sale this oracle has seen on the till: a sale must never leave the till's own
+ * records (Order History and the shift's close are built from them), synced or not.
+ */
+const seenSales = new Set<string>();
+
 /** Every sale on the till against ERPNext. */
 async function sales(site: Site, problems: string[], counts: Record<string, number>) {
 	const rows = await tillDb<{
@@ -27,6 +33,13 @@ async function sales(site: Site, problems: string[], counts: Record<string, numb
 	}>("SELECT local_id, status, grand_total, server_name, error, retry_count FROM pending_invoices");
 	counts.till_sales = rows.length;
 	const localIds = rows.map((r) => r.local_id);
+	const present = new Set(localIds);
+	const gone = [...seenSales].filter((id) => !present.has(id));
+	if (gone.length)
+		problems.push(
+			`${gone.length} sale(s) were on the till and are gone from its records: ${gone.join(", ")}.`,
+		);
+	for (const id of localIds) seenSales.add(id);
 	const erp = localIds.length
 		? await erpList<{
 				name: string;
