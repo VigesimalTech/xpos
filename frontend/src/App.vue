@@ -214,7 +214,8 @@ async function handleClearCart() {
 
 function handleProcessPayment() {
 	if (cartStore.items.length > 0 && posStore.isShiftOpen) {
-		cartStore.showPaymentDialog = true;
+		// Through the store: a sale beyond the cashier's rights needs a manager first (K19).
+		void cartStore.openPaymentDialog();
 	}
 }
 

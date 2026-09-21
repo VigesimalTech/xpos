@@ -15,6 +15,8 @@ import { usePosStore } from "@/stores/posStore";
 export interface ApprovalNeed {
 	/** The POS Role permission the action needs, when it needs one. */
 	permission?: string;
+	/** Several, when one approval covers a whole sale. */
+	permissions?: string[];
 	/** The discount, in percent of the list price, when it is a discount. */
 	discountPct?: number;
 }

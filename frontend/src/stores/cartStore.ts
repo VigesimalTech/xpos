@@ -12,6 +12,9 @@ import {
 	getPendingInvoices,
 } from "@/services/dbBridge";
 import { isElectron } from "@/services/electronBridge";
+import { getDiscountLimit, hasPermission } from "@/services/userRights";
+import { saleNeeds, type SaleNeeds } from "@/services/tillSalePolicy";
+import { useApprovalStore } from "./approvalStore";
 import type {
 	CartItem,
 	POSItem,
@@ -602,7 +605,10 @@ export const useCartStore = defineStore("cart", () => {
 		serialNo?: string,
 		batchNo?: string,
 		conversionFactor?: number,
+		listRate?: number,
 	): { success: boolean; message?: string } {
+		// A price set below the list is a discount by another name (K19): keep the list price.
+		const changed = listRate !== undefined && rate > 0 && Math.abs(rate - listRate) > 0.0001;
 		if (
 			isReturnMode.value &&
 			returnItemCodes.value.length > 0 &&
@@ -629,7 +635,10 @@ export const useCartStore = defineStore("cart", () => {
 			if (existing) {
 				const addQty = isReturnMode.value ? -Math.abs(qty) : qty;
 				existing.qty += addQty;
-				if (rate) existing.rate = normalizeItemRate(rate);
+				if (rate) {
+					if (changed && existing.pos_list_rate === undefined) existing.pos_list_rate = listRate;
+					existing.rate = normalizeItemRate(rate);
+				}
 				return { success: true };
 			}
 		}
@@ -656,6 +665,7 @@ export const useCartStore = defineStore("cart", () => {
 			item_group: item.item_group,
 			brand: item.brand,
 			variant_of: item.variant_of,
+			...(changed ? { pos_list_rate: listRate, pos_rate_overridden: true } : {}),
 		});
 
 		return { success: true };
@@ -706,8 +716,11 @@ export const useCartStore = defineStore("cart", () => {
 	}
 
 	function updateItemRate(index: number, rate: number): void {
-		items.value[index].rate = normalizeItemRate(rate);
-		items.value[index].pos_rate_overridden = true;
+		const item = items.value[index];
+		// The price before the first change: a lower price is a discount by another name (K19).
+		if (item.pos_list_rate === undefined) item.pos_list_rate = item.rate;
+		item.rate = normalizeItemRate(rate);
+		item.pos_rate_overridden = true;
 	}
 
 	function updateItemDiscount(index: number, type: "percentage" | "amount", value: number): void {
@@ -1127,6 +1140,7 @@ export const useCartStore = defineStore("cart", () => {
 	}
 
 	function clearCart(): void {
+		forgetApproval();
 		items.value = [];
 		selectedCartIndex.value = -1;
 		discountPercentage.value = 0;
@@ -1189,7 +1203,80 @@ export const useCartStore = defineStore("cart", () => {
 		if (!customer.value) customer.value = found || { name, customer_name: name };
 	}
 
-	function openPaymentDialog(): void {
+	/** Who approved, with their PIN on the till, what this sale needs beyond the cashier's rights. */
+	const approvedBy = ref<string | null>(null);
+	/** What that approval covered; a sale that goes further needs asking again. */
+	const approvedCover = ref<{ permissions: string[]; discountPct: number } | null>(null);
+
+	function forgetApproval(): void {
+		approvedBy.value = null;
+		approvedCover.value = null;
+	}
+
+	function currentSaleNeeds(): SaleNeeds {
+		const net = subtotal.value;
+		const cartPct =
+			Number(discountPercentage.value) ||
+			(net > 0 && Number(discountAmount.value) ? (Number(discountAmount.value) / net) * 100 : 0);
+		return saleNeeds(
+			{
+				lines: items.value.map((item) => ({
+					item_code: item.item_code,
+					qty: item.qty,
+					rate: item.rate,
+					list_rate: item.pos_list_rate as number | undefined,
+					discount_percentage: item.discount_percentage,
+					discount_amount: item.discount_amount,
+					is_free_item: Boolean(item.pos_is_free_item),
+				})),
+				cartDiscountPct: cartPct,
+				isReturn: isReturnMode.value,
+			},
+			{
+				rights: {
+					allow_change_price: hasPermission("allow_change_price"),
+					show_edit_discount_field: hasPermission("show_edit_discount_field"),
+					apply_additional_discount: hasPermission("apply_additional_discount"),
+					sale_return: hasPermission("sale_return"),
+				},
+				discountLimit: getDiscountLimit(),
+				profileMaxDiscount: usePosStore().posProfile?.max_discount_percentage_allowed,
+			},
+		);
+	}
+
+	/**
+	 * K19: on the desktop till, a sale beyond the cashier's rights needs a manager's PIN
+	 * before payment, once for the sale. False when it was not approved. The web POS is
+	 * left to the server, which flags or rejects the sale: no PIN is checked there.
+	 */
+	async function confirmSaleApproval(): Promise<boolean> {
+		if (!isElectron()) return true;
+		const needs = currentSaleNeeds();
+		if (!needs.reasons.length) {
+			forgetApproval();
+			return true;
+		}
+		const cover = approvedCover.value;
+		if (
+			cover &&
+			needs.discountPct <= cover.discountPct &&
+			needs.permissions.every((p) => cover.permissions.includes(p))
+		) {
+			return true;
+		}
+		const approver = await useApprovalStore().requestApproval(
+			{ permissions: needs.permissions, discountPct: needs.discountPct },
+			needs.reasons.join("; "),
+		);
+		if (!approver) return false;
+		approvedBy.value = approver;
+		approvedCover.value = { permissions: needs.permissions, discountPct: needs.discountPct };
+		return true;
+	}
+
+	async function openPaymentDialog(): Promise<void> {
+		if (!(await confirmSaleApproval())) return;
 		showPaymentDialog.value = true;
 	}
 
@@ -1432,30 +1519,34 @@ export const useCartStore = defineStore("cart", () => {
 		const data: InvoiceData = {
 			pos_profile: posProfile,
 			customer: customer.value?.name || "",
-			items: items.value.map((item: CartItem): InvoiceItem => ({
-				item_code: item.item_code,
-				item_name: item.item_name,
-				local_item_name: item.local_item_name,
-				qty: item.qty,
-				rate: normalizeItemRate(item.rate),
-				price_list_rate: normalizeItemRate(item.rate),
-				uom: item.uom || item.stock_uom,
-				discount_percentage: item.discount_percentage,
-				discount_amount: item.discount_amount,
-				serial_no: item.serial_no,
-				batch_no: item.batch_no,
-				item_tax_template: item.item_tax_template,
-				additional_notes: item.pos_notes,
-				delivery_date: item.pos_delivery_date,
-				offers: item.pos_offers,
-				is_offer: item.pos_is_offer,
-				is_replace: item.pos_is_replace,
-				is_free_item: item.pos_is_free_item ? 1 : undefined,
-				pricing_rules: item.pos_free_item_rule,
-			})),
+			items: items.value.map(
+				(item: CartItem): InvoiceItem => ({
+					item_code: item.item_code,
+					item_name: item.item_name,
+					local_item_name: item.local_item_name,
+					qty: item.qty,
+					rate: normalizeItemRate(item.rate),
+					price_list_rate: normalizeItemRate(item.rate),
+					uom: item.uom || item.stock_uom,
+					discount_percentage: item.discount_percentage,
+					discount_amount: item.discount_amount,
+					serial_no: item.serial_no,
+					batch_no: item.batch_no,
+					item_tax_template: item.item_tax_template,
+					additional_notes: item.pos_notes,
+					delivery_date: item.pos_delivery_date,
+					offers: item.pos_offers,
+					is_offer: item.pos_is_offer,
+					is_replace: item.pos_is_replace,
+					is_free_item: item.pos_is_free_item ? 1 : undefined,
+					pricing_rules: item.pos_free_item_rule,
+				}),
+			),
 			pos_opening_shift: posOpeningShift,
 			// The till syncs as its own API user; the server checks the sale against this cashier's rights.
 			xpos_cashier: useAuthStore().userName,
+			// K19: the manager who approved it on the till; the server checks the approval again.
+			...(approvedBy.value ? { xpos_approved_by: approvedBy.value } : {}),
 			posting_date: posStore.allowChangePostingDate ? postingDate.value || nowDate() : nowDate(),
 			additional_discount_percentage: discountPercentage.value,
 			discount_amount: discountAmount.value,
@@ -1724,6 +1815,7 @@ export const useCartStore = defineStore("cart", () => {
 		clearCart,
 		clearAll,
 		openPaymentDialog,
+		approvedBy,
 		closePaymentDialog,
 		getInvoiceData,
 		getReceiptSnapshot,

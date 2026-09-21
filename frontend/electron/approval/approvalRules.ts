@@ -23,6 +23,8 @@ export interface ApprovalRequest {
 	cashier: string;
 	/** The POS Role permission the action needs, when it needs one. */
 	permission?: string;
+	/** Several, when one approval covers a whole sale (a price change and a discount). */
+	permissions?: string[];
 	/** The discount, in percent of the list price, when the action is a discount. */
 	discountPct?: number;
 	profileMaxDiscount?: number | string | null;
@@ -53,7 +55,8 @@ export function approvalRefusal(approver: ApproverRow, request: ApprovalRequest)
 	if (!Number(approver.enabled)) return "disabled";
 	if (!Number(approver.approve_exceptions)) return "not_an_approver";
 	if (approver.name === request.cashier && !request.allowSelfApproval) return "self_approval";
-	if (request.permission && !Number(approver[request.permission])) return "lacks_permission";
+	const needed = [...(request.permission ? [request.permission] : []), ...(request.permissions ?? [])];
+	if (needed.some((key) => !Number(approver[key]))) return "lacks_permission";
 	if (
 		request.discountPct !== undefined &&
 		request.discountPct >

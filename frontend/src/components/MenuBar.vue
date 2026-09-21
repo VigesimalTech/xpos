@@ -445,7 +445,7 @@ const menus = computed<Menu[]>(() => [
 				disabled: () => cartStore.items.length === 0 || !posStore.isShiftOpen,
 				action: () => {
 					if (cartStore.items.length > 0 && posStore.isShiftOpen) {
-						cartStore.showPaymentDialog = true;
+						void cartStore.openPaymentDialog();
 					}
 				},
 			},

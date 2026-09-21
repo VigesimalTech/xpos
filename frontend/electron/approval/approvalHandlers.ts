@@ -18,6 +18,7 @@ export interface ApprovalAsk {
 	cashier: string;
 	posProfile: string;
 	permission?: string;
+	permissions?: string[];
 	discountPct?: number;
 }
 

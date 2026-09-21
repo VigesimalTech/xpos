@@ -35,7 +35,7 @@
 			</p>
 
 			<div class="flex items-center gap-1 mt-0.5 flex-wrap">
-				<template v-if="hasPermission('allow_change_price') && !item.pos_is_free_item">
+				<template v-if="canDoOrAsk('allow_change_price') && !item.pos_is_free_item">
 					<span class="text-[11px] text-muted-foreground">{{ currencySymbol }}</span>
 					<input
 						ref="rateInput"
@@ -149,7 +149,7 @@
 					{{ __("Auto") }}
 				</span>
 
-				<template v-if="hasPermission('show_edit_discount_field') && !item.pos_is_free_item">
+				<template v-if="canDoOrAsk('show_edit_discount_field') && !item.pos_is_free_item">
 					<button
 						@click="showDiscountInput = !showDiscountInput"
 						class="ms-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-all"
@@ -166,7 +166,7 @@
 			</div>
 
 			<div
-				v-if="showDiscountInput && hasPermission('show_edit_discount_field')"
+				v-if="showDiscountInput && canDoOrAsk('show_edit_discount_field')"
 				class="mt-1.5 p-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-md border border-emerald-200 dark:border-emerald-800"
 			>
 				<div class="flex items-center gap-2">
@@ -231,7 +231,7 @@
 import { imageSrc } from "@/utils/imageSrc";
 import { ref, computed, watch, onMounted, nextTick } from "vue";
 import { usePosStore } from "@/stores/posStore";
-import { hasPermission } from "@/services/userRights";
+import { canDoOrAsk } from "@/services/userRights";
 import { useCartStore } from "@/stores/cartStore";
 import { useItemStore } from "@/stores/itemStore";
 import { Button } from "@/components/ui/button";

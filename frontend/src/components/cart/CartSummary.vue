@@ -145,7 +145,7 @@
 		<div class="flex gap-2">
 			<TooltipWrapper :content="__('Additional Discount')">
 				<Button
-					v-if="hasPermission('apply_additional_discount')"
+					v-if="canDoOrAsk('apply_additional_discount')"
 					variant="outline"
 					size="sm"
 					:class="{
@@ -350,7 +350,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
 import { usePosStore } from "@/stores/posStore";
-import { hasPermission } from "@/services/userRights";
+import { canDoOrAsk } from "@/services/userRights";
 import { useCartStore } from "@/stores/cartStore";
 import { useAuthStore } from "@/stores/authStore";
 import { useOfferStore } from "@/stores/offerStore";
@@ -657,7 +657,8 @@ async function holdOrder() {
 		const data = cartStore.getInvoiceData(profileName, shiftName);
 		if (!data.customer) {
 			const bootCustomer = (window.xpos?.boot as Record<string, unknown>)?.sysdefaults as
-				Record<string, string> | undefined;
+				| Record<string, string>
+				| undefined;
 			// The till has no boot; the POS Profile's customer is its default.
 			data.customer = bootCustomer?.customer || posStore.defaultCustomer || "";
 		}
@@ -737,7 +738,8 @@ async function sendToCashier() {
 
 		if (!data.customer) {
 			const bootCustomer = (window.xpos?.boot as Record<string, unknown>)?.sysdefaults as
-				Record<string, string> | undefined;
+				| Record<string, string>
+				| undefined;
 			// The till has no boot; the POS Profile's customer is its default.
 			data.customer = bootCustomer?.customer || posStore.defaultCustomer || "";
 		}

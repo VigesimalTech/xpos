@@ -63,6 +63,12 @@ describe("K19: who may approve on the till", () => {
 		);
 	});
 
+	it("one approval for a whole sale needs every permission it covers", () => {
+		const both = ask({ permissions: ["sale_return", "expense"] });
+		expect(approvalRefusal(manager(), both)).toBeNull();
+		expect(approvalRefusal(manager({ expense: 0 }), both)).toBe("lacks_permission");
+	});
+
 	it("an approver may not approve a discount beyond their own limit", () => {
 		expect(approvalRefusal(manager(), ask({ discountPct: 50 }))).toBe("over_limit");
 		// The POS Profile's maximum caps the approver too.
