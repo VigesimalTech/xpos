@@ -57,8 +57,13 @@ test("a new till is set up and a cashier signs in with their ERPNext password", 
 });
 
 test("the cashier opens a shift on their POS Profile", async () => {
-	await page.getByText("Select...").click();
-	await page.getByRole("option", { name: `${site!.pos_profile} (${site!.company})` }).click();
+	// Only the user's own profiles are offered; with one, it is already chosen.
+	const profile = `${site!.pos_profile} (${site!.company})`;
+	await expect(page.getByText(profile).or(page.getByText("Select...")).first()).toBeVisible();
+	if (await page.getByText("Select...").isVisible()) {
+		await page.getByText("Select...").click();
+		await page.getByRole("option", { name: profile }).click();
+	}
 	await page.getByRole("button", { name: "Open Shift" }).click();
 	await expect(page.getByText(site!.customer).first()).toBeVisible();
 });

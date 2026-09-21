@@ -181,9 +181,16 @@ export async function signIn(page: Page, user: string, password: string): Promis
 			timeout: 90_000,
 		})
 		.toBe(1);
-	await page.getByPlaceholder("Enter your email or username").fill(user);
+	// With cashiers who have PINs, the till opens on "Who is signing in?": the password
+	// form is one tap away.
+	const email = page.getByPlaceholder("Enter your email or username");
+	const usePassword = page.getByText("Use password instead");
+	await expect(email.or(usePassword).first()).toBeVisible({ timeout: 30_000 });
+	if (!(await email.isVisible())) await usePassword.click();
+	await email.fill(user);
 	await page.getByPlaceholder("Enter your password").fill(password);
-	await page.getByRole("button", { name: /sign in|log in|login/i }).click();
+	// Not "Sign in with a PIN", which sits under the form.
+	await page.getByRole("button", { name: /^(sign in|log in|login)$/i }).click();
 }
 
 /** Read from ERPNext as Administrator, to check what the till sent. */
