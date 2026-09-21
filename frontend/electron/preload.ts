@@ -360,7 +360,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 			ipcRenderer.invoke("db:create-pos-opening-shift", shift),
 		getOpenShift: (user: string) => ipcRenderer.invoke("db:get-open-shift", user),
 		checkOpenShift: (user: string) => ipcRenderer.invoke("db:check-open-shift", user),
-		getOpeningData: () => ipcRenderer.invoke("db:get-opening-data"),
+		getOpeningData: (user?: string) => ipcRenderer.invoke("db:get-opening-data", user),
 		closePosShift: (localId: string) => ipcRenderer.invoke("db:close-pos-shift", localId),
 		getPosOpeningShifts: (opts?: { user?: string; status?: string }) =>
 			ipcRenderer.invoke("db:get-pos-opening-shifts", opts),

@@ -7,6 +7,7 @@
  */
 
 import { ipcMain, net } from "electron";
+import { profilesForUser, type PosUserProfiles } from "./openingProfiles";
 import {
 	query,
 	queryOne,
@@ -1206,10 +1207,18 @@ export function registerDbHandlers(): void {
 		};
 	});
 
-	ipcMain.handle("db:get-opening-data", async () => {
-		const profiles = await query<Record<string, unknown>>(
+	ipcMain.handle("db:get-opening-data", async (_e, user?: string) => {
+		const all = await query<Record<string, unknown>>(
 			"SELECT * FROM `pos_profiles` WHERE `disabled` = 0 ORDER BY `name`",
 		);
+		// Only the profiles the signed-in user is on (openingProfiles.ts).
+		const posUser = user
+			? await queryOne<PosUserProfiles>(
+					"SELECT `pos_profile`, `pos_profiles` FROM `pos_users` WHERE `username` = ? OR `name` = ?",
+					[user, user],
+				)
+			: null;
+		const profiles = profilesForUser(all, posUser);
 		const companies = await query<Record<string, unknown>>("SELECT * FROM `companies` ORDER BY `name`");
 
 		const profilesWithPayments = await Promise.all(

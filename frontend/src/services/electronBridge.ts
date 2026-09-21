@@ -350,7 +350,7 @@ export interface ElectronDbAPI {
 	createPosOpeningShift: (shift: Record<string, unknown>) => Promise<Record<string, unknown>>;
 	getOpenShift: (user: string) => Promise<Record<string, unknown> | null>;
 	checkOpenShift: (user: string) => Promise<Record<string, unknown> | null>;
-	getOpeningData: () => Promise<Record<string, unknown>>;
+	getOpeningData: (user?: string) => Promise<Record<string, unknown>>;
 	getCountries: () => Promise<Record<string, unknown>[]>;
 	getCurrencies: () => Promise<Record<string, unknown>[]>;
 	clearCachedData: () => Promise<boolean>;

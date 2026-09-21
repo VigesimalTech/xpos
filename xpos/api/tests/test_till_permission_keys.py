@@ -34,3 +34,25 @@ class TestTillPermissionKeys(unittest.TestCase):
 		keys = till_permission_keys(["*", "view_reports", "barcode_printer", "price_checker", "purchasing"])
 		self.assertTrue({"view_reports", "barcode_printer", "price_checker", "purchasing"} <= set(keys))
 		self.assertNotIn("purchasing", till_permission_keys(["*"]))
+
+
+class TestProfilesByUser(unittest.TestCase):
+	"""A till offers a cashier only the POS Profiles they are on when a shift opens:
+	ERPNext refuses a shift on any other, and every sale in it would be stranded."""
+
+	def test_every_profile_of_each_user_once_in_name_order(self):
+		from xpos.api.auth import profiles_by_user
+
+		rows = [
+			{"user": "both@x", "pos_profile": "Shop B"},
+			{"user": "both@x", "pos_profile": "Shop A"},
+			{"user": "both@x", "pos_profile": "Shop A"},
+			{"user": "one@x", "pos_profile": "Shop A"},
+		]
+		self.assertEqual(profiles_by_user(rows), {"both@x": ["Shop A", "Shop B"], "one@x": ["Shop A"]})
+
+	def test_only_a_till_that_asks_gets_the_list(self):
+		from xpos.api.auth import asked_fields
+
+		self.assertIn("pos_profiles", asked_fields('["*", "pos_profiles"]'))
+		self.assertNotIn("pos_profiles", asked_fields(["*"]))

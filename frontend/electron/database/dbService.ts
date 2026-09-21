@@ -368,6 +368,8 @@ async function runMigrations(): Promise<void> {
 		["barcode_printer", "TINYINT(1) DEFAULT 0"],
 		["price_checker", "TINYINT(1) DEFAULT 0"],
 		["purchasing", "TINYINT(1) DEFAULT 0"],
+		// Every POS Profile the user is on (JSON list): the only ones a shift may open on.
+		["pos_profiles", "TEXT DEFAULT NULL"],
 		// Till PIN: hash and salt come from ERPNext (xpos.api.pin); the lockout is local.
 		["pin_hash", "VARCHAR(255) DEFAULT NULL"],
 		["pin_salt", "VARCHAR(64) DEFAULT NULL"],

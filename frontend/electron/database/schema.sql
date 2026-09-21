@@ -574,6 +574,7 @@ CREATE TABLE IF NOT EXISTS `pos_users` (
   `no_sale_drawer` TINYINT(1) DEFAULT 0,
   `return_without_receipt` TINYINT(1) DEFAULT 0,
   `remove_cart_items` TINYINT(1) DEFAULT 0,
+  `pos_profiles` TEXT DEFAULT NULL,
   `view_reports` TINYINT(1) DEFAULT 0,
   `barcode_printer` TINYINT(1) DEFAULT 0,
   `price_checker` TINYINT(1) DEFAULT 0,

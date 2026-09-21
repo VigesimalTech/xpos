@@ -10,6 +10,7 @@ from frappe.sessions import get_csrf_token as session_csrf_token
 from frappe.utils import cint, flt
 
 from xpos.api.till import till_cashier
+from xpos.utils import row_value
 
 ALL_PERMISSION_KEYS = (
 	"close_shift",
@@ -44,15 +45,34 @@ ALL_PERMISSION_KEYS = (
 TILL_BASE_PERMISSION_KEYS = ALL_PERMISSION_KEYS[:15]
 
 
-def till_permission_keys(fields: str | list | None = None) -> tuple:
-	"""The permission keys to send a till whose cashier pull asked for `fields`."""
+def asked_fields(fields: str | list | None = None) -> set:
+	"""The field names a till's pull asked for (a JSON list, one name, or a list)."""
 	if isinstance(fields, str):
 		try:
 			fields = json.loads(fields)
 		except ValueError:
 			fields = [fields]
-	asked = set(fields or [])
+	return set(fields or [])
+
+
+def till_permission_keys(fields: str | list | None = None) -> tuple:
+	"""The permission keys to send a till whose cashier pull asked for `fields`."""
+	asked = asked_fields(fields)
 	return TILL_BASE_PERMISSION_KEYS + tuple(key for key in ALL_PERMISSION_KEYS[15:] if key in asked)
+
+
+def profiles_by_user(rows) -> dict[str, list[str]]:
+	"""Every POS Profile each user is on, from (user, pos_profile) rows, in name order.
+
+	A till offers a cashier only these when a shift opens: ERPNext refuses a shift on a
+	profile the user is not on, and the sales in it would never sync.
+	"""
+	out: dict[str, list[str]] = {}
+	for row in rows:
+		user, profile = row_value(row, "user"), row_value(row, "pos_profile")
+		if user and profile and profile not in out.setdefault(user, []):
+			out[user].append(profile)
+	return {user: sorted(profiles) for user, profiles in out.items()}
 
 
 DEFAULT_ROLE = "Cashier"
@@ -288,6 +308,26 @@ def get_pos_users(
 	}
 
 	permission_keys = till_permission_keys(fields)
+	# Newer than older tills know: sent only to a till that asks for it by name.
+	user_profiles = None
+	if "pos_profiles" in asked_fields(fields):
+		user_profiles = profiles_by_user(
+			frappe.db.sql(
+				"""
+				SELECT pu.user, pu.parent AS pos_profile
+				FROM `tabPOS Profile User` pu
+				INNER JOIN `tabPOS Profile` pp ON pp.name = pu.parent
+				WHERE pp.disabled = 0 AND pu.user IN %(users)s
+				  AND (%(all_profiles)s = 1 OR pu.parent IN %(profiles)s)
+				""",
+				{
+					"users": tuple(r.user for r in profile_users),
+					"all_profiles": 0 if till_profiles else 1,
+					"profiles": tuple(till_profiles) or ("",),
+				},
+				as_dict=True,
+			)
+		)
 	results = []
 	for pu in profile_users:
 		user = user_meta.get(pu.user)
@@ -316,6 +356,8 @@ def get_pos_users(
 			"discount_limit": discount_limit,
 			**{key: cint(perms.get(key, False)) for key in permission_keys},
 		}
+		if user_profiles is not None:
+			row["pos_profiles"] = json.dumps(user_profiles.get(pu.user, [pu.pos_profile]))
 		results.append(row)
 
 	return results

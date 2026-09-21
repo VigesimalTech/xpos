@@ -359,7 +359,11 @@ export const usePosStore = defineStore("pos", () => {
 	async function fetchOpeningData(): Promise<OpeningData | undefined> {
 		try {
 			if (isElectron()) {
-				const data = (await window.electronAPI!.db.getOpeningData()) as unknown as OpeningData;
+				const { useAuthStore } = await import("@/stores/authStore");
+				// Only the profiles the signed-in user is on, as the web POS asks ERPNext.
+				const data = (await window.electronAPI!.db.getOpeningData(
+					useAuthStore().userName,
+				)) as unknown as OpeningData;
 				openingData.value = data;
 				return data;
 			}

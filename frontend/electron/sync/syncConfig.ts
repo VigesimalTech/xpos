@@ -688,6 +688,7 @@ export const SYNC_TABLES: SyncTableConfig[] = [
 			"barcode_printer",
 			"price_checker",
 			"purchasing",
+			"pos_profiles",
 		],
 		orderBy: "modified",
 		direction: "pull",
