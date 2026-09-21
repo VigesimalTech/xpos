@@ -122,6 +122,13 @@ def _approval_problems(event: dict) -> list[str]:
 	pos_profile = event.get("pos_profile")
 	if not approver or not pos_profile:
 		return []
+	# Renamed or deleted while the till was offline: keep the event, say why it is unchecked.
+	if not frappe.db.exists("POS Profile", pos_profile):
+		return [
+			_("POS Profile {0} is not on this server, so the approval by {1} could not be checked.").format(
+				pos_profile, approver
+			)
+		]
 	pos = frappe.get_cached_doc("POS Profile", pos_profile)
 	return check_approver(approver, event.get("cashier") or "", pos)
 

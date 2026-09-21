@@ -179,6 +179,17 @@ describe("K20: the till logs what leaves no sale", () => {
 		});
 	});
 
+	it("a cleared sale too long to keep whole keeps its first lines, as JSON, and says how many there were", async () => {
+		const lines = Array.from({ length: 3000 }, (_, i) => ({ item_code: `ITEM-${i}`, qty: 1, rate: 10 }));
+		await invoke("audit:record", { event_type: "sale_cleared", details: { lines } });
+
+		const details = JSON.parse(String((await events())[0].details));
+		expect(details.lines_total).toBe(3000);
+		expect(details.lines.length).toBeGreaterThan(0);
+		expect(details.lines.length).toBeLessThan(3000);
+		expect(details.lines[0]).toEqual(lines[0]);
+	});
+
 	it("a screen may not record an approval or a wrong PIN: only the PIN check does", async () => {
 		for (const event_type of ["approval", "pin_failed", "anything"]) {
 			expect(await invoke("audit:record", { event_type, approved_by: MANAGER })).toBeNull();

@@ -136,6 +136,8 @@ class SyncCase(unittest.TestCase):
 				return (filters["parent"], filters["user"]) in self.on_profile
 			if doctype == "POS Opening Shift":
 				return filters == "POS-OPEN-0001"
+			if doctype == "POS Profile":
+				return filters == "Shop 1"
 			return False
 
 		self.frappe.db.exists.side_effect = exists
@@ -204,6 +206,15 @@ class TestSyncAuditEvents(SyncCase):
 		self.check_approver.assert_called_once()
 		self.assertEqual(self.check_approver.call_args.args[:2], (MANAGER, CASHIER))
 		self.assertIn("not on the profile", self.stored["till:e1"]["checks"])
+
+	def test_an_approval_on_a_pos_profile_the_server_no_longer_has_is_stored_and_noted(self):
+		self.frappe.get_cached_doc.side_effect = LookupError("POS Profile Gone not found")
+		result = self.audit.sync_audit_events(
+			[self.event(event_type="approval", approved_by=MANAGER, pos_profile="Gone")]
+		)
+		self.assertEqual(result, {"accepted": ["e1"]})
+		self.check_approver.assert_not_called()
+		self.assertIn("POS Profile Gone is not on this server", self.stored["till:e1"]["checks"])
 
 	def test_one_event_that_cannot_be_stored_does_not_hold_back_the_rest(self):
 		original = self.frappe.get_doc.side_effect

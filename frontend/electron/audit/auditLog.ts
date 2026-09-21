@@ -67,6 +67,35 @@ function number(value: unknown): number | null {
 	return value === undefined || value === null || value === "" || !Number.isFinite(n) ? null : n;
 }
 
+/** What the `details` column holds at most. */
+const MAX_DETAILS = 60_000;
+
+/**
+ * `details` as JSON that fits its column and still parses. Too long, a sale's lines are
+ * dropped from the end, with how many there were; anything else is replaced by a note
+ * that it was too long. A slice of the text would be unreadable, and lost at sync.
+ */
+export function detailsJson(details: unknown): string | null {
+	if (details === undefined || details === null) return null;
+	const json = JSON.stringify(details);
+	if (json === undefined) return null;
+	if (json.length <= MAX_DETAILS) return json;
+	const lines = (details as { lines?: unknown }).lines;
+	if (Array.isArray(lines)) {
+		let kept = Math.floor((lines.length * MAX_DETAILS) / json.length);
+		while (kept > 0) {
+			const cut = JSON.stringify({
+				...(details as object),
+				lines: lines.slice(0, kept),
+				lines_total: lines.length,
+			});
+			if (cut.length <= MAX_DETAILS) return cut;
+			kept = Math.floor(kept * 0.9);
+		}
+	}
+	return JSON.stringify({ too_long: true, length: json.length });
+}
+
 /** Write one event to the local log. Returns its local id, or null if it could not be written. */
 export async function recordAuditEvent(event: AuditEvent): Promise<string | null> {
 	const localId = crypto.randomUUID();
@@ -92,9 +121,7 @@ export async function recordAuditEvent(event: AuditEvent): Promise<string | null
 				number(event.amount),
 				text(event.reference, 255),
 				text(event.description, 1000),
-				event.details === undefined || event.details === null
-					? null
-					: JSON.stringify(event.details).slice(0, 60_000),
+				detailsJson(event.details),
 			],
 		);
 		return localId;

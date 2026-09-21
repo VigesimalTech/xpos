@@ -722,6 +722,8 @@ export const useCartStore = defineStore("cart", () => {
 	): Promise<{ success: boolean; message?: string }> {
 		const item = items.value[index];
 		if (!item) return { success: false };
+		// Down to nothing, the line goes: a removal, logged as one.
+		if (qty === 0) return { success: await requestRemoveItem(index) };
 		const before = item.qty;
 		const lowering = Math.abs(qty) < Math.abs(before);
 		if (!lowering || item.pos_is_free_item) return updateItemQty(index, qty);

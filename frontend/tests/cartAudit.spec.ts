@@ -110,6 +110,20 @@ describe("K20: removals from a sale go in the audit log", () => {
 		);
 	});
 
+	it("a quantity lowered to nothing is a deleted line", async () => {
+		perms.value.remove_cart_items = true;
+		const cart = cartWith(line("A", 1));
+
+		const result = await cart.requestItemQty(0, 0);
+
+		expect(result.success).toBe(true);
+		expect(cart.items).toHaveLength(0);
+		expect(audit.recordAudit).toHaveBeenCalledTimes(1);
+		expect(audit.recordAudit).toHaveBeenCalledWith(
+			expect.objectContaining({ event_type: "line_removed", item_code: "A", qty: 1, amount: 10 }),
+		);
+	});
+
 	it("a raised quantity is not logged", async () => {
 		const cart = cartWith(line("A", 1));
 
