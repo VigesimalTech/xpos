@@ -29,6 +29,7 @@ interface Site extends Keys {
 	tills: Record<string, Keys>;
 	discount_limits: Record<string, number>;
 	reject_profile: string;
+	expense_account: string;
 }
 
 const configPath = process.env.XPOS_RT_CONFIG;
@@ -290,6 +291,55 @@ describe.skipIf(!configPath)("K19: a manager's approval, checked again on the se
 			`Approver ${OTHER_SHOP_CASHIER} is not on POS Profile ${site.pos_profile}`,
 		);
 		expect(invoice.xpos_approved_by || "").toBe("");
+	});
+
+	it("records an expense the cashier's role does not allow, with the manager who approved it", async () => {
+		const approved = await invoke<{ id: number }>("db:create-expense", {
+			to_account: site.expense_account,
+			amount: 5,
+			remarks: "Approved on the till",
+			user: CASHIER,
+			approved_by: SUPERVISOR,
+			pos_opening_entry_id: shift,
+		});
+		const unapproved = await invoke<{ id: number }>("db:create-expense", {
+			to_account: site.expense_account,
+			amount: 6,
+			remarks: "Not approved",
+			user: CASHIER,
+			pos_opening_entry_id: shift,
+		});
+
+		await syncAsTill(site.pos_profile);
+
+		const rows = await query<{
+			id: number;
+			sync_status: string;
+			erp_id: string | null;
+			error: string | null;
+		}>("SELECT `id`, `sync_status`, `erp_id`, `error` FROM `expenses` WHERE `id` IN (?, ?)", [
+			approved.id,
+			unapproved.id,
+		]);
+		const done = rows.find((r) => r.id === approved.id)!;
+		const refused = rows.find((r) => r.id === unapproved.id)!;
+		expect(done, `sync error: ${done.error}`).toMatchObject({ sync_status: "synced" });
+		expect(refused.sync_status).not.toBe("synced");
+		expect(refused.error).toContain("not permitted to record");
+
+		const filters = encodeURIComponent(JSON.stringify([["remarks", "=", "Approved on the till"]]));
+		const fields = encodeURIComponent(JSON.stringify(["name", "user", "approved_by"]));
+		const res = await fetch(
+			`${site.url}/api/resource/POS Cash Movement?filters=${filters}&fields=${fields}`,
+			{
+				headers: {
+					Authorization: `token ${site.api_key}:${site.api_secret}`,
+					Accept: "application/json",
+				},
+			},
+		);
+		const body = (await res.json()) as { data: { user: string; approved_by: string }[] };
+		expect(body.data).toEqual([expect.objectContaining({ user: CASHIER, approved_by: SUPERVISOR })]);
 	});
 
 	it("needs no approval, and records none, for a sale within the cashier's rights", async () => {

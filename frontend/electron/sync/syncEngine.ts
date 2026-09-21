@@ -657,6 +657,8 @@ export function cashMovementPayload(
 		remarks: record.remarks || "",
 		posting_date: postingDate || undefined,
 		cashier: record.owner || undefined,
+		// K19: the manager who approved it on the till; the server checks the approval again.
+		...(record.approved_by ? { xpos_approved_by: record.approved_by } : {}),
 	};
 }
 

@@ -25,6 +25,8 @@ vi.mock("@/services/dbBridge", () => ({
 	getCachedCashMovementContext: vi.fn(async (profile: string) => meta.get(profile) ?? null),
 }));
 vi.mock("@/stores/authStore", () => ({ useAuthStore: () => ({ userName: "cashier@example.com" }) }));
+// A cashier whose POS Role allows expenses and bank drops: no manager needed (K19).
+vi.mock("@/services/userRights", () => ({ hasPermission: () => true }));
 
 import { call } from "@/services/api";
 import { usePaymentStore } from "@/stores/paymentStore";

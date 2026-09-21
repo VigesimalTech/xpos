@@ -428,6 +428,9 @@ async function runMigrations(): Promise<void> {
 		["expenses", "error", "TEXT"],
 		["bank_drops", "local_id", "VARCHAR(64) DEFAULT NULL"],
 		["bank_drops", "error", "TEXT"],
+		// K19: the manager who approved it on the till, when the cashier's role does not allow it.
+		["expenses", "approved_by", "VARCHAR(140) DEFAULT NULL"],
+		["bank_drops", "approved_by", "VARCHAR(140) DEFAULT NULL"],
 		["pos_opening_shifts", "local_id", "VARCHAR(64) DEFAULT NULL"],
 		["pos_closing_entries", "local_id", "VARCHAR(64) DEFAULT NULL"],
 	];

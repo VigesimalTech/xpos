@@ -1602,8 +1602,8 @@ export function registerDbHandlers(): void {
 		const result = await execute(
 			`INSERT INTO \`expenses\`
        (\`local_id\`, \`to_account\`, \`amount\`, \`posting_date\`, \`remarks\`,
-        \`owner\`, \`pos_opening_entry_id\`, \`sync_status\`)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`,
+        \`owner\`, \`approved_by\`, \`pos_opening_entry_id\`, \`sync_status\`)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
 			[
 				crypto.randomUUID(),
 				expense.expense_type || expense.to_account || "General",
@@ -1611,6 +1611,7 @@ export function registerDbHandlers(): void {
 				expense.posting_date || new Date().toISOString().slice(0, 10),
 				expense.description || expense.remarks || null,
 				expense.user || expense.owner || null,
+				expense.approved_by || null,
 				openingEntryId,
 			],
 		);
@@ -1677,8 +1678,8 @@ export function registerDbHandlers(): void {
 		const result = await execute(
 			`INSERT INTO \`bank_drops\`
        (\`local_id\`, \`to_account\`, \`amount\`, \`posting_date\`, \`remarks\`,
-        \`owner\`, \`pos_opening_entry_id\`, \`sync_status\`)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`,
+        \`owner\`, \`approved_by\`, \`pos_opening_entry_id\`, \`sync_status\`)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
 			[
 				crypto.randomUUID(),
 				drop.mode_of_payment || drop.to_account || "Cash",
@@ -1686,6 +1687,7 @@ export function registerDbHandlers(): void {
 				drop.posting_date || new Date().toISOString().slice(0, 10),
 				drop.description || drop.remarks || null,
 				drop.user || drop.owner || null,
+				drop.approved_by || null,
 				openingEntryId,
 			],
 		);

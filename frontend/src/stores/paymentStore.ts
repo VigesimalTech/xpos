@@ -11,6 +11,8 @@ import {
 	getExpenses,
 } from "@/services/dbBridge";
 import { nowDate } from "@/utils/datetime";
+import { approveCashMovement } from "@/services/cashApproval";
+import __ from "@/lib/translate";
 import { useAuthStore } from "./authStore";
 import type {
 	OutstandingInvoice,
@@ -124,6 +126,12 @@ export const usePaymentStore = defineStore("payment", () => {
 		kind: "expense" | "deposit",
 		data: Record<string, unknown>,
 	): Promise<unknown> {
+		// K19: beyond the cashier's role, a manager approves with their PIN.
+		const approval = await approveCashMovement(
+			kind === "expense" ? "expense" : "bank_drop",
+			Number(data.amount) || 0,
+		);
+		if (!approval.ok) throw new Error(__("Not recorded: a manager did not approve it."));
 		const record = {
 			to_account: kind === "expense" ? data.expense_account : data.target_account,
 			amount: data.amount,
@@ -131,6 +139,7 @@ export const usePaymentStore = defineStore("payment", () => {
 			posting_date: nowDate(),
 			company: data.company,
 			user: useAuthStore().userName,
+			approved_by: approval.approvedBy,
 			pos_opening_entry_id: data.pos_opening_shift ? Number(data.pos_opening_shift) : null,
 		};
 		return kind === "expense" ? createExpense(record) : createBankDrop(record);
