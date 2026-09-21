@@ -4,7 +4,7 @@ In risk order: money and data first. Each names what to protect, the oracle, and
 attacks most likely to break it. Add a charter when a feature lands; strike nothing out,
 mark it with the date it was last run.
 
-## 1. Offline selling and sync (S1 territory)
+## 1. Offline selling and sync (S1 territory) — last run 21 Sep 2026
 
 Protect: every sale made on the till reaches ERPNext exactly once, with the same total.
 Oracle: `/check` (no sale missing, duplicated, stuck in `syncing`, or failed without a

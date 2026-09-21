@@ -99,6 +99,21 @@ Each of these found a real bug in this app at least once.
 - **State machines.** Do things out of order: close a shift with a held order, sign out
   mid-sale, return a sale that has not synced, reprint a sale from another shift.
 - **Twice.** Sync twice, submit twice, restart twice, reopen the same held order twice.
+- **Down is not off.** The till's own network up while ERPNext is gone is the usual outage,
+  and differs from the machine being offline: test with the line, not by switching the
+  machine's network off. Watch what each failure costs: a retry counter, a status, a flag.
+  (Found: a minute of it dead-lettered every sale for good.)
+- **Lose the answer, not the request.** `offline("lose-replies", /method/)`: the server acts,
+  the till never hears. Everything sent must be safe to send twice. (Found: the re-send was
+  refused as a duplicate and the sale given up.)
+- **Two things doing one job.** Look for a second code path that does the same work (a web
+  store and the desktop engine both syncing, two dialogs for one action). They race.
+  (Found: the web store re-sent synced sales and deleted the till's records of them.)
+- **Every event has a listener, on every platform.** Map each event, IPC channel and menu
+  action to what handles it, per layout (web vs till). (Found: Return, Repeat and the sync
+  panel were heard only by the web navbar; on the till nothing opened.)
+- **Records must not vanish.** The oracle remembers every sale it has seen; a sale leaving
+  the till's records is a finding even when ERPNext has it.
 - **Read the logs you were not looking at.** `/check` flags errors; also read `/log` after
   anything odd. A warning today is a lost sale tomorrow.
 
