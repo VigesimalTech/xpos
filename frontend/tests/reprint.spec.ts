@@ -14,6 +14,11 @@ vi.mock("@/services/electronBridge", () => ({ isElectron: () => electron }));
 vi.mock("@/services/api", () => ({ call: vi.fn(), showError: vi.fn() }));
 vi.mock("@/services/dbBridge", () => ({ getCachedReceiptContext: vi.fn(async () => null) }));
 vi.mock("@/utils", () => ({ get_full_url: (u: string) => `https://erp.example.com${u}` }));
+// A cashier whose POS Role allows reprints, unless a test says otherwise (K19).
+let mayReprint = true;
+vi.mock("@/services/userRights", () => ({ hasPermission: () => mayReprint }));
+const requestApproval = vi.fn(async (): Promise<string | null> => null);
+vi.mock("@/stores/approvalStore", () => ({ useApprovalStore: () => ({ requestApproval }) }));
 vi.mock("@/stores/posStore", () => ({
 	usePosStore: () => ({
 		invoiceType: "Sales Invoice",
@@ -34,12 +39,38 @@ const getPendingInvoice = vi.fn(async (id: number) => ({ id, data: {}, customer_
 
 beforeEach(() => {
 	electron = true;
+	mayReprint = true;
+	requestApproval.mockReset();
+	requestApproval.mockResolvedValue(null);
 	vi.mocked(call).mockReset();
 	printReceipt.mockClear();
 	printInvoice.mockClear();
 	getPendingInvoice.mockClear();
 	(window as any).electronAPI = { print: { printReceipt, printInvoice }, db: { getPendingInvoice } };
 	vi.spyOn(window, "open").mockImplementation(() => null);
+});
+
+describe("K19: a reprint the cashier's role does not allow", () => {
+	it("prints nothing unless a manager approves", async () => {
+		mayReprint = false;
+
+		await usePrintInvoice().reprint("LOCAL-5");
+
+		expect(requestApproval).toHaveBeenCalledWith(
+			{ permission: "allow_reprint_invoice" },
+			expect.stringContaining("LOCAL-5"),
+		);
+		expect(getPendingInvoice).not.toHaveBeenCalled();
+	});
+
+	it("prints once a manager approves", async () => {
+		mayReprint = false;
+		requestApproval.mockResolvedValue("manager@example.com");
+
+		await usePrintInvoice().reprint("LOCAL-5");
+
+		expect(getPendingInvoice).toHaveBeenCalledWith(5);
+	});
 });
 
 describe("printing a receipt again", () => {

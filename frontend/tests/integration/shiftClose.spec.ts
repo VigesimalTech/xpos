@@ -49,8 +49,9 @@ async function sell(shift: number, paid: number, extra: Record<string, unknown> 
 	});
 }
 
-async function closeOnTill(shift: number, counted: number): Promise<void> {
+async function closeOnTill(shift: number, counted: number, approvedBy?: string): Promise<void> {
 	await invoke("db:create-pos-closing-entry", {
+		...(approvedBy ? { approved_by: approvedBy } : {}),
 		pos_opening_entry_id: shift,
 		pos_profile: PROFILE,
 		user: CASHIER,
@@ -166,6 +167,16 @@ describe("closing a shift on the till", () => {
 		});
 		const [row] = await query<{ sync_status: string }>("SELECT `sync_status` FROM `pos_closing_entries`");
 		expect(row.sync_status).toBe("synced");
+	});
+
+	it("K19: a close a manager approved on the till is sent with the approver", async () => {
+		const shift = await openShift();
+		await closeOnTill(shift, 1000, "manager@example.com");
+
+		await runSyncCyclePublic();
+
+		const [close] = frappe.callsTo(CREATE_CLOSING_SHIFT);
+		expect(sent(close)).toMatchObject({ user: CASHIER, xpos_approved_by: "manager@example.com" });
 	});
 
 	it("waits while a sale in the shift has not reached ERPNext", async () => {

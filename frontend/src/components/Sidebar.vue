@@ -132,7 +132,7 @@ import { useRoute } from "vue-router";
 import { usePosStore } from "@/stores/posStore";
 import { cn } from "@/lib/utils";
 import { __ } from "@/lib/translate";
-import { hasPermission } from "@/services/userRights";
+import { canDoOrAsk } from "@/services/userRights";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
 	LayoutGrid,
@@ -202,13 +202,13 @@ const financeNavItems = computed(() => [
 		route: "/expenses",
 		label: __("Expenses"),
 		icon: Wallet,
-		show: hasPermission("expense") && posStore.allowPosExpense,
+		show: canDoOrAsk("expense") && posStore.allowPosExpense,
 	},
 	{
 		route: "/bank-drops",
 		label: __("Bank Drops"),
 		icon: Landmark,
-		show: hasPermission("bank_drop") && posStore.allowCashDeposit,
+		show: canDoOrAsk("bank_drop") && posStore.allowCashDeposit,
 	},
 ]);
 

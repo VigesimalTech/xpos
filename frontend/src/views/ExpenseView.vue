@@ -215,7 +215,7 @@ import { usePosStore } from "@/stores/posStore";
 import { useMoney } from "@/composables/useMoney";
 import { useAuthStore } from "@/stores/authStore";
 import { usePaymentStore } from "@/stores/paymentStore";
-import { hasPermission } from "@/services/userRights";
+import { canDoOrAsk } from "@/services/userRights";
 import { createExpense, getExpenses, deleteExpense } from "@/services/dbBridge";
 import { approveCashMovement } from "@/services/cashApproval";
 import { isElectron } from "@/services/electronBridge";
@@ -290,7 +290,7 @@ const sortOrder = ref("posting_date desc");
 const standardFilters = ref<Record<string, unknown>>({});
 const queryFilters = ref<QueryFilter[]>([]);
 
-const canAddExpense = computed(() => hasPermission("expense") && posStore.allowPosExpense);
+const canAddExpense = computed(() => canDoOrAsk("expense") && posStore.allowPosExpense);
 
 const allFilterableFields = computed<DocField[]>(() => [
 	{ fieldname: "name", fieldtype: "Data", label: __("ID"), in_standard_filter: 1 },

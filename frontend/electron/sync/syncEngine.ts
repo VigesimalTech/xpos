@@ -517,6 +517,8 @@ async function pushTable(config: SyncTableConfig): Promise<{ synced: number; fai
 					user: record.user,
 					company: record.company,
 					payment_reconciliation: await getClosingEntryDetails(recordId),
+					// K19: the manager who approved closing it on the till.
+					...(record.approved_by ? { xpos_approved_by: record.approved_by } : {}),
 				};
 			} else {
 				data = record as Record<string, unknown>;

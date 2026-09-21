@@ -272,7 +272,7 @@ import { usePosStore } from "@/stores/posStore";
 import { useMoney } from "@/composables/useMoney";
 import { useAuthStore } from "@/stores/authStore";
 import { usePaymentStore } from "@/stores/paymentStore";
-import { hasPermission } from "@/services/userRights";
+import { canDoOrAsk } from "@/services/userRights";
 import { createBankDrop, getBankDrops, deleteBankDrop } from "@/services/dbBridge";
 import { approveCashMovement } from "@/services/cashApproval";
 import { isElectron } from "@/services/electronBridge";
@@ -364,7 +364,7 @@ const sortOrder = ref("posting_date desc");
 const standardFilters = ref<Record<string, unknown>>({});
 const queryFilters = ref<QueryFilter[]>([]);
 
-const canAddBankDrop = computed(() => hasPermission("bank_drop") && posStore.allowCashDeposit);
+const canAddBankDrop = computed(() => canDoOrAsk("bank_drop") && posStore.allowCashDeposit);
 
 const form = ref({
 	target_account: "",

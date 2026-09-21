@@ -1318,13 +1318,14 @@ export function registerDbHandlers(): void {
 				: null;
 		const result = await execute(
 			`INSERT INTO \`pos_closing_entries\`
-       (\`local_id\`, \`pos_profile\`, \`user\`, \`company\`, \`pos_opening_entry_id\`,
+       (\`local_id\`, \`pos_profile\`, \`user\`, \`approved_by\`, \`company\`, \`pos_opening_entry_id\`,
         \`posting_date\`, \`period_end_date\`, \`sync_status\`)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending')`,
 			[
 				crypto.randomUUID(),
 				entry.pos_profile,
 				entry.user,
+				entry.approved_by || null,
 				entry.company,
 				openingEntryId,
 				entry.posting_date || entry.closing_date || new Date().toISOString().slice(0, 10),

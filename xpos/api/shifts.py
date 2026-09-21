@@ -8,6 +8,7 @@ import frappe
 from frappe import _
 from frappe.utils import cint, flt, now_datetime, nowdate
 
+from xpos.api.approval import check_approver, permission_by_approval, resolve_approver
 from xpos.api.exchange import change_leg_table_exists, payment_tender_fields_exist
 from xpos.api.till import acting_user, till_cashier
 from xpos.api.utilities import can_close_shift, get_invoice_type, is_pos_cashier
@@ -340,6 +341,7 @@ def _close_shift(
 	posting_time: str | None = None,
 	period_end_date=None,
 	local_id: str | None = None,
+	approved_by: str | None = None,
 ) -> dict:
 	"""Close `opening` from ERPNext's own records of the shift: its invoices, taxes and the
 	expected amount per mode. Only the counted amounts come from `closing_details`."""
@@ -388,6 +390,7 @@ def _close_shift(
 			"grand_total": grand_total,
 			"net_total": net_total,
 			"total_quantity": total_qty,
+			"approved_by": approved_by,
 		}
 	)
 	if local_id:
@@ -718,8 +721,17 @@ def create_closing_shift(data: str | dict, local_id: str | None = None) -> dict:
 		return {"name": existing, "duplicate": True}
 
 	user = acting_user(data.get("user") or opening.user, opening.pos_profile)
-	if not can_close_shift(user, opening.pos_profile):
-		frappe.throw(_("Only a Supervisor can close a shift."), frappe.PermissionError)
+	# K19: without the right, a manager's approval on the till lets the cashier close.
+	cashier_may = can_close_shift(user, opening.pos_profile)
+	approver = None if cashier_may else resolve_approver(data)
+	problems: list[str] = []
+	approver_may = False
+	if approver:
+		problems = check_approver(approver, user, frappe.get_cached_doc("POS Profile", opening.pos_profile))
+		approver_may = can_close_shift(approver, opening.pos_profile)
+	allowed, approved_by, reasons = permission_by_approval(cashier_may, approver, problems, approver_may)
+	if not allowed:
+		frappe.throw(" ".join([_("Only a Supervisor can close a shift."), *reasons]), frappe.PermissionError)
 
 	closing_details = data.get("payment_reconciliation") or data.get("closing_details") or []
 	result = _close_shift(
@@ -730,5 +742,6 @@ def create_closing_shift(data: str | dict, local_id: str | None = None) -> dict:
 		posting_time=data.get("posting_time"),
 		period_end_date=data.get("period_end_date"),
 		local_id=local_id,
+		approved_by=approved_by,
 	)
 	return {"name": result["name"]}

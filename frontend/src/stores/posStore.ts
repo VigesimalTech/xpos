@@ -484,10 +484,15 @@ export const usePosStore = defineStore("pos", () => {
 	 * Close the shift on the till, online or not: the counted amounts are kept with the
 	 * shift, and sync sends the close once ERPNext has the shift's sales and cash movements.
 	 */
-	async function closeShiftOnTill(closingDetails: Record<string, unknown>[]): Promise<{ name: string }> {
+	async function closeShiftOnTill(
+		closingDetails: Record<string, unknown>[],
+		approvedBy?: string,
+	): Promise<{ name: string }> {
 		const shift = posOpeningShift.value!;
 		const today = nowDate();
 		const { id } = (await createPosClosingEntry({
+			// K19: the manager who approved closing it, when the cashier's role does not allow it.
+			approved_by: approvedBy,
 			pos_opening_entry_id: Number(shift.name),
 			pos_profile: shift.pos_profile,
 			user: shift.user,
@@ -507,11 +512,14 @@ export const usePosStore = defineStore("pos", () => {
 		return { name: `LOCAL-CLOSE-${id}` };
 	}
 
-	async function closeShift(closingDetails: Record<string, unknown>[]): Promise<unknown> {
+	async function closeShift(
+		closingDetails: Record<string, unknown>[],
+		approvedBy?: string,
+	): Promise<unknown> {
 		if (!posOpeningShift.value?.name) return;
 		try {
 			const result = isElectron()
-				? await closeShiftOnTill(closingDetails)
+				? await closeShiftOnTill(closingDetails, approvedBy)
 				: await call("xpos.api.shifts.close_shift", {
 						opening_shift: posOpeningShift.value.name,
 						closing_details: JSON.stringify(closingDetails),

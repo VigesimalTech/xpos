@@ -617,6 +617,7 @@ CREATE TABLE IF NOT EXISTS `pos_closing_entries` (
   `company` VARCHAR(255) DEFAULT NULL,
   `pos_profile` VARCHAR(255) DEFAULT NULL,
   `user` VARCHAR(255) DEFAULT NULL,
+  `approved_by` VARCHAR(140) DEFAULT NULL,
   `erp_id` VARCHAR(255) DEFAULT NULL,
   `sync_status` ENUM('pending','syncing','synced','failed') DEFAULT 'pending',
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,

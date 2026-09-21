@@ -73,7 +73,7 @@ import { usePaymentStore } from "@/stores/paymentStore";
 import { useCustomerStore } from "@/stores/customerStore";
 import { useAuthStore } from "@/stores/authStore";
 import { isElectron } from "@/services/electronBridge";
-import { hasPermission } from "@/services/userRights";
+import { canDoOrAsk } from "@/services/userRights";
 import __ from "@/lib/translate";
 import { usePrintInvoice } from "@/composables/usePrintInvoice";
 import AboutDialog from "@/components/dialogs/AboutDialog.vue";
@@ -363,7 +363,7 @@ const menus = computed<Menu[]>(() => [
 				label: "Return Invoice",
 				icon: RotateCcw,
 				shortcut: "Ctrl+R",
-				hidden: () => !hasPermission("sale_return"),
+				hidden: () => !canDoOrAsk("sale_return"),
 				disabled: () => !posStore.allowReturn,
 				action: () => {
 					window.dispatchEvent(new CustomEvent("xpos:show-return-dialog"));
@@ -375,7 +375,7 @@ const menus = computed<Menu[]>(() => [
 				label: "Print Last Receipt",
 				icon: Printer,
 				shortcut: "Ctrl+P",
-				hidden: () => !hasPermission("allow_reprint_invoice"),
+				hidden: () => !canDoOrAsk("allow_reprint_invoice"),
 				disabled: () => !posStore.lastInvoiceName,
 				action: () => {
 					const name = posStore.lastInvoiceName;
@@ -565,7 +565,7 @@ const menus = computed<Menu[]>(() => [
 				label: "Close Shift",
 				icon: LogOut,
 				shortcut: "Ctrl+Shift+O",
-				hidden: () => !hasPermission("close_shift"),
+				hidden: () => !canDoOrAsk("close_shift"),
 				disabled: () => !posStore.isShiftOpen,
 				action: () => {
 					posStore.showClosingDialog = true;
