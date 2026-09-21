@@ -19,6 +19,8 @@ let mayReprint = true;
 vi.mock("@/services/userRights", () => ({ hasPermission: () => mayReprint }));
 const requestApproval = vi.fn(async (): Promise<string | null> => null);
 vi.mock("@/stores/approvalStore", () => ({ useApprovalStore: () => ({ requestApproval }) }));
+const recordAudit = vi.hoisted(() => vi.fn());
+vi.mock("@/services/auditLog", () => ({ recordAudit }));
 vi.mock("@/stores/posStore", () => ({
 	usePosStore: () => ({
 		invoiceType: "Sales Invoice",
@@ -42,12 +44,44 @@ beforeEach(() => {
 	mayReprint = true;
 	requestApproval.mockReset();
 	requestApproval.mockResolvedValue(null);
+	recordAudit.mockReset();
 	vi.mocked(call).mockReset();
 	printReceipt.mockClear();
 	printInvoice.mockClear();
 	getPendingInvoice.mockClear();
 	(window as any).electronAPI = { print: { printReceipt, printInvoice }, db: { getPendingInvoice } };
 	vi.spyOn(window, "open").mockImplementation(() => null);
+});
+
+describe("K20: every reprint goes in the audit log", () => {
+	it("names the receipt printed again", async () => {
+		await usePrintInvoice().reprint("LOCAL-5");
+
+		expect(recordAudit).toHaveBeenCalledWith({
+			event_type: "reprint",
+			reference: "LOCAL-5",
+			approved_by: null,
+		});
+	});
+
+	it("and the manager who approved it", async () => {
+		mayReprint = false;
+		requestApproval.mockResolvedValue("manager@example.com");
+
+		await usePrintInvoice().reprint("LOCAL-5");
+
+		expect(recordAudit).toHaveBeenCalledWith(
+			expect.objectContaining({ event_type: "reprint", approved_by: "manager@example.com" }),
+		);
+	});
+
+	it("a reprint not approved is not logged", async () => {
+		mayReprint = false;
+
+		await usePrintInvoice().reprint("LOCAL-5");
+
+		expect(recordAudit).not.toHaveBeenCalled();
+	});
 });
 
 describe("K19: a reprint the cashier's role does not allow", () => {

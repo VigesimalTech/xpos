@@ -35,10 +35,15 @@ export const useApprovalStore = defineStore("approval", () => {
 	let settle: ((approver: string | null) => void) | null = null;
 
 	function ask() {
+		const pos = usePosStore();
+		const shift = pos.posOpeningShift?.name;
 		return {
 			...need.value,
 			cashier: useAuthStore().userName,
-			posProfile: usePosStore().posProfile?.name ?? "",
+			posProfile: pos.posProfile?.name ?? "",
+			// K20: the audit log records what was approved, and in which shift.
+			reason: reason.value,
+			...(shift ? { shift } : {}),
 		};
 	}
 

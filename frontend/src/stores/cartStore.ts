@@ -16,6 +16,7 @@ import { getDiscountLimit, hasPermission } from "@/services/userRights";
 import { saleNeeds, type SaleNeeds } from "@/services/tillSalePolicy";
 import { useApprovalStore } from "./approvalStore";
 import { ensureAllowed } from "@/services/ensureAllowed";
+import { recordAudit } from "@/services/auditLog";
 import type {
 	CartItem,
 	POSItem,
@@ -675,23 +676,43 @@ export const useCartStore = defineStore("cart", () => {
 	/**
 	 * K19: taking something out of the customer's sale on the desktop till needs Remove
 	 * Items From the Cart, or a manager's PIN. Not in a return (it only lowers a refund),
-	 * and not on the web POS, where no PIN can be checked.
+	 * and not on the web POS, where no PIN can be checked. `logged` says whether the
+	 * removal goes in the audit log (K20), with who approved it.
 	 */
-	async function allowRemoval(reason: string): Promise<boolean> {
-		if (isReturnMode.value || !isElectron()) return true;
-		return (await ensureAllowed("remove_cart_items", reason)).ok;
+	async function allowRemoval(
+		reason: string,
+	): Promise<{ ok: boolean; logged: boolean; approvedBy: string | null }> {
+		if (isReturnMode.value || !isElectron()) return { ok: true, logged: false, approvedBy: null };
+		const { ok, approvedBy } = await ensureAllowed("remove_cart_items", reason);
+		return { ok, logged: true, approvedBy: approvedBy ?? null };
+	}
+
+	/** The value of `qty` of a line at the till's price, for the audit log. */
+	function lineValue(item: CartItem, qty = item.qty): number {
+		return Math.round(Math.abs(qty) * Number(item.rate || 0) * 100) / 100;
 	}
 
 	async function requestRemoveItem(index: number): Promise<boolean> {
 		const item = items.value[index];
 		if (!item) return false;
-		if (
-			!item.pos_is_free_item &&
-			!(await allowRemoval(__("Remove {0} from the sale", [item.item_name])))
-		) {
-			return false;
+		if (item.pos_is_free_item) {
+			removeItem(index);
+			return true;
 		}
+		const allowed = await allowRemoval(__("Remove {0} from the sale", [item.item_name]));
+		if (!allowed.ok) return false;
+		const removed = { ...item };
 		removeItem(index);
+		if (allowed.logged) {
+			recordAudit({
+				event_type: "line_removed",
+				item_code: removed.item_code,
+				item_name: removed.item_name,
+				qty: Math.abs(removed.qty),
+				amount: lineValue(removed),
+				approved_by: allowed.approvedBy,
+			});
+		}
 		return true;
 	}
 
@@ -701,28 +722,55 @@ export const useCartStore = defineStore("cart", () => {
 	): Promise<{ success: boolean; message?: string }> {
 		const item = items.value[index];
 		if (!item) return { success: false };
-		const lowering = Math.abs(qty) < Math.abs(item.qty);
-		if (
-			lowering &&
-			!item.pos_is_free_item &&
-			!(await allowRemoval(
-				__("Lower {0} from {1} to {2}", [item.item_name, String(item.qty), String(qty)]),
-			))
-		) {
-			return { success: false };
+		const before = item.qty;
+		const lowering = Math.abs(qty) < Math.abs(before);
+		if (!lowering || item.pos_is_free_item) return updateItemQty(index, qty);
+		const allowed = await allowRemoval(
+			__("Lower {0} from {1} to {2}", [item.item_name, String(before), String(qty)]),
+		);
+		if (!allowed.ok) return { success: false };
+		const result = updateItemQty(index, qty);
+		if (result.success && allowed.logged) {
+			const taken = Math.abs(before) - Math.abs(qty);
+			recordAudit({
+				event_type: "qty_lowered",
+				item_code: item.item_code,
+				item_name: item.item_name,
+				qty: taken,
+				amount: lineValue(item, taken),
+				approved_by: allowed.approvedBy,
+				description: `${before} to ${qty}`,
+			});
 		}
-		return updateItemQty(index, qty);
+		return result;
 	}
 
 	/** Clear the sale on the cashier's say, not after a payment. False when not allowed. */
 	async function requestClearCart(): Promise<boolean> {
-		if (
-			items.value.length &&
-			!(await allowRemoval(__("Clear the sale ({0} lines)", [String(items.value.length)])))
-		) {
-			return false;
+		if (!items.value.length) {
+			clearCart();
+			return true;
 		}
+		const allowed = await allowRemoval(__("Clear the sale ({0} lines)", [String(items.value.length)]));
+		if (!allowed.ok) return false;
+		const lines = items.value.filter((item) => !item.pos_is_free_item);
 		clearCart();
+		if (allowed.logged && lines.length) {
+			recordAudit({
+				event_type: "sale_cleared",
+				qty: lines.reduce((sum, item) => sum + Math.abs(item.qty), 0),
+				amount: Math.round(lines.reduce((sum, item) => sum + lineValue(item), 0) * 100) / 100,
+				approved_by: allowed.approvedBy,
+				description: `${lines.length} lines`,
+				details: {
+					lines: lines.map((item) => ({
+						item_code: item.item_code,
+						qty: item.qty,
+						rate: item.rate,
+					})),
+				},
+			});
+		}
 		return true;
 	}
 

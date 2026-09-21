@@ -10,6 +10,7 @@ import { ipcMain } from "electron";
 import { query, queryOne } from "../database/dbService";
 import { checkTillPin, type PinResult } from "../database/ipcHandlers";
 import { createLogger } from "../logger";
+import { recordAuditEvent, recordPinFailure } from "../audit/auditLog";
 import { approvalRefusal, type ApprovalRefusal, type ApproverRow } from "./approvalRules";
 
 const log = createLogger("Approval");
@@ -20,6 +21,9 @@ export interface ApprovalAsk {
 	permission?: string;
 	permissions?: string[];
 	discountPct?: number;
+	/** For the audit log (K20): what was asked for, and the till's shift. */
+	reason?: string;
+	shift?: string | number;
 }
 
 export type ApprovalVerdict =
@@ -78,10 +82,31 @@ export async function verifyApproval(
 		return { ok: false, reason: refusal };
 	}
 	const result = await checkTillPin(row.name, pin);
-	if (!result.ok) return { ok: false, reason: result.reason ?? "wrong_pin", ...pick(result) };
+	if (!result.ok) {
+		await recordPinFailure(row.name, result, {
+			for: "approval",
+			cashier: ask.cashier,
+			pos_profile: ask.posProfile,
+			shift: ask.shift,
+		});
+		return { ok: false, reason: result.reason ?? "wrong_pin", ...pick(result) };
+	}
 	log.info(
 		`Approved by ${row.name} for ${ask.cashier}: ${ask.permission ?? ""} ${ask.discountPct ?? ""}`.trim(),
 	);
+	// K20: every approval goes in the audit log, including those that leave no record.
+	await recordAuditEvent({
+		event_type: "approval",
+		cashier: ask.cashier,
+		approved_by: row.name,
+		pos_profile: ask.posProfile,
+		shift: ask.shift,
+		description: ask.reason,
+		details: {
+			permissions: ask.permissions ?? (ask.permission ? [ask.permission] : []),
+			...(ask.discountPct ? { discount_pct: ask.discountPct } : {}),
+		},
+	});
 	return { ok: true, approver: row.name };
 }
 

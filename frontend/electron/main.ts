@@ -12,6 +12,7 @@ import { installServerFileAuth } from "./serverFiles";
 import { printReceipt, registerPrintHandlers } from "./print/receiptPrinter";
 import { applyOpenAtLogin, claimSingleInstance, registerStartupHandlers } from "./startup/startup";
 import { registerApprovalHandlers } from "./approval/approvalHandlers";
+import { registerAuditHandlers } from "./audit/auditLog";
 import { startHubServer, stopHubServer, getHubApiSecret } from "./hub/hubServer";
 import { initTillClient, runTillSync, pingHub } from "./hub/tillClient";
 import { type NodeRole } from "./hub/nodeConfig";
@@ -686,6 +687,7 @@ app.whenReady().then(async () => {
 	registerPrintHandlers();
 	registerStartupHandlers();
 	registerApprovalHandlers();
+	registerAuditHandlers();
 	applyOpenAtLogin().catch((e) => log.warn("Could not set open at login", e));
 
 	initAutoUpdater();

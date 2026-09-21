@@ -21,6 +21,7 @@ import {
 	type DbConfig,
 } from "./dbService";
 import { createLogger } from "../logger";
+import { recordPinFailure } from "../audit/auditLog";
 import {
 	isHeldOrderData,
 	parseJsonColumn,
@@ -915,7 +916,12 @@ export function registerDbHandlers(): void {
 		);
 	});
 
-	ipcMain.handle("db:verify-pin", (_e, username: string, pin: string) => checkTillPin(username, pin));
+	ipcMain.handle("db:verify-pin", async (_e, username: string, pin: string) => {
+		const result = await checkTillPin(username, pin);
+		// K20: a wrong PIN at sign-in goes in the audit log.
+		if (!result.ok) await recordPinFailure(username, result, { for: "sign_in" });
+		return result;
+	});
 
 	ipcMain.handle("db:verify-password", async (_e, username: string, password: string) => {
 		const row = await queryOne<{ name: string; password_hash: string; password_salt: string | null }>(

@@ -20,6 +20,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
 		verify: (approver: string, pin: string, ask: Record<string, unknown>) =>
 			ipcRenderer.invoke("approval:verify", approver, pin, ask),
 	},
+	audit: {
+		record: (event: Record<string, unknown>) => ipcRenderer.invoke("audit:record", event),
+	},
 	testErpNext: (config: {
 		url: string;
 		apiKey?: string;
