@@ -873,4 +873,33 @@ CREATE TABLE IF NOT EXISTS `deletion_log` (
   INDEX `idx_table_name` (`table_name`),
   INDEX `idx_deleted_at` (`deleted_at`),
   UNIQUE INDEX `idx_table_record` (`table_name`, `record_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- K20: what happened at the till that leaves no sale behind (deleted lines, cleared
+-- sales, reprints, approvals, wrong PINs), kept until ERPNext has it
+-- (xpos.api.audit.sync_audit_events). pos_opening_entry_id is the till's own shift id.
+CREATE TABLE IF NOT EXISTS `audit_events` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY,
+  `local_id` VARCHAR(64) NOT NULL,
+  `event_type` VARCHAR(50) NOT NULL,
+  `event_time` DATETIME NOT NULL,
+  `pos_profile` VARCHAR(255) DEFAULT NULL,
+  `pos_opening_entry_id` INT DEFAULT NULL,
+  `cashier` VARCHAR(255) DEFAULT NULL,
+  `approved_by` VARCHAR(255) DEFAULT NULL,
+  `pin_user` VARCHAR(255) DEFAULT NULL,
+  `item_code` VARCHAR(255) DEFAULT NULL,
+  `item_name` VARCHAR(255) DEFAULT NULL,
+  `qty` DECIMAL(18,6) DEFAULT NULL,
+  `amount` DECIMAL(18,6) DEFAULT NULL,
+  `reference` VARCHAR(255) DEFAULT NULL,
+  `description` TEXT,
+  `details` TEXT,
+  `sync_status` ENUM('pending','synced','failed') DEFAULT 'pending',
+  `retry_count` INT DEFAULT 0,
+  `error` TEXT,
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `synced_at` DATETIME DEFAULT NULL,
+  UNIQUE INDEX `idx_local_id` (`local_id`),
+  INDEX `idx_sync_status` (`sync_status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
