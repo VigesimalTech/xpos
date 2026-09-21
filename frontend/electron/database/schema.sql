@@ -374,6 +374,7 @@ CREATE TABLE IF NOT EXISTS `pos_profiles` (
   `hide_variants_items` TINYINT(1) DEFAULT 0,
   `input_qty` TINYINT(1) DEFAULT 0,
   `max_discount_percentage_allowed` DECIMAL(9,3) DEFAULT 100,
+  `xpos_allow_self_approval` TINYINT(1) DEFAULT 0,
   `pos_mixed_currency_tender` TINYINT(1) DEFAULT 0,
   `print_backup_receipt` TINYINT(1) DEFAULT 0,
   `require_cash_movement_remarks` TINYINT(1) DEFAULT 0,

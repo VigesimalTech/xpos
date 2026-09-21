@@ -55,6 +55,8 @@
 			<CashMovementDialog v-if="paymentStore.showCashMovementDialog" />
 
 			<DraftInvoiceDialog v-if="cartStore.showDraftDialog" />
+			<!-- K19: a manager's PIN approves what the cashier may not do alone. -->
+			<ManagerApprovalDialog v-if="isElectronEnv" />
 
 			<KeyboardShortcutsDialog :open="showShortcutsDialog" @close="showShortcutsDialog = false" />
 			<AboutDialog :open="showAboutDialog" @close="showAboutDialog = false" />
@@ -161,6 +163,7 @@ import LoyaltyDialog from "@/components/dialogs/LoyaltyDialog.vue";
 import ItemDetailDialog from "@/components/dialogs/ItemDetailDialog.vue";
 import CashMovementDialog from "@/components/dialogs/CashMovementDialog.vue";
 import DraftInvoiceDialog from "@/components/dialogs/DraftInvoiceDialog.vue";
+import ManagerApprovalDialog from "@/components/dialogs/ManagerApprovalDialog.vue";
 import KeyboardShortcutsDialog from "@/components/dialogs/KeyboardShortcutsDialog.vue";
 import AboutDialog from "@/components/dialogs/AboutDialog.vue";
 import SplashScreen from "@/components/SplashScreen.vue";

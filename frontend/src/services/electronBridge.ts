@@ -1,5 +1,24 @@
+export interface ApprovalAsk {
+	cashier: string;
+	posProfile: string;
+	permission?: string;
+	discountPct?: number;
+}
+
 export interface ElectronAPI {
 	isFirstRun: () => Promise<boolean>;
+	/** K19: a manager's approval on the till (electron/approval). */
+	approval: {
+		approvers: (ask: ApprovalAsk) => Promise<{ name: string; full_name: string }[]>;
+		verify: (
+			approver: string,
+			pin: string,
+			ask: ApprovalAsk,
+		) => Promise<
+			| { ok: true; approver: string }
+			| { ok: false; reason: string; attemptsLeft?: number; lockedUntil?: string }
+		>;
+	};
 	testErpNext: (config: {
 		url: string;
 		apiKey?: string;

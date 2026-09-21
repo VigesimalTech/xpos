@@ -268,6 +268,7 @@ export const SYNC_TABLES: SyncTableConfig[] = [
 			"hide_variants_items",
 			"input_qty",
 			"max_discount_percentage_allowed",
+			"xpos_allow_self_approval",
 			"pos_mixed_currency_tender",
 			"print_backup_receipt",
 			"require_cash_movement_remarks",
