@@ -29,3 +29,8 @@ class TestTillPermissionKeys(unittest.TestCase):
 	def test_the_base_keys_are_those_before_k19(self):
 		self.assertEqual(len(TILL_BASE_PERMISSION_KEYS), 15)
 		self.assertTrue(set(TILL_BASE_PERMISSION_KEYS) < set(ALL_PERMISSION_KEYS))
+
+	def test_a_till_that_asks_gets_the_screen_keys(self):
+		keys = till_permission_keys(["*", "view_reports", "barcode_printer", "price_checker", "purchasing"])
+		self.assertTrue({"view_reports", "barcode_printer", "price_checker", "purchasing"} <= set(keys))
+		self.assertNotIn("purchasing", till_permission_keys(["*"]))

@@ -22,6 +22,10 @@ export interface PosPermissions {
 	no_sale_drawer: boolean;
 	return_without_receipt: boolean;
 	remove_cart_items: boolean;
+	view_reports: boolean;
+	barcode_printer: boolean;
+	price_checker: boolean;
+	purchasing: boolean;
 }
 
 const DEFAULT_PERMISSIONS: PosPermissions = {
@@ -44,6 +48,10 @@ const DEFAULT_PERMISSIONS: PosPermissions = {
 	no_sale_drawer: false,
 	return_without_receipt: false,
 	remove_cart_items: false,
+	view_reports: false,
+	barcode_printer: false,
+	price_checker: false,
+	purchasing: false,
 };
 
 const currentRole = ref<string>("");

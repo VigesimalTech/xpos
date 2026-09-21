@@ -143,6 +143,15 @@ const PERMISSION_GROUPS: { title: string; items: { key: string; label: string }[
 		],
 	},
 	{
+		title: "Screens",
+		items: [
+			{ key: "view_reports", label: "Reports" },
+			{ key: "barcode_printer", label: "Barcode Printer" },
+			{ key: "price_checker", label: "Price Checker" },
+			{ key: "purchasing", label: "Purchasing" },
+		],
+	},
+	{
 		title: "Administration",
 		items: [
 			{ key: "manage_role_permissions", label: "Manage Role Permissions" },

@@ -279,6 +279,9 @@ async function runMigrations(): Promise<void> {
 		["input_qty", "TINYINT(1) DEFAULT 0"],
 		["max_discount_percentage_allowed", "DECIMAL(9,3) DEFAULT 100"],
 		["xpos_allow_self_approval", "TINYINT(1) DEFAULT 0"],
+		// K27: what a cashier sees of the screens their role lacks, and whether purchasing is on.
+		["xpos_screen_access", "VARCHAR(40) DEFAULT 'Hide'"],
+		["xpos_allow_purchasing", "TINYINT(1) DEFAULT 0"],
 		["pos_mixed_currency_tender", "TINYINT(1) DEFAULT 0"],
 		["print_backup_receipt", "TINYINT(1) DEFAULT 0"],
 		["require_cash_movement_remarks", "TINYINT(1) DEFAULT 0"],
@@ -360,6 +363,11 @@ async function runMigrations(): Promise<void> {
 		["no_sale_drawer", "TINYINT(1) DEFAULT 0"],
 		["return_without_receipt", "TINYINT(1) DEFAULT 0"],
 		["remove_cart_items", "TINYINT(1) DEFAULT 0"],
+		// K27: the screens a role may open.
+		["view_reports", "TINYINT(1) DEFAULT 0"],
+		["barcode_printer", "TINYINT(1) DEFAULT 0"],
+		["price_checker", "TINYINT(1) DEFAULT 0"],
+		["purchasing", "TINYINT(1) DEFAULT 0"],
 		// Till PIN: hash and salt come from ERPNext (xpos.api.pin); the lockout is local.
 		["pin_hash", "VARCHAR(255) DEFAULT NULL"],
 		["pin_salt", "VARCHAR(64) DEFAULT NULL"],

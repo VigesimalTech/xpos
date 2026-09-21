@@ -51,6 +51,7 @@
 				<span>{{ __("Orders") }}</span>
 			</router-link>
 			<router-link
+				v-if="canOpenScreen('reports')"
 				to="/reports"
 				:class="
 					cn(
@@ -244,6 +245,7 @@
 
 <script setup lang="ts">
 import { imageSrc } from "@/utils/imageSrc";
+import { canOpenScreen } from "@/services/screenAccess";
 import { computed, inject, onMounted, onUnmounted, ref, nextTick, type Ref } from "vue";
 import { usePosStore } from "@/stores/posStore";
 import { usePaymentStore } from "@/stores/paymentStore";

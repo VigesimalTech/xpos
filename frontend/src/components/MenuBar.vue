@@ -74,6 +74,7 @@ import { useCustomerStore } from "@/stores/customerStore";
 import { useAuthStore } from "@/stores/authStore";
 import { isElectron } from "@/services/electronBridge";
 import { canDoOrAsk } from "@/services/userRights";
+import { canOpenScreen } from "@/services/screenAccess";
 import __ from "@/lib/translate";
 import { usePrintInvoice } from "@/composables/usePrintInvoice";
 import AboutDialog from "@/components/dialogs/AboutDialog.vue";
@@ -335,7 +336,7 @@ interface Menu {
 	items: MenuItem[];
 }
 
-const menus = computed<Menu[]>(() => [
+const allMenus = computed<Menu[]>(() => [
 	{
 		label: "File",
 		items: [
@@ -477,7 +478,8 @@ const menus = computed<Menu[]>(() => [
 				id: "goto-reports",
 				label: "Report Catalog",
 				icon: BarChart3,
-				shortcut: "Alt+8",
+				shortcut: "Alt+9",
+				hidden: () => !canOpenScreen("reports"),
 				action: () => router.push("/reports"),
 			},
 		],
@@ -490,6 +492,7 @@ const menus = computed<Menu[]>(() => [
 				label: "Purchase Order",
 				icon: ClipboardList,
 				shortcut: "Alt+3",
+				hidden: () => !canOpenScreen("purchasing"),
 				action: () => router.push("/purchase-order"),
 			},
 			{
@@ -497,6 +500,7 @@ const menus = computed<Menu[]>(() => [
 				label: "Purchase Invoice",
 				icon: Receipt,
 				shortcut: "Alt+4",
+				hidden: () => !canOpenScreen("purchasing"),
 				action: () => router.push("/purchase-invoices"),
 			},
 			{
@@ -504,6 +508,7 @@ const menus = computed<Menu[]>(() => [
 				label: "Stock Receiving",
 				icon: PackageCheck,
 				shortcut: "Alt+5",
+				hidden: () => !canOpenScreen("purchasing"),
 				action: () => router.push("/stock-receiving"),
 			},
 		],
@@ -516,6 +521,7 @@ const menus = computed<Menu[]>(() => [
 				label: "Expenses",
 				icon: Wallet,
 				shortcut: "Alt+6",
+				hidden: () => !canOpenScreen("expenses"),
 				action: () => router.push("/expenses"),
 			},
 			{
@@ -523,6 +529,7 @@ const menus = computed<Menu[]>(() => [
 				label: "Bank Drops",
 				icon: Landmark,
 				shortcut: "Alt+7",
+				hidden: () => !canOpenScreen("bank_drops"),
 				action: () => router.push("/bank-drops"),
 			},
 		],
@@ -554,6 +561,7 @@ const menus = computed<Menu[]>(() => [
 				label: "Barcode Printer",
 				icon: Barcode,
 				shortcut: "Alt+8",
+				hidden: () => !canOpenScreen("barcode_printer"),
 				action: () => router.push("/barcode-print"),
 			},
 		],
@@ -628,6 +636,11 @@ const menus = computed<Menu[]>(() => [
 		],
 	},
 ]);
+
+// K27: a menu with nothing the cashier may open is left out.
+const menus = computed<Menu[]>(() =>
+	allMenus.value.filter((menu) => menu.items.some((item) => !item.separator && !item.hidden?.())),
+);
 </script>
 
 <style scoped>

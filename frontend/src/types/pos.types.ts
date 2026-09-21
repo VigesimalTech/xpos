@@ -67,6 +67,9 @@ export interface POSProfile {
 	enable_cash_movement?: boolean;
 	allow_pos_expense?: boolean;
 	allow_cash_deposit?: boolean;
+	/** K27: what the cashier sees of a screen their role lacks. */
+	xpos_screen_access?: "Hide" | "Show, Ask a Manager";
+	xpos_allow_purchasing?: boolean | number;
 	max_discount_percentage_allowed?: number;
 	auto_fetch_coupons_gifts?: boolean;
 	hide_closing_shift?: boolean;

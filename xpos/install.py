@@ -32,6 +32,12 @@ POS_PERMISSIONS = (
 	# Reports
 	("current_stock_by_brand", "Current Stock by Brand", "Reports"),
 	("current_stock_report", "Current Stock Report", "Reports"),
+	# Screens (K27): without one, the POS Profile's Screens the Role Lacks decides whether
+	# the screen is hidden or opens with a manager's PIN.
+	("view_reports", "Reports", "Screens"),
+	("barcode_printer", "Barcode Printer", "Screens"),
+	("price_checker", "Price Checker", "Screens"),
+	("purchasing", "Purchasing", "Screens"),
 	# Administration
 	("manage_role_permissions", "Manage Role Permissions", "Administration"),
 	# A manager's PIN on the till approves what the cashier's role does not allow.
@@ -41,8 +47,8 @@ POS_PERMISSIONS = (
 ALL_PERMISSION_NAMES = tuple(name for name, _label, _group in POS_PERMISSIONS)
 
 # Cashiers ring up sales out of the box; every catalog permission is an elevated
-# capability, so none are enabled by default.
-_CASHIER_ENABLED: set[str] = set()
+# capability, so none are enabled by default but the Price Checker, a cashier's tool.
+_CASHIER_ENABLED: set[str] = {"price_checker"}
 _MANAGER_DISABLED = {"manage_role_permissions"}
 
 DEFAULT_ROLES = (

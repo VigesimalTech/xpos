@@ -249,6 +249,7 @@ import { useCustomerStore } from "@/stores/customerStore";
 import { usePaymentStore } from "@/stores/paymentStore";
 import type { POSItem } from "@/types/pos.types";
 import __ from "@/lib/translate";
+import { canOpenScreen, type Screen } from "@/services/screenAccess";
 
 interface CommandResult {
 	id: string;
@@ -258,6 +259,8 @@ interface CommandResult {
 	shortcut?: string;
 	icon?: Component;
 	action?: () => void;
+	/** K27: a page the cashier's role may not open is not offered. */
+	screen?: Screen;
 	meta?: POSItem | Record<string, unknown>;
 	_flatIndex?: number;
 }
@@ -316,6 +319,7 @@ const pages: CommandResult[] = [
 	{
 		id: "page-reports",
 		type: "page",
+		screen: "reports",
 		label: __("Reports"),
 		description: __("Browse analytics reports"),
 		shortcut: "Alt+9",
@@ -325,6 +329,7 @@ const pages: CommandResult[] = [
 	{
 		id: "page-purchase-order",
 		type: "page",
+		screen: "purchasing",
 		label: __("Purchase Order"),
 		description: __("Create purchase orders"),
 		shortcut: "Alt+3",
@@ -334,6 +339,7 @@ const pages: CommandResult[] = [
 	{
 		id: "page-purchase-invoice",
 		type: "page",
+		screen: "purchasing",
 		label: __("Purchase Invoice"),
 		description: __("View purchase invoices"),
 		shortcut: "Alt+4",
@@ -343,6 +349,7 @@ const pages: CommandResult[] = [
 	{
 		id: "page-stock-receiving",
 		type: "page",
+		screen: "purchasing",
 		label: __("Stock Receiving"),
 		description: __("Receive stock"),
 		shortcut: "Alt+5",
@@ -352,6 +359,7 @@ const pages: CommandResult[] = [
 	{
 		id: "page-expenses",
 		type: "page",
+		screen: "expenses",
 		label: __("Expenses"),
 		description: __("Manage expenses"),
 		shortcut: "Alt+6",
@@ -361,6 +369,7 @@ const pages: CommandResult[] = [
 	{
 		id: "page-bank-drops",
 		type: "page",
+		screen: "bank_drops",
 		label: __("Bank Drops"),
 		description: __("Record bank drops"),
 		shortcut: "Alt+7",
@@ -370,6 +379,7 @@ const pages: CommandResult[] = [
 	{
 		id: "page-barcode-print",
 		type: "page",
+		screen: "barcode_printer",
 		label: __("Barcode Printer"),
 		description: __("Print barcode labels"),
 		icon: Barcode,
@@ -661,6 +671,7 @@ function onSearch() {
 		const goQuery = isGoPrefix ? query.slice(3).trim() : query;
 
 		for (const page of pages) {
+			if (page.screen && !canOpenScreen(page.screen)) continue;
 			const score = scoreMatch(page.label, isGoPrefix ? goQuery : query);
 			if (score > 0 || (isGoPrefix && goQuery === "")) {
 				localResults.push(page);
