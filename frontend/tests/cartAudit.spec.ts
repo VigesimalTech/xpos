@@ -2,7 +2,8 @@
  * @vitest-environment jsdom
  *
  * K20: taking something out of the customer's sale goes in the till's audit log, with
- * the manager who approved it: a deleted line, a lowered quantity, a cleared sale.
+ * the manager who approved it: a deleted line, a lowered quantity, a cleared sale. A
+ * lowered quantity that keeps the line needs no approval, so it is logged without one.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
@@ -99,14 +100,20 @@ describe("K20: removals from a sale go in the audit log", () => {
 		expect(audit.recordAudit).not.toHaveBeenCalled();
 	});
 
-	it("a lowered quantity logs what was taken off", async () => {
-		perms.value.remove_cart_items = true;
+	it("a lowered quantity logs what was taken off, with no approver", async () => {
 		const cart = cartWith(line("A", 5));
 
 		await cart.requestItemQty(0, 2);
 
+		expect(approval.requestApproval).not.toHaveBeenCalled();
 		expect(audit.recordAudit).toHaveBeenCalledWith(
-			expect.objectContaining({ event_type: "qty_lowered", item_code: "A", qty: 3, amount: 30 }),
+			expect.objectContaining({
+				event_type: "qty_lowered",
+				item_code: "A",
+				qty: 3,
+				amount: 30,
+				approved_by: null,
+			}),
 		);
 	});
 
