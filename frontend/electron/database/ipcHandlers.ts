@@ -7,6 +7,7 @@
  */
 
 import { ipcMain, net } from "electron";
+import { refusedOf } from "./refusedSales";
 import { profilesForUser, type PosUserProfiles } from "./openingProfiles";
 import {
 	query,
@@ -1276,14 +1277,23 @@ export function registerDbHandlers(): void {
 			[Number(shiftId), Number(shiftId)],
 		);
 		// P9: closing is allowed with records still waiting, but the cashier is told first.
-		const unsentSales = (
-			await query<{ data: unknown }>(
-				"SELECT `data` FROM `pending_invoices` WHERE `status` IN ('pending', 'syncing', 'failed', 'dead_letter')",
+		const waiting = (
+			await query<{
+				data: unknown;
+				status: string;
+				local_id: string;
+				grand_total: unknown;
+				error: unknown;
+			}>(
+				"SELECT `data`, `status`, `local_id`, `grand_total`, `error` FROM `pending_invoices` WHERE `status` IN ('pending', 'syncing', 'failed', 'dead_letter')",
 			)
 		).filter(({ data }) => {
 			const sale = parseJsonColumn(data);
 			return !isHeldOrderData(sale) && shiftOfSale(sale) === String(shiftId);
-		}).length;
+		});
+		const unsentSales = waiting.filter((s) => s.status !== "dead_letter").length;
+		// Refused by ERPNext: they will not sync on their own and are not in the close.
+		const refusedSales = refusedOf(waiting);
 		const [unsentMovements] = await query<{ n: number }>(
 			`SELECT (SELECT COUNT(*) FROM \`expenses\` WHERE \`pos_opening_entry_id\` = ? AND \`sync_status\` <> 'synced')
 			      + (SELECT COUNT(*) FROM \`bank_drops\` WHERE \`pos_opening_entry_id\` = ? AND \`sync_status\` <> 'synced') AS n`,
@@ -1291,6 +1301,7 @@ export function registerDbHandlers(): void {
 		);
 		return {
 			unsent_count: unsentSales + Number(unsentMovements?.n || 0),
+			refused_sales: refusedSales,
 			...summarizeShift({
 				sales,
 				openingBalances,

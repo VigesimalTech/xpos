@@ -31,6 +31,27 @@
 							)
 						}}
 					</div>
+					<div
+						v-if="refusedSales.length"
+						class="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+						data-testid="closing-refused"
+					>
+						<p class="font-medium">
+							{{
+								__("{0} sale(s) refused by ERPNext ({1}) are not in this close.", [
+									refusedSales.length,
+									money(refusedTotal),
+								])
+							}}
+						</p>
+						<p class="mt-1">
+							{{
+								__(
+									"Their cash is in the drawer, so ERPNext will show the close over by that amount. They stay on this till under 'need attention', and the close tells ERPNext about them for a manager to settle.",
+								)
+							}}
+						</p>
+					</div>
 					<div class="grid grid-cols-3 gap-3">
 						<Card class="bg-primary/5 border-primary/20">
 							<CardContent class="p-4 text-center">
@@ -295,6 +316,16 @@ const closedShiftName = ref("");
 const closedShiftPrint = ref<ShiftSummaryPrint | null>(null);
 const summary = ref<ClosingSummary | null>(null);
 /** On the till: sales and cash movements of this shift not yet in ERPNext. */
+/** Sales ERPNext refused: not in the close (decided 21 Sep 2026). */
+const refusedSales = computed(
+	() =>
+		((summary.value as { refused_sales?: { local_id: string; grand_total: number }[] } | null)
+			?.refused_sales || []) as { local_id: string; grand_total: number }[],
+);
+const refusedTotal = computed(() =>
+	refusedSales.value.reduce((sum, s) => sum + (Number(s.grand_total) || 0), 0),
+);
+
 const unsentCount = computed(() =>
 	Number((summary.value as { unsent_count?: number } | null)?.unsent_count || 0),
 );

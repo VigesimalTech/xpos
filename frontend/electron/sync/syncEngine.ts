@@ -9,6 +9,7 @@ import {
 import { query, queryOne, execute, upsertBatch, getMeta, setMeta } from "../database/dbService";
 import { createLogger } from "../logger";
 import { isHeldOrderData, parseJsonColumn, shiftOfSale } from "../database/shiftSummary";
+import { refusedOf } from "../database/refusedSales";
 
 const log = createLogger("SyncEngine");
 
@@ -81,6 +82,9 @@ export function isUnreachable(error: unknown): boolean {
 }
 
 let reachable: boolean | null = null;
+
+/** Answers from a proxy in front of ERPNext, not from ERPNext: it is down or restarting. */
+const GATEWAY_DOWN = new Set([502, 503, 504]);
 
 /** Tell the screen when ERPNext stops or starts answering, so it can say "Offline". */
 function setReachable(value: boolean): void {
@@ -201,6 +205,16 @@ async function apiCall<T = unknown>(
 						// Not ERPNext's answer (a captive portal, a proxy's error page).
 						setReachable(false);
 						reject(new ServerUnreachable(`Invalid JSON response from ${method}`));
+						return;
+					}
+					// A proxy or load balancer answering for an ERPNext that is down.
+					if (GATEWAY_DOWN.has(response.statusCode)) {
+						setReachable(false);
+						reject(
+							new ServerUnreachable(
+								`HTTP ${response.statusCode}: ERPNext is not answering (${method})`,
+							),
+						);
 						return;
 					}
 					setReachable(true);
@@ -582,6 +596,8 @@ async function pushTable(config: SyncTableConfig): Promise<{ synced: number; fai
 					payment_reconciliation: await getClosingEntryDetails(recordId),
 					// K19: the manager who approved closing it on the till.
 					...(record.approved_by ? { xpos_approved_by: record.approved_by } : {}),
+					// Sales ERPNext refused are not in the close: ERPNext notes them on it.
+					refused_sales: await refusedSalesOfShift(String(openingShiftLocalId)),
 				};
 			} else {
 				data = record as Record<string, unknown>;
@@ -713,6 +729,25 @@ export async function shiftHasUnsentRecords(localShiftId: string): Promise<boole
 		const sale = parseJsonColumn(data);
 		return !isHeldOrderData(sale) && shiftOfSale(sale) === localShiftId;
 	});
+}
+
+/** The shift's sales ERPNext refused, as they go with its close (refusedSales.ts). */
+async function refusedSalesOfShift(localShiftId: string) {
+	const rows = await query<{
+		data: unknown;
+		status: string;
+		local_id: string;
+		grand_total: unknown;
+		error: unknown;
+	}>(
+		"SELECT `data`, `status`, `local_id`, `grand_total`, `error` FROM `pending_invoices` WHERE `status` = 'dead_letter'",
+	);
+	return refusedOf(
+		rows.filter(({ data }) => {
+			const sale = parseJsonColumn(data);
+			return !isHeldOrderData(sale) && shiftOfSale(sale) === localShiftId;
+		}),
+	);
 }
 
 /** What sync_cash_movement is sent for a local expense or bank drop. */
@@ -943,6 +978,9 @@ const NETWORK_ERROR_SQL = [
 	"`error` LIKE 'net::%'",
 	"`error` LIKE 'No answer from ERPNext%'",
 	"`error` LIKE 'Invalid JSON response from%'",
+	"`error` LIKE 'HTTP 502%'",
+	"`error` LIKE 'HTTP 503%'",
+	"`error` LIKE 'HTTP 504%'",
 	"`error` LIKE '%ECONNREFUSED%'",
 	"`error` LIKE '%ETIMEDOUT%'",
 	"`error` LIKE '%ENOTFOUND%'",

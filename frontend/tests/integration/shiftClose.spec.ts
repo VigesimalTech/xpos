@@ -200,6 +200,45 @@ describe("closing a shift on the till", () => {
 		expect(frappe.callsTo(CREATE_CLOSING_SHIFT)).toHaveLength(1);
 	});
 
+	it("a sale ERPNext refused is not in the close: the summary lists it, and the close tells ERPNext", async () => {
+		const shift = await openShift();
+		await sell(shift, 300);
+		await sell(shift, 50);
+		frappe.on(CREATE_INVOICE, (args) => {
+			const data = typeof args.data === "string" ? JSON.parse(args.data) : args.data;
+			if (data.items[0].rate === 50)
+				throw new FrappeError(417, "Posting date is in a closed accounting period");
+			return { name: "ACC-SINV-0001" };
+		});
+		for (let i = 0; i < 4; i++) await runSyncCyclePublic();
+
+		const summary = await invoke<Record<string, any>>("db:get-shift-closing-summary", shift);
+		expect(summary.unsent_count).toBe(0);
+		expect(summary.refused_sales).toMatchObject([
+			{ grand_total: 50, error: expect.stringContaining("closed accounting period") },
+		]);
+
+		await closeOnTill(shift, 1350);
+		await runSyncCyclePublic();
+		const [close] = frappe.callsTo(CREATE_CLOSING_SHIFT);
+		const sent = typeof close.args.data === "string" ? JSON.parse(close.args.data) : close.args.data;
+		expect(sent.refused_sales).toMatchObject([{ grand_total: 50 }]);
+	});
+
+	it("ERPNext down behind its proxy (502, 503, 504) is not ERPNext refusing: the sale waits", async () => {
+		frappe.on(CREATE_INVOICE, () => {
+			throw new FrappeError(502, "Bad Gateway");
+		});
+		const shift = await openShift();
+		await sell(shift, 300);
+		for (let i = 0; i < 5; i++) await runSyncCyclePublic();
+
+		const [sale] = await query<{ status: string; retry_count: number }>(
+			"SELECT `status`, `retry_count` FROM `pending_invoices`",
+		);
+		expect(sale).toMatchObject({ status: "pending", retry_count: 0 });
+	});
+
 	it("sends shifts and closes under the till's UUIDs, not its numeric ids", async () => {
 		const shift = await openShift();
 		await closeOnTill(shift, 1000);
