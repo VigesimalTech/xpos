@@ -25,6 +25,10 @@ ALL_PERMISSION_KEYS = (
 	"current_stock_by_brand",
 	"current_stock_report",
 	"manage_role_permissions",
+	"approve_exceptions",
+	"void_after_payment",
+	"no_sale_drawer",
+	"return_without_receipt",
 )
 
 DEFAULT_ROLE = "Cashier"

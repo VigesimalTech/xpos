@@ -21,14 +21,19 @@ POS_PERMISSIONS = (
 	("sale_return", "Sale Return", "Sales Operations"),
 	("recall_other_shift_tabs", "Recall Other Shifts' Tabs", "Sales Operations"),
 	("settle_outstanding_invoice", "Settle Outstanding Invoice", "Sales Operations"),
+	("void_after_payment", "Void After Payment", "Sales Operations"),
+	("return_without_receipt", "Return Without Receipt", "Sales Operations"),
 	# Cash Management
 	("expense", "Expense", "Cash Management"),
 	("bank_drop", "Bank Drop", "Cash Management"),
+	("no_sale_drawer", "Open Drawer Without a Sale", "Cash Management"),
 	# Reports
 	("current_stock_by_brand", "Current Stock by Brand", "Reports"),
 	("current_stock_report", "Current Stock Report", "Reports"),
 	# Administration
 	("manage_role_permissions", "Manage Role Permissions", "Administration"),
+	# A manager's PIN on the till approves what the cashier's role does not allow.
+	("approve_exceptions", "Approve Exceptions", "Administration"),
 )
 
 ALL_PERMISSION_NAMES = tuple(name for name, _label, _group in POS_PERMISSIONS)

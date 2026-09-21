@@ -41,18 +41,29 @@ const site: Site = configPath
 
 const CASHIER = "rt-cashier@example.com"; // on the first shop, limit 10%
 const OTHER_SHOP_CASHIER = "rt-other@example.com"; // on the second shop only, limit 0
+const SUPERVISOR = "rt-supervisor@example.com"; // Manager on the first shop, limit 30%
+const BOTH_SHOPS_CASHIER = "rt-both@example.com"; // Cashier role on both shops: may not approve
 
 type ServerInvoice = {
 	name: string;
 	docstatus: number;
 	xpos_cashier: string;
 	xpos_policy_flags: string | null;
+	xpos_approved_by: string | null;
+	xpos_approved_exceptions: string | null;
 };
 
 async function invoiceFor(localId: string): Promise<ServerInvoice | undefined> {
 	const filters = encodeURIComponent(JSON.stringify([["xpos_local_id", "=", localId]]));
 	const fields = encodeURIComponent(
-		JSON.stringify(["name", "docstatus", "xpos_cashier", "xpos_policy_flags"]),
+		JSON.stringify([
+			"name",
+			"docstatus",
+			"xpos_cashier",
+			"xpos_policy_flags",
+			"xpos_approved_by",
+			"xpos_approved_exceptions",
+		]),
 	);
 	const res = await fetch(`${site.url}/api/resource/Sales Invoice?filters=${filters}&fields=${fields}`, {
 		headers: { Authorization: `token ${site.api_key}:${site.api_secret}`, Accept: "application/json" },
@@ -94,12 +105,16 @@ async function openShift(profile: string, cashier: string): Promise<number> {
 	return id;
 }
 
-/** One unit at the list price, less `discountPct` off the cart, rung up by `cashier`. */
+/**
+ * One unit at the list price, less `discountPct` off the cart, rung up by `cashier`,
+ * with the manager who approved it on the till, if any.
+ */
 async function ringUpSale(
 	profile: string,
 	shiftId: number,
 	cashier: string,
 	discountPct = 0,
+	approver?: string,
 ): Promise<string> {
 	const total = site.rate * (1 - discountPct / 100);
 	const { local_id } = await invoke<{ local_id: string }>("db:add-pending-invoice", {
@@ -114,6 +129,7 @@ async function ringUpSale(
 			payments: [{ mode_of_payment: "Cash", amount: total }],
 			pos_opening_shift_local_id: shiftId,
 			xpos_cashier: cashier,
+			...(approver ? { xpos_approved_by: approver } : {}),
 			is_return: 0,
 		},
 		customer_name: site.customer,
@@ -208,5 +224,78 @@ describe.skipIf(!configPath)("K18: the server checks each sale against the cashi
 		const local = await localRow(localId);
 		expect(local, `sync error: ${local?.error}`).toMatchObject({ status: "synced" });
 		expect(await invoiceFor(localId)).toMatchObject({ docstatus: 1, xpos_cashier: OTHER_SHOP_CASHIER });
+	});
+});
+
+describe.skipIf(!configPath)("K19: a manager's approval, checked again on the server", () => {
+	let shift = 0;
+
+	beforeAll(async () => {
+		await createTestDb();
+		registerDbHandlers();
+		setOnline(true);
+		expect(site.discount_limits[`${SUPERVISOR}|${site.pos_profile}`]).toBe(30);
+		shift = await openShift(site.pos_profile, CASHIER);
+	});
+
+	afterAll(async () => {
+		stopSyncEngine();
+		await closeTestDb();
+	});
+
+	async function synced(localId: string): Promise<ServerInvoice> {
+		await syncAsTill(site.pos_profile);
+		const local = await localRow(localId);
+		expect(local, `sync error: ${local?.error}`).toMatchObject({ status: "synced" });
+		const invoice = await invoiceFor(localId);
+		expect(invoice).toMatchObject({ docstatus: 1, xpos_cashier: CASHIER });
+		return invoice!;
+	}
+
+	it("accepts a discount over the cashier's limit that a manager approved within theirs", async () => {
+		const invoice = await synced(await ringUpSale(site.pos_profile, shift, CASHIER, 25, SUPERVISOR));
+
+		expect(invoice.xpos_policy_flags || "").toBe("");
+		expect(invoice.xpos_approved_by).toBe(SUPERVISOR);
+		expect(invoice.xpos_approved_exceptions).toContain(
+			"25% cart discount, over rt-cashier@example.com's discount limit of 10%",
+		);
+	});
+
+	it("still flags what goes beyond the approver's own limit", async () => {
+		const invoice = await synced(await ringUpSale(site.pos_profile, shift, CASHIER, 50, SUPERVISOR));
+
+		expect(invoice.xpos_policy_flags).toContain(`over ${SUPERVISOR}'s discount limit`);
+		expect(invoice.xpos_approved_by).toBe(SUPERVISOR);
+	});
+
+	it("does not count an approval by someone without Approve Exceptions", async () => {
+		const invoice = await synced(
+			await ringUpSale(site.pos_profile, shift, CASHIER, 25, BOTH_SHOPS_CASHIER),
+		);
+
+		expect(invoice.xpos_policy_flags).toContain("over rt-cashier@example.com's discount limit of 10%");
+		expect(invoice.xpos_policy_flags).toContain(
+			`Approver ${BOTH_SHOPS_CASHIER} does not have the Approve Exceptions permission`,
+		);
+		expect(invoice.xpos_approved_by || "").toBe("");
+	});
+
+	it("does not count an approval by someone from another shop", async () => {
+		const invoice = await synced(
+			await ringUpSale(site.pos_profile, shift, CASHIER, 25, OTHER_SHOP_CASHIER),
+		);
+
+		expect(invoice.xpos_policy_flags).toContain(
+			`Approver ${OTHER_SHOP_CASHIER} is not on POS Profile ${site.pos_profile}`,
+		);
+		expect(invoice.xpos_approved_by || "").toBe("");
+	});
+
+	it("needs no approval, and records none, for a sale within the cashier's rights", async () => {
+		const invoice = await synced(await ringUpSale(site.pos_profile, shift, CASHIER, 0, SUPERVISOR));
+
+		expect(invoice.xpos_policy_flags || "").toBe("");
+		expect(invoice.xpos_approved_by || "").toBe("");
 	});
 });

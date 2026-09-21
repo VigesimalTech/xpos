@@ -4,7 +4,8 @@ Policy lives in ERPNext and cascades to the tills: the cashier's POS Role
 permissions, their discount limit on the POS Profile user row, and the POS
 Profile's maximum discount. The till enforces it; this module checks every
 sale again when it reaches the server, for the cashier who made it rather
-than the till's API user. Tills sell offline, so a sale that breaks policy
+than the till's API user, and for the manager who approved an exception on the till
+(`approval.py`). Tills sell offline, so a sale that breaks policy
 has usually been paid for already: the POS Profile decides whether it is
 recorded and flagged for review (the default) or rejected.
 
@@ -200,10 +201,22 @@ def check_sale_policy(data: dict, pos, cashier: str) -> list[str]:
 
 
 def apply_sale_policy(invoice_doc, data: dict, pos) -> None:
-	"""Record who made the sale, check it, and flag or reject it as the POS Profile says."""
+	"""Record who made the sale and who approved it, check it, and flag or reject it as
+	the POS Profile says."""
+	from xpos.api.approval import apply_approval, check_approver, resolve_approver
+
 	cashier = resolve_cashier(data)
 	invoice_doc.xpos_cashier = cashier
 	flags = check_sale_policy(data, pos, cashier)
+	approver = resolve_approver(data) if flags else None
+	if approver:
+		problems = check_approver(approver, cashier, pos)
+		approver_flags = [] if problems else check_sale_policy(data, pos, approver)
+		flags, approved_by, approved = apply_approval(flags, approver, problems, approver_flags)
+	else:
+		approved_by = approved = None
+	invoice_doc.xpos_approved_by = approved_by
+	invoice_doc.xpos_approved_exceptions = approved
 	if not flags:
 		invoice_doc.xpos_policy_flags = None
 		return

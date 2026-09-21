@@ -120,13 +120,18 @@ const PERMISSION_GROUPS: { title: string; items: { key: string; label: string }[
 	},
 	{
 		title: "Sales Operations",
-		items: [{ key: "sale_return", label: "Sale Return" }],
+		items: [
+			{ key: "sale_return", label: "Sale Return" },
+			{ key: "return_without_receipt", label: "Return Without Receipt" },
+			{ key: "void_after_payment", label: "Void After Payment" },
+		],
 	},
 	{
 		title: "Cash Management",
 		items: [
 			{ key: "expense", label: "Expense" },
 			{ key: "bank_drop", label: "Bank Drop" },
+			{ key: "no_sale_drawer", label: "Open Drawer Without a Sale" },
 		],
 	},
 	{
@@ -138,7 +143,10 @@ const PERMISSION_GROUPS: { title: string; items: { key: string; label: string }[
 	},
 	{
 		title: "Administration",
-		items: [{ key: "manage_role_permissions", label: "Manage Role Permissions" }],
+		items: [
+			{ key: "manage_role_permissions", label: "Manage Role Permissions" },
+			{ key: "approve_exceptions", label: "Approve Exceptions" },
+		],
 	},
 ];
 
