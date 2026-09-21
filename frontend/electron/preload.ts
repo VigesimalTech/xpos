@@ -23,6 +23,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	audit: {
 		record: (event: Record<string, unknown>) => ipcRenderer.invoke("audit:record", event),
 	},
+	getSetupState: (): Promise<"ready" | "setup" | "waiting-for-database"> =>
+		ipcRenderer.invoke("app:setup-state"),
 	testErpNext: (config: {
 		url: string;
 		apiKey?: string;

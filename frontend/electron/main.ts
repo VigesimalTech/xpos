@@ -13,6 +13,7 @@ import { printReceipt, registerPrintHandlers } from "./print/receiptPrinter";
 import { applyOpenAtLogin, claimSingleInstance, registerStartupHandlers } from "./startup/startup";
 import { registerApprovalHandlers } from "./approval/approvalHandlers";
 import { registerAuditHandlers } from "./audit/auditLog";
+import { connectWhenReady, recordSetupComplete, registerSetupStateHandlers } from "./startup/setupState";
 import { startHubServer, stopHubServer, getHubApiSecret } from "./hub/hubServer";
 import { initTillClient, runTillSync, pingHub } from "./hub/tillClient";
 import { type NodeRole } from "./hub/nodeConfig";
@@ -148,14 +149,7 @@ function createWindow(): void {
 	});
 }
 
-ipcMain.handle("app:is-first-run", async () => {
-	try {
-		const role = await getMeta("node_role");
-		return !role;
-	} catch {
-		return true;
-	}
-});
+registerSetupStateHandlers();
 
 ipcMain.handle(
 	"app:test-erpnext",
@@ -331,6 +325,9 @@ ipcMain.handle("clear-auth", async () => {
 
 let syncEngineStarted = false;
 
+const DB_RETRY_MS = 3000;
+const stopWaitingForDb = new AbortController();
+
 ipcMain.handle(
 	"start-sync-engine",
 	async (
@@ -416,6 +413,7 @@ ipcMain.handle(
 		try {
 			currentRole = config.role;
 			await setMeta("node_role", config.role);
+			recordSetupComplete(config.role);
 
 			if (config.role === "hub") {
 				if (tillSyncInterval) {
@@ -667,19 +665,6 @@ app.whenReady().then(async () => {
 		/* ignore */
 	}
 
-	try {
-		await initDatabase();
-		log.info("Local MariaDB initialized");
-	} catch (err) {
-		const errMsg = err instanceof Error ? err.message : String(err);
-		log.error(`MariaDB init failed: ${errMsg}`);
-	}
-
-	try {
-		savedServerUrl = await getMeta("server_url");
-	} catch {
-		/* DB unavailable; the env URL still applies */
-	}
 	installServerCors();
 	installServerFileAuth();
 
@@ -688,7 +673,6 @@ app.whenReady().then(async () => {
 	registerStartupHandlers();
 	registerApprovalHandlers();
 	registerAuditHandlers();
-	applyOpenAtLogin().catch((e) => log.warn("Could not set open at login", e));
 
 	initAutoUpdater();
 
@@ -699,6 +683,42 @@ app.whenReady().then(async () => {
 			createWindow();
 		}
 	});
+
+	// After a power cut or at login the app can be up before MariaDB. The window
+	// shows "waiting for the local database" (setupState.ts) until this connects.
+	try {
+		await connectWhenReady(
+			async () => {
+				if (await databaseAnswers()) return; // the setup wizard connected it meanwhile
+				await closeDatabase();
+				await initDatabase();
+			},
+			{ retryMs: DB_RETRY_MS, signal: stopWaitingForDb.signal },
+		);
+		log.info("Local MariaDB initialized");
+	} catch {
+		return; // quitting
+	}
+	await startAfterDatabase();
+});
+
+async function databaseAnswers(): Promise<boolean> {
+	try {
+		await getMeta("node_role");
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+/** Everything that reads the local database at start: the saved server, the role, sync. */
+async function startAfterDatabase(): Promise<void> {
+	try {
+		savedServerUrl = await getMeta("server_url");
+	} catch {
+		/* the env URL still applies */
+	}
+	applyOpenAtLogin().catch((e) => log.warn("Could not set open at login", e));
 
 	try {
 		const savedRole = await getMeta("node_role");
@@ -712,7 +732,9 @@ app.whenReady().then(async () => {
 			const apiKey = await getMeta("api_key");
 			const apiSecret = await getMeta("api_secret");
 			const serverUrl = await getMeta("server_url");
-			if (apiKey && apiSecret && serverUrl) {
+			if (syncEngineStarted) {
+				log.info("Sync engine already started by setup");
+			} else if (apiKey && apiSecret && serverUrl) {
 				log.info("Auto-starting sync engine with saved credentials");
 				initSyncEngine({ serverUrl, csrfToken: "", sessionCookies: "", apiKey, apiSecret });
 				syncEngineStarted = true;
@@ -728,18 +750,20 @@ app.whenReady().then(async () => {
 			const hubUrl = (await getMeta("hub_url")) || "http://localhost:6789";
 			const tillId = (await getMeta("till_id")) || "TILL-01";
 			await initTillClient(hubUrl, tillId);
-			tillSyncInterval = setInterval(async () => {
-				try {
-					await runTillSync();
-				} catch {
-					/* logged inside */
-				}
-			}, 30_000);
+			if (!tillSyncInterval) {
+				tillSyncInterval = setInterval(async () => {
+					try {
+						await runTillSync();
+					} catch {
+						/* logged inside */
+					}
+				}, 30_000);
+			}
 		}
 	} catch (err) {
 		log.error("Post-DB init setup failed", err);
 	}
-});
+}
 
 app.on("window-all-closed", () => {
 	if (process.platform !== "darwin") {
@@ -748,6 +772,7 @@ app.on("window-all-closed", () => {
 });
 
 app.on("will-quit", async () => {
+	stopWaitingForDb.abort();
 	stopAutoUpdater();
 	stopSyncEngine();
 	if (tillSyncInterval) {
