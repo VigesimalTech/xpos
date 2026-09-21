@@ -173,6 +173,7 @@ export async function initDatabase(config?: Partial<DbConfig>): Promise<void> {
 }
 
 export async function closeDatabase(): Promise<void> {
+	tableColumns.clear();
 	if (pool) {
 		await pool.end();
 		pool = null;
@@ -352,6 +353,11 @@ async function runMigrations(): Promise<void> {
 		["recall_other_shift_tabs", "TINYINT(1) DEFAULT 0"],
 		["settle_outstanding_invoice", "TINYINT(1) DEFAULT 0"],
 		["manage_role_permissions", "TINYINT(1) DEFAULT 0"],
+		// K19: what a manager's PIN may approve, and the actions only they may do.
+		["approve_exceptions", "TINYINT(1) DEFAULT 0"],
+		["void_after_payment", "TINYINT(1) DEFAULT 0"],
+		["no_sale_drawer", "TINYINT(1) DEFAULT 0"],
+		["return_without_receipt", "TINYINT(1) DEFAULT 0"],
 		// Till PIN: hash and salt come from ERPNext (xpos.api.pin); the lockout is local.
 		["pin_hash", "VARCHAR(255) DEFAULT NULL"],
 		["pin_salt", "VARCHAR(64) DEFAULT NULL"],
@@ -566,6 +572,28 @@ const PRESERVE_ON_UPDATE: Record<string, string[]> = {
 	pos_users: ["password_hash", "password_salt"],
 };
 
+const tableColumns = new Map<string, Set<string>>();
+
+async function columnsOf(table: string): Promise<Set<string>> {
+	let columns = tableColumns.get(table);
+	if (!columns) {
+		const [rows] = await getPool().execute<RowDataPacket[]>(
+			"SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?",
+			[table],
+		);
+		columns = new Set(rows.map((r) => r.COLUMN_NAME as string));
+		tableColumns.set(table, columns);
+	}
+	return columns;
+}
+
+const reportedUnknown = new Set<string>();
+
+/**
+ * Insert or update pulled rows. A field the table has no column for is skipped, not
+ * sent: a server newer than this till may send fields it does not know yet, and one
+ * unknown column would otherwise fail the whole pull.
+ */
 export async function upsertBatch(
 	table: string,
 	rows: Record<string, unknown>[],
@@ -573,7 +601,15 @@ export async function upsertBatch(
 ): Promise<number> {
 	if (rows.length === 0) return 0;
 
-	const columns = Object.keys(rows[0]);
+	const known = await columnsOf(table);
+	const columns = Object.keys(rows[0]).filter((c) => known.has(c));
+	for (const c of Object.keys(rows[0])) {
+		if (!known.has(c) && !reportedUnknown.has(`${table}.${c}`)) {
+			reportedUnknown.add(`${table}.${c}`);
+			log.info(`Pull: ${table} has no column ${c}; skipping it`);
+		}
+	}
+	if (columns.length === 0) return 0;
 	const placeholders = columns.map(() => "?").join(", ");
 	const preserved = PRESERVE_ON_UPDATE[table] ?? [];
 	const updateCols = columns

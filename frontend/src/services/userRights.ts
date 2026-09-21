@@ -17,6 +17,10 @@ export interface PosPermissions {
 	bank_drop: boolean;
 	current_stock_by_brand: boolean;
 	current_stock_report: boolean;
+	approve_exceptions: boolean;
+	void_after_payment: boolean;
+	no_sale_drawer: boolean;
+	return_without_receipt: boolean;
 }
 
 const DEFAULT_PERMISSIONS: PosPermissions = {
@@ -34,6 +38,10 @@ const DEFAULT_PERMISSIONS: PosPermissions = {
 	bank_drop: false,
 	current_stock_by_brand: false,
 	current_stock_report: false,
+	approve_exceptions: false,
+	void_after_payment: false,
+	no_sale_drawer: false,
+	return_without_receipt: false,
 };
 
 const currentRole = ref<string>("");

@@ -2,6 +2,8 @@
 # For license information, please see license.txt
 
 
+import json
+
 import frappe
 from frappe import _
 from frappe.sessions import get_csrf_token as session_csrf_token
@@ -30,6 +32,23 @@ ALL_PERMISSION_KEYS = (
 	"no_sale_drawer",
 	"return_without_receipt",
 )
+
+# What every till gets in its cashier pull: the keys from before K19. A till stores each
+# field of a pulled cashier in a column of its own and fails the whole pull on a field it
+# has no column for, so newer keys go only to a till that asks for them by name.
+TILL_BASE_PERMISSION_KEYS = ALL_PERMISSION_KEYS[:15]
+
+
+def till_permission_keys(fields: str | list | None = None) -> tuple:
+	"""The permission keys to send a till whose cashier pull asked for `fields`."""
+	if isinstance(fields, str):
+		try:
+			fields = json.loads(fields)
+		except ValueError:
+			fields = [fields]
+	asked = set(fields or [])
+	return TILL_BASE_PERMISSION_KEYS + tuple(key for key in ALL_PERMISSION_KEYS[15:] if key in asked)
+
 
 DEFAULT_ROLE = "Cashier"
 DEFAULT_DISCOUNT_LIMIT = 0  # 0 means no discount without a manager; 100 means no cap
@@ -189,6 +208,7 @@ def get_csrf_token() -> str:
 def get_pos_users(
 	limit_start: int = 0,
 	limit_page_length: int = 100,
+	fields: str | list | None = None,
 ):
 	"""Return POS-enabled Frappe users for offline authentication sync.
 
@@ -197,6 +217,9 @@ def get_pos_users(
 	listed on it. A cashier on several of them comes back once, with the first
 	of the till's profiles. An API user on no enabled POS Profile (an admin or
 	integration key) gets every POS user, as before.
+
+	`fields` is what the till's pull asked for; it decides which permission keys
+	are sent (`till_permission_keys`).
 
 	Returns:
 	    list[dict]: One record per user with at minimum
@@ -259,6 +282,7 @@ def get_pos_users(
 		)
 	}
 
+	permission_keys = till_permission_keys(fields)
 	results = []
 	for pu in profile_users:
 		user = user_meta.get(pu.user)
@@ -285,7 +309,7 @@ def get_pos_users(
 			"company": pu.company or "",
 			"theme": "Default",
 			"discount_limit": discount_limit,
-			**{key: cint(perms.get(key, False)) for key in ALL_PERMISSION_KEYS},
+			**{key: cint(perms.get(key, False)) for key in permission_keys},
 		}
 		results.append(row)
 
