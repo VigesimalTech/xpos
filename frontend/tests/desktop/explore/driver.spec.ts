@@ -19,6 +19,9 @@
  *   POST /restart  quit the app and start it again on the same profile and database
  *   POST /quit     close the till and end the run
  *
+ * To reopen a till after /quit: XPOS_EXPLORE_FRESH=0, XPOS_EXPLORE_PROFILE=<its folder>
+ * and XPOS_EXPLORE_LINE_PORT=<the port of its line, printed at start>.
+ *
  * Every print channel is recorded, not printed: no paper, and every receipt is kept.
  */
 import { createServer } from "node:http";
@@ -36,7 +39,10 @@ test("explore", async () => {
 	test.setTimeout(0);
 	if (!h.site) throw new Error("needs XPOS_RT_CONFIG and XPOS_RT_URL");
 	mkdirSync(SHOTS, { recursive: true });
-	const net = await serverLine(h.site.url);
+	const net = await serverLine(h.site.url, Number(process.env.XPOS_EXPLORE_LINE_PORT) || undefined);
+	// Start with the line down, to reopen a till into an outage (XPOS_EXPLORE_LINE=hang|refuse).
+	const startLine = process.env.XPOS_EXPLORE_LINE;
+	if (startLine === "hang" || startLine === "refuse") await net.offline(startLine);
 	const tillSite = { ...h.site, url: net.url };
 	const fresh = process.env.XPOS_EXPLORE_FRESH !== "0";
 	const profile = process.env.XPOS_EXPLORE_PROFILE || h.newProfile();

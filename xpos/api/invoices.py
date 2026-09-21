@@ -264,20 +264,24 @@ def _ensure_pos_invoice_payment_row(invoice_doc, pos_profile_doc, require_paymen
 	)
 
 
-def find_invoice_by_local_id(local_id: str | None, warehouse: str | None = None) -> tuple[str, str] | None:
+def find_invoice_by_local_id(local_id: str | None) -> tuple[str, str] | None:
 	"""Return (doctype, name) of an invoice already created for this client local_id.
 
 	The desktop/offline client assigns every cart a stable ``local_id`` and may
 	re-push it after a dropped response. Looking it up here makes invoice creation
 	idempotent so a retry returns the original invoice instead of creating a second
 	real Sales Invoice (double stock depletion + double revenue).
+
+	By the local id alone, which is unique across the site: the till sends no
+	warehouse (the invoice takes it from the POS Profile), and matching on one
+	missed every till sale, so a retry after a lost answer hit the unique index
+	and the till gave the sale up as failed although ERPNext had it. A draft
+	counts too: a sale submitted in the background is one for a moment.
 	"""
 	if not local_id:
 		return None
 	for dt in ("Sales Invoice", "POS Invoice"):
-		name = frappe.db.get_value(
-			dt, {"xpos_local_id": local_id, "set_warehouse": warehouse, "docstatus": 1}, "name"
-		)
+		name = frappe.db.get_value(dt, {"xpos_local_id": local_id, "docstatus": ["<", 2]}, "name")
 		if name:
 			return dt, name
 	return None
@@ -296,8 +300,7 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 
 	local_id = local_id or data.get("local_id")
 
-	warehouse = data.get("warehouse")
-	existing = find_invoice_by_local_id(local_id, warehouse)
+	existing = find_invoice_by_local_id(local_id)
 	if existing:
 		dt, name = existing
 		return {**_build_invoice_response(frappe.get_doc(dt, name)), "duplicate": True}
@@ -634,7 +637,7 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 			invoice_doc.insert(ignore_permissions=True)
 	except frappe.exceptions.UniqueValidationError:
 		frappe.db.rollback()
-		existing = find_invoice_by_local_id(local_id, warehouse)
+		existing = find_invoice_by_local_id(local_id)
 		if existing:
 			dt, name = existing
 			return {**_build_invoice_response(frappe.get_doc(dt, name)), "duplicate": True}
