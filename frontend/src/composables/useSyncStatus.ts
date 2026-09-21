@@ -29,6 +29,8 @@ export function useSyncStatus() {
 	const errorLog = ref<SyncErrorEntry[]>([]);
 	const deadLetters = ref<DeadLetterEntry[]>([]);
 	const cycleHadError = ref(false);
+	/** ERPNext is not answering: the till sells offline and sends later. */
+	const unreachable = ref(false);
 
 	const cleanups: Array<() => void> = [];
 
@@ -50,6 +52,12 @@ export function useSyncStatus() {
 		});
 
 		const offError = window.electronAPI.onSyncError((error) => {
+			// ERPNext not answering is being offline, which the pill shows; it is not an error
+			// for the error log (it counted every failed push while offline).
+			if (error.unreachable) {
+				unreachable.value = true;
+				return;
+			}
 			lastError.value = error.message;
 			cycleHadError.value = true;
 			errorLog.value.unshift({
@@ -94,7 +102,19 @@ export function useSyncStatus() {
 			});
 		});
 
-		cleanups.push(offStatus, offError, offComplete, offDeadLetter);
+		const offReachability = window.electronAPI.onSyncReachability?.(({ reachable }) => {
+			unreachable.value = !reachable;
+			// Back in touch: the error was the network's, not a sale's.
+			if (reachable && !deadLetters.value.length) lastError.value = null;
+		});
+
+		cleanups.push(
+			offStatus,
+			offError,
+			offComplete,
+			offDeadLetter,
+			...(offReachability ? [offReachability] : []),
+		);
 	});
 
 	onUnmounted(() => {
@@ -117,6 +137,7 @@ export function useSyncStatus() {
 		syncTable,
 		lastSyncTime,
 		lastError,
+		unreachable,
 		syncCompleteCount,
 		errorLog,
 		deadLetters,

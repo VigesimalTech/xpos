@@ -68,7 +68,11 @@ export interface ElectronAPI {
 	onSyncStatus: (
 		callback: (status: { phase: string; table?: string; progress?: number }) => void,
 	) => () => void;
-	onSyncError: (callback: (error: { message: string; table?: string }) => void) => () => void;
+	onSyncError: (
+		callback: (error: { message: string; table?: string; unreachable?: boolean }) => void,
+	) => () => void;
+	/** Whether ERPNext is answering the till, when that changes. */
+	onSyncReachability?: (callback: (state: { reachable: boolean }) => void) => () => void;
 	onSyncComplete: (callback: (summary: { pulled: number; pushed: number }) => void) => () => void;
 	onSyncDeadLetter: (
 		callback: (info: {

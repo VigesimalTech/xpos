@@ -59,11 +59,20 @@ contextBridge.exposeInMainWorld("electronAPI", {
 		return () => ipcRenderer.removeListener("sync-status", handler);
 	},
 
-	onSyncError: (callback: (error: { message: string; table?: string }) => void) => {
-		const handler = (_event: Electron.IpcRendererEvent, error: { message: string; table?: string }) =>
-			callback(error);
+	onSyncError: (callback: (error: { message: string; table?: string; unreachable?: boolean }) => void) => {
+		const handler = (
+			_event: Electron.IpcRendererEvent,
+			error: { message: string; table?: string; unreachable?: boolean },
+		) => callback(error);
 		ipcRenderer.on("sync-error", handler);
 		return () => ipcRenderer.removeListener("sync-error", handler);
+	},
+
+	/** Whether ERPNext is answering the till, when that changes. */
+	onSyncReachability: (callback: (state: { reachable: boolean }) => void) => {
+		const handler = (_event: Electron.IpcRendererEvent, state: { reachable: boolean }) => callback(state);
+		ipcRenderer.on("sync-reachability", handler);
+		return () => ipcRenderer.removeListener("sync-reachability", handler);
 	},
 
 	onSyncComplete: (callback: (summary: { pulled: number; pushed: number }) => void) => {

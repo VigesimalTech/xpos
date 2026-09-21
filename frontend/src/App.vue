@@ -91,10 +91,14 @@
 				:content="
 					offlineStore.deadLetterCount > 0
 						? offlineStore.deadLetterCount + ' invoice(s) failed to sync. Click to review'
-						: syncStatus.lastError.value ||
-							(syncStatus.lastSyncTime.value
-								? 'Last sync: ' + syncStatus.lastSyncTime.value
-								: 'Not synced yet')
+						: syncStatus.unreachable.value
+							? __(
+									'ERPNext is not answering. Sales are saved on this till and sent when it is back.',
+								)
+							: syncStatus.lastError.value ||
+								(syncStatus.lastSyncTime.value
+									? 'Last sync: ' + syncStatus.lastSyncTime.value
+									: 'Not synced yet')
 				"
 				side="right"
 			>
@@ -102,16 +106,20 @@
 					type="button"
 					class="fixed bottom-3 start-3 z-50 flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium shadow-md select-none cursor-pointer"
 					:class="
-						syncStatus.isSyncing.value
+						syncStatus.isSyncing.value && !syncStatus.unreachable.value
 							? 'bg-blue-600 text-white'
-							: offlineStore.deadLetterCount > 0 || syncStatus.lastError.value
+							: offlineStore.deadLetterCount > 0
 								? 'bg-destructive text-destructive-foreground'
-								: 'bg-muted text-muted-foreground'
+								: syncStatus.unreachable.value
+									? 'bg-amber-500 text-white'
+									: syncStatus.lastError.value
+										? 'bg-destructive text-destructive-foreground'
+										: 'bg-muted text-muted-foreground'
 					"
 					@click="handleOpenOfflinePanel"
 				>
 					<span
-						v-if="syncStatus.isSyncing.value"
+						v-if="syncStatus.isSyncing.value && !syncStatus.unreachable.value"
 						class="w-2 h-2 rounded-full bg-white animate-ping"
 					/>
 					<span
@@ -124,14 +132,15 @@
 						"
 					/>
 					<span>
-						<template v-if="syncStatus.isSyncing.value">
+						<template v-if="offlineStore.deadLetterCount > 0"
+							>{{ offlineStore.deadLetterCount }} need attention</template
+						>
+						<template v-else-if="syncStatus.unreachable.value">{{ offlineLabel }}</template>
+						<template v-else-if="syncStatus.isSyncing.value">
 							Syncing{{
 								syncStatus.syncTable.value ? ": " + syncStatus.syncTable.value : "..."
 							}}
 						</template>
-						<template v-else-if="offlineStore.deadLetterCount > 0"
-							>{{ offlineStore.deadLetterCount }} need attention</template
-						>
 						<template v-else-if="syncStatus.lastError.value">Sync error</template>
 						<template v-else-if="syncStatus.lastSyncTime.value"
 							>Synced {{ syncStatus.lastSyncTime.value }}</template
@@ -420,6 +429,26 @@ watch(
 				),
 			);
 		}
+	},
+);
+
+/**
+ * While ERPNext is not answering, the pill says so and how many sales wait to be sent:
+ * selling offline is normal, not an error (the user's wording, 21 Sep 2026).
+ */
+const offlineLabel = computed(() => {
+	const n = offlineStore.pendingCount;
+	if (!n) return __("Offline");
+	return n === 1 ? __("Offline – 1 sale waiting") : __("Offline – {0} sales waiting", [String(n)]);
+});
+
+let offlineCountTimer: ReturnType<typeof setInterval> | null = null;
+watch(
+	() => syncStatus.unreachable.value,
+	(offline) => {
+		offlineStore.refreshPendingCount();
+		if (offlineCountTimer) clearInterval(offlineCountTimer);
+		offlineCountTimer = offline ? setInterval(() => offlineStore.refreshPendingCount(), 5000) : null;
 	},
 );
 
