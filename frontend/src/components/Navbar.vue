@@ -89,7 +89,7 @@
 				variant="ghost"
 				size="sm"
 				class="text-muted-foreground hover:text-blue-500 gap-1"
-				@click="showRepeatDialog = true"
+				@click="openDialog('xpos:show-repeat-dialog')"
 			>
 				<Repeat class="w-4 h-4" />
 				<span class="hidden lg:inline text-xs">{{ __("Repeat") }}</span>
@@ -104,7 +104,7 @@
 				variant="ghost"
 				size="sm"
 				class="text-muted-foreground hover:text-amber-500 gap-1"
-				@click="showReturnDialog = true"
+				@click="openDialog('xpos:show-return-dialog')"
 			>
 				<RotateCcw class="w-4 h-4" />
 				<span class="hidden lg:inline text-xs">{{ __("Return") }}</span>
@@ -148,8 +148,6 @@
 				</Button>
 			</TooltipWrapper>
 		</div>
-
-		<OfflinePendingPanel :open="showOfflinePanel" @close="showOfflinePanel = false" />
 
 		<div class="hidden md:flex items-center">
 			<Badge variant="secondary" class="gap-1.5">
@@ -234,10 +232,6 @@
 			</Button>
 		</TooltipWrapper>
 
-		<ReturnDialog :open="showReturnDialog" @close="showReturnDialog = false" />
-
-		<RepeatInvoiceDialog :open="showRepeatDialog" @close="showRepeatDialog = false" />
-
 		<AboutDialog :open="showAboutDialog" @close="showAboutDialog = false" />
 		<KeyboardShortcutsDialog :open="showShortcutsDialog" @close="showShortcutsDialog = false" />
 	</header>
@@ -246,7 +240,7 @@
 <script setup lang="ts">
 import { imageSrc } from "@/utils/imageSrc";
 import { canOpenScreen } from "@/services/screenAccess";
-import { computed, inject, onMounted, onUnmounted, ref, nextTick, type Ref } from "vue";
+import { computed, inject, ref, nextTick, type Ref } from "vue";
 import { usePosStore } from "@/stores/posStore";
 import { usePaymentStore } from "@/stores/paymentStore";
 import { useAuthStore } from "@/stores/authStore";
@@ -257,8 +251,6 @@ import { TooltipWrapper } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Popover, PopoverContentStyled, PopoverTrigger } from "@/components/ui/popover";
-import ReturnDialog from "@/components/dialogs/ReturnDialog.vue";
-import RepeatInvoiceDialog from "@/components/dialogs/RepeatInvoiceDialog.vue";
 import {
 	Building2,
 	Sun,
@@ -285,7 +277,6 @@ import {
 	Menu,
 	LayoutDashboard,
 } from "lucide-vue-next";
-import OfflinePendingPanel from "@/components/offline/OfflinePendingPanel.vue";
 import AboutDialog from "@/components/dialogs/AboutDialog.vue";
 import KeyboardShortcutsDialog from "@/components/dialogs/KeyboardShortcutsDialog.vue";
 import { useOfflineStore } from "@/stores/offlineStore";
@@ -319,20 +310,19 @@ const themeTooltip = computed(() => {
 });
 const offlineStore = useOfflineStore();
 
-const showReturnDialog = ref(false);
-const showRepeatDialog = ref(false);
-const showOfflinePanel = ref(false);
 const showAboutDialog = ref(false);
 const showShortcutsDialog = ref(false);
 
-function handleOfflineAction() {
-	if (offlineStore.hasPending || offlineStore.hasDeadLetters || !offlineStore.isOnline) {
-		showOfflinePanel.value = true;
-	}
+// Return, Repeat and the unsynced-sales panel are opened by event: SaleDialogs.vue hosts
+// them on both the web POS and the till.
+function openDialog(event: string) {
+	window.dispatchEvent(new CustomEvent(event));
 }
 
-function handleOpenOfflinePanel() {
-	showOfflinePanel.value = true;
+function handleOfflineAction() {
+	if (offlineStore.hasPending || offlineStore.hasDeadLetters || !offlineStore.isOnline) {
+		openDialog("xpos:open-offline-panel");
+	}
 }
 
 function toggleSidebar() {
@@ -343,40 +333,6 @@ function openSearch() {
 	router.push("/pos");
 	nextTick(() => window.dispatchEvent(new CustomEvent("xpos:open-command-search")));
 }
-
-function handleShowRepeatDialog() {
-	showRepeatDialog.value = true;
-}
-
-function handleShowReturnDialog() {
-	if (!posStore.allowReturn || !canDoOrAsk("sale_return")) return;
-	showReturnDialog.value = true;
-}
-
-function handleKeyboard(e: KeyboardEvent) {
-	if (e.ctrlKey && e.key.toLowerCase() === "g") {
-		e.preventDefault();
-		showRepeatDialog.value = true;
-	}
-	if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === "r") {
-		e.preventDefault();
-		if (posStore.allowReturn && canDoOrAsk("sale_return")) showReturnDialog.value = true;
-	}
-}
-
-onMounted(() => {
-	window.addEventListener("keydown", handleKeyboard);
-	window.addEventListener("xpos:show-repeat-dialog", handleShowRepeatDialog as EventListener);
-	window.addEventListener("xpos:show-return-dialog", handleShowReturnDialog as EventListener);
-	window.addEventListener("xpos:open-offline-panel", handleOpenOfflinePanel as EventListener);
-});
-
-onUnmounted(() => {
-	window.removeEventListener("keydown", handleKeyboard);
-	window.removeEventListener("xpos:show-repeat-dialog", handleShowRepeatDialog as EventListener);
-	window.removeEventListener("xpos:show-return-dialog", handleShowReturnDialog as EventListener);
-	window.removeEventListener("xpos:open-offline-panel", handleOpenOfflinePanel as EventListener);
-});
 
 function printLastInvoice() {
 	const name = posStore.lastInvoiceName;

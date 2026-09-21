@@ -2,6 +2,7 @@
 	<div class="flex flex-col h-dvh overflow-hidden">
 		<MenuBar v-if="isElectron()" />
 		<Navbar v-else />
+		<SaleDialogs />
 		<div class="flex-1 relative overflow-hidden">
 			<Sidebar />
 			<main class="h-full overflow-hidden">
@@ -68,6 +69,7 @@ import Navbar from "@/components/Navbar.vue";
 import { canOpenScreen } from "@/services/screenAccess";
 import Sidebar from "@/components/Sidebar.vue";
 import MenuBar from "@/components/MenuBar.vue";
+import SaleDialogs from "@/components/SaleDialogs.vue";
 import { isElectron } from "@/services/electronBridge";
 import { useRoute } from "vue-router";
 import { LayoutGrid, FileText, BarChart3, AlignJustify } from "lucide-vue-next";
