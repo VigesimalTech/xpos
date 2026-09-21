@@ -1,0 +1,240 @@
+{
+ "actions": [],
+ "autoname": "POS-AE-.YY.-.#######",
+ "creation": "2026-09-21 12:00:00.000000",
+ "description": "What happened at a till that leaves no sale behind: deleted lines, cleared sales, reprints, approvals, wrong PINs. Written by the tills only.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "event_type",
+  "event_time",
+  "column_break_1",
+  "pos_profile",
+  "pos_opening_shift",
+  "section_break_people",
+  "cashier",
+  "approved_by",
+  "column_break_2",
+  "pin_user",
+  "section_break_what",
+  "item_code",
+  "item_name",
+  "qty",
+  "amount",
+  "column_break_3",
+  "reference",
+  "description",
+  "details",
+  "section_break_checks",
+  "checks",
+  "section_break_till",
+  "till_user",
+  "column_break_4",
+  "client_request_id"
+ ],
+ "fields": [
+  {
+   "fieldname": "event_type",
+   "fieldtype": "Select",
+   "label": "Event Type",
+   "read_only": 1,
+   "options": "Line Removed\nQuantity Lowered\nSale Cleared\nHeld Order Discarded\nReprint\nApproval\nPIN Failed\nNo Sale\nVoid After Payment\nOther",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "event_time",
+   "fieldtype": "Datetime",
+   "label": "Event Time",
+   "read_only": 1,
+   "in_list_view": 1,
+   "description": "When the till logged it, by the till's clock."
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "pos_profile",
+   "fieldtype": "Link",
+   "label": "POS Profile",
+   "read_only": 1,
+   "options": "POS Profile",
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "pos_opening_shift",
+   "fieldtype": "Link",
+   "label": "POS Opening Shift",
+   "read_only": 1,
+   "options": "POS Opening Shift"
+  },
+  {
+   "fieldname": "section_break_people",
+   "fieldtype": "Section Break",
+   "label": "Who"
+  },
+  {
+   "fieldname": "cashier",
+   "fieldtype": "Link",
+   "label": "Cashier",
+   "read_only": 1,
+   "options": "User",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "description": "Who was signed in on the till."
+  },
+  {
+   "fieldname": "approved_by",
+   "fieldtype": "Link",
+   "label": "Approved By",
+   "read_only": 1,
+   "options": "User",
+   "in_standard_filter": 1,
+   "description": "The manager who approved it on the till with their PIN."
+  },
+  {
+   "fieldname": "column_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "pin_user",
+   "fieldtype": "Link",
+   "label": "PIN Of",
+   "read_only": 1,
+   "options": "User",
+   "description": "For a wrong PIN: whose PIN was tried."
+  },
+  {
+   "fieldname": "section_break_what",
+   "fieldtype": "Section Break",
+   "label": "What"
+  },
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "label": "Item",
+   "read_only": 1,
+   "options": "Item"
+  },
+  {
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "label": "Item Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "qty",
+   "fieldtype": "Float",
+   "label": "Quantity",
+   "read_only": 1
+  },
+  {
+   "fieldname": "amount",
+   "fieldtype": "Currency",
+   "label": "Amount",
+   "read_only": 1,
+   "description": "The value taken out of the sale, at the till's price."
+  },
+  {
+   "fieldname": "column_break_3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "reference",
+   "fieldtype": "Data",
+   "label": "Reference",
+   "read_only": 1,
+   "description": "The invoice or held order it concerns."
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description",
+   "read_only": 1
+  },
+  {
+   "fieldname": "details",
+   "fieldtype": "Code",
+   "label": "Details",
+   "read_only": 1,
+   "options": "JSON"
+  },
+  {
+   "fieldname": "section_break_checks",
+   "fieldtype": "Section Break",
+   "label": "Checks"
+  },
+  {
+   "fieldname": "checks",
+   "fieldtype": "Small Text",
+   "label": "Checks",
+   "read_only": 1,
+   "description": "What did not check out against ERPNext when the event arrived. The event is kept either way."
+  },
+  {
+   "fieldname": "section_break_till",
+   "fieldtype": "Section Break",
+   "label": "Till",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "till_user",
+   "fieldtype": "Link",
+   "label": "Till User",
+   "read_only": 1,
+   "options": "User",
+   "description": "The API user of the till that sent it."
+  },
+  {
+   "fieldname": "column_break_4",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "client_request_id",
+   "fieldtype": "Data",
+   "label": "Client Request ID",
+   "read_only": 1,
+   "unique": 1,
+   "no_copy": 1
+  }
+ ],
+ "in_create": 1,
+ "links": [],
+ "modified": "2026-09-21 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "X POS",
+ "name": "POS Audit Event",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1
+  },
+  {
+   "role": "Sales Manager",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1
+  },
+  {
+   "role": "Accounts Manager",
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "event_type"
+}
