@@ -13,6 +13,7 @@
   "section_break_2",
   "pos_opening_shift",
   "user",
+  "approved_by",
   "movement_type",
   "amount",
   "section_break_3",
@@ -73,6 +74,15 @@
    "label": "User",
    "options": "User",
    "reqd": 1
+  },
+  {
+   "description": "The manager who approved this on the till with their PIN, because the cashier's POS Role does not allow it.",
+   "fieldname": "approved_by",
+   "fieldtype": "Link",
+   "label": "Approved By",
+   "no_copy": 1,
+   "options": "User",
+   "read_only": 1
   },
   {
    "fieldname": "movement_type",
@@ -159,7 +169,7 @@
  ],
  "is_submittable": 1,
  "links": [],
- "modified": "2026-03-29 15:29:13.422452",
+ "modified": "2026-09-21 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "X POS",
  "name": "POS Cash Movement",

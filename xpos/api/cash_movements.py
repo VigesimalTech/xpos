@@ -11,6 +11,7 @@ from erpnext.accounts.doctype.sales_invoice.sales_invoice import (
 from frappe import _
 from frappe.utils import cint, flt, now_datetime, nowdate
 
+from xpos.api.approval import check_approver, permission_by_approval, resolve_approver
 from xpos.api.auth import is_pos_manager, user_has_pos_permission
 from xpos.api.profiles import resolve_pos_profile
 from xpos.api.till import acting_user, sent_by_till, till_cashier
@@ -18,8 +19,14 @@ from xpos.api.till import acting_user, sent_by_till, till_cashier
 MOVEMENT_PERMISSION_KEYS = {"Expense": "expense", "Deposit": "bank_drop"}
 
 
-def ensure_cash_movement_allowed(profile, movement_type: str, user: str | None = None) -> None:
-	"""Raise unless this profile and `user` (the session's by default) may record `movement_type`."""
+def ensure_cash_movement_allowed(
+	profile, movement_type: str, user: str | None = None, approver: str | None = None
+) -> str | None:
+	"""Raise unless this profile and `user` (the session's by default) may record `movement_type`.
+
+	A cashier whose role lacks the permission may still record it with a manager's approval
+	on the till (`approval.py`). Returns who approved it, or None when no approval was needed.
+	"""
 	if not cint(profile.get("enable_cash_movement")):
 		frappe.throw(
 			_("Cash Movement is disabled for POS Profile {0}.").format(profile.name),
@@ -39,11 +46,22 @@ def ensure_cash_movement_allowed(profile, movement_type: str, user: str | None =
 		)
 
 	permission_key = MOVEMENT_PERMISSION_KEYS.get(movement_type)
-	if permission_key and not user_has_pos_permission(permission_key, user, pos_profile=profile.name):
+	if not permission_key:
+		return None
+	cashier = user or till_cashier() or frappe.session.user
+	cashier_has = user_has_pos_permission(permission_key, cashier, pos_profile=profile.name)
+	problems: list[str] = []
+	approver_has = False
+	if not cashier_has and approver:
+		problems = check_approver(approver, cashier, profile)
+		approver_has = user_has_pos_permission(permission_key, approver, pos_profile=profile.name)
+	allowed, approved_by, reasons = permission_by_approval(cashier_has, approver, problems, approver_has)
+	if not allowed:
 		frappe.throw(
-			_("You are not permitted to record a {0}.").format(movement_type.lower()),
+			" ".join([_("You are not permitted to record a {0}.").format(movement_type.lower()), *reasons]),
 			frappe.PermissionError,
 		)
+	return approved_by
 
 
 def validate_cash_movement_amount(profile, amount: float) -> float:
@@ -264,6 +282,7 @@ def sync_cash_movement(data: str | dict, local_id: str | None = None):
 		remarks=data.get("remarks") or "",
 		posting_date=data.get("posting_date"),
 		client_request_id=client_request_id,
+		approver=resolve_approver(data),
 	)
 	return {"name": movement.get("name")}
 
@@ -284,10 +303,11 @@ def _post_cash_movement(
 	remarks: str,
 	posting_date: str | None = None,
 	client_request_id: str | None = None,
+	approver: str | None = None,
 ):
 	"""Check an expense or deposit against the POS Profile, post its journal entry and record it."""
 	profile = resolve_pos_profile(opening.pos_profile)
-	ensure_cash_movement_allowed(profile, movement_type, user)
+	approved_by = ensure_cash_movement_allowed(profile, movement_type, user, approver)
 	amount = validate_cash_movement_amount(profile, amount)
 
 	company = opening.company
@@ -353,6 +373,7 @@ def _post_cash_movement(
 		company=company,
 		posting_date=posting_date,
 		client_request_id=client_request_id,
+		approved_by=approved_by,
 	)
 
 
@@ -430,6 +451,7 @@ def _create_cash_movement_record(**kwargs):
 			"posting_time": now_datetime().strftime("%H:%M:%S"),
 			"status": "Submitted",
 			"client_request_id": kwargs.get("client_request_id"),
+			"approved_by": kwargs.get("approved_by"),
 		}
 	)
 	movement.insert(ignore_permissions=True)

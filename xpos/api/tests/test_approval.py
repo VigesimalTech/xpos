@@ -1,6 +1,6 @@
 import unittest
 
-from xpos.api.approval import apply_approval, approval_problems
+from xpos.api.approval import apply_approval, approval_problems, permission_by_approval
 
 CASHIER = "cashier@example.com"
 MANAGER = "manager@example.com"
@@ -71,3 +71,31 @@ class TestApplyApproval(unittest.TestCase):
 		self.assertEqual(flags, ["over limit", "cannot approve their own sale"])
 		self.assertIsNone(approved_by)
 		self.assertIsNone(approved)
+
+
+class TestPermissionByApproval(unittest.TestCase):
+	"""An action the cashier's role lacks (an expense, a bank drop) is allowed only with a
+	valid approval by someone whose own role allows it."""
+
+	def test_a_cashier_with_the_permission_needs_no_approval(self):
+		self.assertEqual(permission_by_approval(True, MANAGER, [], True), (True, None, []))
+
+	def test_without_the_permission_or_an_approver_it_is_refused(self):
+		allowed, approved_by, reasons = permission_by_approval(False, None, [], False)
+		self.assertFalse(allowed)
+		self.assertIsNone(approved_by)
+
+	def test_a_valid_approver_who_holds_the_permission_allows_it(self):
+		self.assertEqual(permission_by_approval(False, MANAGER, [], True), (True, MANAGER, []))
+
+	def test_an_approver_who_lacks_the_permission_too_cannot_allow_it(self):
+		allowed, approved_by, reasons = permission_by_approval(False, MANAGER, [], False)
+		self.assertFalse(allowed)
+		self.assertIsNone(approved_by)
+		self.assertEqual(len(reasons), 1)
+
+	def test_an_invalid_approval_allows_nothing_and_says_why(self):
+		self.assertEqual(
+			permission_by_approval(False, CASHIER, ["cannot approve their own"], True),
+			(False, None, ["cannot approve their own"]),
+		)

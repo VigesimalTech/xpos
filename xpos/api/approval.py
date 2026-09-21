@@ -15,7 +15,8 @@ limit approves up to 20%, and anything beyond still counts against the record.
 Only a till names an approver. A person signed in to the web POS is checked as
 themselves: nobody entered a PIN there, so an approver in the payload is ignored.
 
-`approval_problems` and `apply_approval` hold the rules and need no database.
+`approval_problems`, `apply_approval` (a sale) and `permission_by_approval` (an action
+needing one permission, such as an expense) hold the rules and need no database.
 """
 
 import frappe
@@ -68,11 +69,31 @@ def apply_approval(
 	return approver_flags, approver, "\n".join(cashier_flags)
 
 
-def resolve_approver(data: dict) -> str | None:
+def permission_by_approval(
+	cashier_has: bool,
+	approver: str | None,
+	problems: list[str],
+	approver_has: bool,
+) -> tuple[bool, str | None, list[str]]:
+	"""Whether an action needing one POS Role permission may go ahead: (allowed,
+	approved by, why not). The cashier's own permission needs no approval; without it,
+	a valid approver whose own role holds the permission allows it."""
+	if cashier_has:
+		return True, None, []
+	if not approver:
+		return False, None, []
+	if problems:
+		return False, None, problems
+	if not approver_has:
+		return False, None, [_("Approver {0} may not do this either.").format(approver)]
+	return True, approver, []
+
+
+def resolve_approver(data: dict, key: str = "xpos_approved_by") -> str | None:
 	"""The approver a till names on a record; never from a person's own sign-in."""
 	if not sent_by_till():
 		return None
-	return data.get("xpos_approved_by") or None
+	return data.get(key) or None
 
 
 def check_approver(approver: str, cashier: str, pos) -> list[str]:
