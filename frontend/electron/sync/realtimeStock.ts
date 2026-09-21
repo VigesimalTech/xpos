@@ -78,6 +78,8 @@ async function handleBinUpdate(binName?: string): Promise<void> {
 	try {
 		const response = await fetch(`${serverUrl}/api/resource/Bin/${encodeURIComponent(binName)}`, {
 			headers: { Accept: "application/json" },
+			// A stock update that never answers is dropped, not waited on for ever.
+			signal: AbortSignal.timeout(30_000),
 		});
 		if (!response.ok) return;
 

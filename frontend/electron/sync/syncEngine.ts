@@ -33,6 +33,18 @@ let syncState: SyncState = {
 };
 
 let syncIntervalId: ReturnType<typeof setInterval> | null = null;
+
+/**
+ * How long one request to ERPNext may take. Without a limit, a connection that is taken
+ * and never answered (a dead Wi-Fi link, a captive portal) held the sync forever, and
+ * every later sync, sales included, waited behind it until the app restarted.
+ */
+let requestTimeoutMs = 60_000;
+
+/** For tests: a shorter limit. */
+export function setRequestTimeout(ms: number): void {
+	requestTimeoutMs = ms;
+}
 let pushIntervalId: ReturnType<typeof setInterval> | null = null;
 let syncContext: SyncContext | null = null;
 let syncCycleCount = 0;
@@ -133,33 +145,50 @@ async function apiCall<T = unknown>(
 		}
 
 		let responseBody = "";
+		let settled = false;
+		const finish = (fn: () => void) => {
+			if (settled) return;
+			settled = true;
+			clearTimeout(timer);
+			fn();
+		};
+		const timer = setTimeout(() => {
+			finish(() => {
+				request.abort();
+				reject(
+					new Error(
+						`No answer from ERPNext in ${Math.round(requestTimeoutMs / 1000)} s (${method})`,
+					),
+				);
+			});
+		}, requestTimeoutMs);
 
 		request.on("response", (response: Electron.IncomingMessage) => {
 			response.on("data", (chunk: Uint8Array) => {
 				responseBody += chunk.toString();
 			});
 
-			response.on("end", () => {
-				try {
-					const data = JSON.parse(responseBody);
-					if (response.statusCode && response.statusCode >= 400) {
-						reject(
-							new Error(
-								data.message || `HTTP ${response.statusCode}${frappeErrorDetail(data)}`,
-							),
-						);
-					} else {
-						resolve(data.message as T);
+			response.on("end", () =>
+				finish(() => {
+					try {
+						const data = JSON.parse(responseBody);
+						if (response.statusCode && response.statusCode >= 400) {
+							reject(
+								new Error(
+									data.message || `HTTP ${response.statusCode}${frappeErrorDetail(data)}`,
+								),
+							);
+						} else {
+							resolve(data.message as T);
+						}
+					} catch {
+						reject(new Error(`Invalid JSON response from ${method}`));
 					}
-				} catch {
-					reject(new Error(`Invalid JSON response from ${method}`));
-				}
-			});
+				}),
+			);
 		});
 
-		request.on("error", (err: Error) => {
-			reject(err);
-		});
+		request.on("error", (err: Error) => finish(() => reject(err)));
 
 		if (body !== null) {
 			request.write(body);

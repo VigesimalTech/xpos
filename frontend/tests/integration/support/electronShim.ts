@@ -31,6 +31,7 @@ class ShimResponse extends EventEmitter {
 class ShimRequest extends EventEmitter {
 	private headers: Record<string, string> = {};
 	private chunks: string[] = [];
+	private req: http.ClientRequest | null = null;
 
 	constructor(private options: { method?: string; url: string }) {
 		super();
@@ -60,6 +61,13 @@ class ShimRequest extends EventEmitter {
 		req.on("error", (err) => this.emit("error", err));
 		for (const chunk of this.chunks) req.write(chunk);
 		req.end();
+		this.req = req;
+	}
+
+	/** As Electron's: stop the request; emits "abort", not "error". */
+	abort(): void {
+		this.req?.destroy();
+		this.emit("abort");
 	}
 }
 
