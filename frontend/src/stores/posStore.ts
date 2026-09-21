@@ -583,6 +583,7 @@ export const usePosStore = defineStore("pos", () => {
 
 	return {
 		isLoading,
+		refreshReceiptContext,
 		isReady,
 		isCashier,
 		currentView,

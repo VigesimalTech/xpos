@@ -99,6 +99,19 @@ export function usePrintInvoice() {
 		}
 	}
 
+	/**
+	 * The receipt layout for this POS Profile. Opening a shift fetches it in the background;
+	 * a new till's first sale can be paid before that lands, and then printed the fallback
+	 * page instead of the shop's receipt. So fetch it now if it is not there (online only).
+	 */
+	async function receiptContext() {
+		const name = posStore.profileName;
+		const cached = await getCachedReceiptContext(name);
+		if (cached) return cached;
+		await posStore.refreshReceiptContext(name);
+		return getCachedReceiptContext(name);
+	}
+
 	async function printInvoiceLocal(localId: number) {
 		try {
 			if (!window.electronAPI?.db || !window.electronAPI?.print) {
@@ -114,7 +127,7 @@ export function usePrintInvoice() {
 			const snapshot = (invoice.data as Record<string, unknown>)?.receipt as
 				| ReceiptSnapshot
 				| undefined;
-			const context = await getCachedReceiptContext(posStore.profileName);
+			const context = await receiptContext();
 
 			if (snapshot && context) {
 				if (!snapshot.name) snapshot.name = `LOCAL-${localId}`;
@@ -151,7 +164,7 @@ export function usePrintInvoice() {
 	 */
 	async function printReceiptOffline(snapshot: ReceiptSnapshot): Promise<boolean> {
 		try {
-			const context = await getCachedReceiptContext(posStore.profileName);
+			const context = await receiptContext();
 			if (!context) {
 				showError(
 					__(
