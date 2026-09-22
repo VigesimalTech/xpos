@@ -764,9 +764,13 @@ def refused_sales_note(refused, currency: str | None = None) -> str | None:
 		_("The cash for them is in the drawer, so the close shows it over by that. A manager settles each."),
 	]
 	lines += [
-		f"{frappe.utils.escape_html(str(r.get('local_id')))}: "
-		f"{fmt_money(flt(r.get('grand_total')), currency=currency)}: "
-		f"{frappe.utils.escape_html(str(r.get('error') or ''))}"
+		": ".join(
+			(
+				frappe.utils.escape_html(str(r.get("local_id"))),
+				fmt_money(flt(r.get("grand_total")), currency=currency),
+				frappe.utils.escape_html(str(r.get("error") or "")),
+			)
+		)
 		for r in rows
 	]
 	# A comment is HTML: one line each, not one run-on paragraph.
