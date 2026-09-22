@@ -462,6 +462,17 @@ watch(isAuthPage, (isAuth, wasAuth) => {
 	}
 });
 
+// A restarted till signs its last cashier back in without the sign-in page, often after the
+// check at start has run: look for their shift once they are known.
+watch(
+	() => authStore.userName,
+	(name, prev) => {
+		if (name && name !== "Guest" && name !== prev && !isAuthPage.value && authStore.isAuthenticated) {
+			posStore.checkExistingShift();
+		}
+	},
+);
+
 watch(
 	() => posStore.isReady,
 	async (ready, wasReady) => {

@@ -8,6 +8,7 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import {
+	databaseRelay,
 	erpList,
 	eventually,
 	launchTill,
@@ -17,6 +18,7 @@ import {
 	signIn,
 	site,
 	tillDb,
+	type DatabaseRelay,
 	type Till,
 } from "../support/till";
 
@@ -25,6 +27,9 @@ test.skip(!site, "needs a seeded site: XPOS_RT_CONFIG and XPOS_RT_URL (see tests
 
 let till: Till;
 let page: Page;
+/** Relays a restarted till's database goes through: kept open until the till closes. */
+const relays: DatabaseRelay[] = [];
+const tillProfile = newProfile();
 /** Requests that went somewhere other than the till's ERPNext: the setup must reach every one. */
 const strayRequests: string[] = [];
 
@@ -37,17 +42,22 @@ async function addItem(name: string) {
 	await expect(page.locator("[data-cart-index]").filter({ visible: true })).toHaveCount(1);
 }
 
-test.beforeAll(async () => {
-	till = await launchTill(newProfile());
-	page = till.page;
+function watchRequests() {
 	page.on("request", (request) => {
 		const url = request.url();
 		if (url.startsWith("http") && !url.startsWith(site!.url)) strayRequests.push(url);
 	});
+}
+
+test.beforeAll(async () => {
+	till = await launchTill(tillProfile);
+	page = till.page;
+	watchRequests();
 });
 
 test.afterAll(async () => {
 	await till?.close();
+	for (const relay of relays) await relay.stop();
 });
 
 test("a new till is set up and a cashier signs in with their ERPNext password", async () => {
@@ -66,6 +76,37 @@ test("the cashier opens a shift on their POS Profile", async () => {
 	}
 	await page.getByRole("button", { name: "Open Shift" }).click();
 	await expect(page.getByText(site!.customer).first()).toBeVisible();
+});
+
+test("restarted mid-shift, the till comes back to its shift, every time", async () => {
+	// A crash or a power cut. The till reopens signed in as the last cashier, or at sign-in;
+	// either way it must find the shift still open, not ask for a new one. It asked whenever
+	// its database answered a moment late, as after a power cut: the shift was looked up
+	// before the cashier was known (bug hunt, release sweep, 22 Sep 2026).
+	for (const databaseLate of [false, true, false]) {
+		await till.close();
+		const relay = databaseLate ? await databaseRelay() : null;
+		till = await launchTill(tillProfile, { fresh: false, dbPort: relay?.port });
+		page = till.page;
+		watchRequests();
+		if (relay) {
+			await page.waitForTimeout(2000);
+			await relay.start();
+			relays.push(relay);
+		}
+		// The sale screen: its cart names the customer (a hidden layout has a copy too).
+		const pos = page.getByText(site!.customer).filter({ visible: true }).first();
+		const openShift = page.getByText("Open your shift to get started");
+		const signInScreen = page
+			.getByText("Use password instead")
+			.or(page.getByPlaceholder("Enter your password"));
+		await expect(pos.or(signInScreen).or(openShift).first()).toBeVisible({ timeout: 30_000 });
+		if (await signInScreen.first().isVisible()) {
+			await signIn(page, site!.supervisor, site!.cashier_password);
+		}
+		await expect(pos, `database late: ${databaseLate}`).toBeVisible({ timeout: 30_000 });
+		await expect(openShift).not.toBeVisible();
+	}
 });
 
 let saleLocalId = "";

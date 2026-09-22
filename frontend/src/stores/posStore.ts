@@ -260,6 +260,10 @@ export const usePosStore = defineStore("pos", () => {
 				const { useAuthStore } = await import("@/stores/authStore");
 				const authStore = useAuthStore();
 				const currentUser = authStore.userName;
+				// At start the till may ask before it has signed its last cashier back in:
+				// as "Guest" it found no shift and offered a new one. Decide nothing until
+				// the cashier is known; App.vue asks again then (release sweep, 22 Sep 2026).
+				if (!currentUser || currentUser === "Guest") return;
 
 				const result = (await window.electronAPI!.db.checkOpenShift(
 					currentUser,
