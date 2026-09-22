@@ -4,7 +4,7 @@ In risk order: money and data first. Each names what to protect, the oracle, and
 attacks most likely to break it. Add a charter when a feature lands; strike nothing out,
 mark it with the date it was last run.
 
-## 1. Offline selling and sync (S1 territory) — last run 21 Sep 2026
+## 1. Offline selling and sync (S1 territory) — last run 22 Sep 2026 (release sweep)
 
 Protect: every sale made on the till reaches ERPNext exactly once, with the same total.
 Oracle: `/check` (no sale missing, duplicated, stuck in `syncing`, or failed without a
@@ -18,7 +18,7 @@ reason a cashier can act on); ERPNext stock and totals match the till.
 - A sale ERPNext rejects (policy, closed period, missing item): the till says why and
   keeps it for review, and nothing else is blocked behind it.
 
-## 2. Payment and totals — last run 22 Sep 2026
+## 2. Payment and totals — last run 22 Sep 2026 (release sweep; not: free items, pricing rules, coupons)
 
 Protect: what the cashier sees, what prints and what ERPNext books are the same numbers.
 Oracle: screen total = receipt total = `pending_invoices.grand_total` = ERPNext.
@@ -27,9 +27,11 @@ Oracle: screen total = receipt total = `pending_invoices.grand_total` = ERPNext.
 - Rounding: prices with decimals, quantities that do not divide, tax inclusive and not.
 - Discounts: line and whole-sale, at the cashier's limit, just over (manager's PIN), 100%.
 - Price change on a line (allowed and not). Free items, pricing rules, coupons.
+- Tax inclusive and not, with and without the template's own "included" flag, against what
+  ERPNext books. Change given from cash, the way the till builds its payment rows.
 - Pay twice fast; Enter twice on Save & Print.
 
-## 3. Shift open and close — last run 22 Sep 2026 (not: two users on one till)
+## 3. Shift open and close — last run 22 Sep 2026 (release sweep)
 
 Protect: the closing counts every sale, return and cash movement of the shift, once.
 Oracle: closing summary = sum of the shift's sales and movements; ERPNext closing entry.
@@ -37,6 +39,8 @@ Oracle: closing summary = sum of the shift's sales and movements; ERPNext closin
 - Close with sales pending sync, with a held order, offline.
 - Two users on one till, each with a shift. Close one; the other's sales stay theirs.
 - Restart mid-close. Close, then reopen a shift at once.
+- Restart mid-shift with the database late (a power cut): the till must find its shift and
+  talk to its own ERPNext, not the default address.
 
 ## 4. Returns, voids and reprints — last run 22 Sep 2026 (not: void after payment, return without receipt)
 
@@ -47,7 +51,7 @@ Oracle: ERPNext return against the right invoice; audit events.
 - Return without a receipt (permission and manager PIN). Void after payment.
 - Reprint: last receipt, from Order History, a sale from another shift.
 
-## 5. Manager approval and permissions — last run 21 Sep 2026
+## 5. Manager approval and permissions — last run 22 Sep 2026 (release sweep: PIN lockout)
 
 Protect: nothing the role forbids happens without a named approver, on every way in.
 Oracle: audit events; the approver on the invoice; the server's own check on sync.
