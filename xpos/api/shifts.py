@@ -748,9 +748,9 @@ def create_closing_shift(data: str | dict, local_id: str | None = None) -> dict:
 	return {"name": result["name"]}
 
 
-def refused_sales_note(refused) -> str | None:
+def refused_sales_note(refused, currency: str | None = None) -> str | None:
 	"""What the close says about sales ERPNext refused: paid at the till, so in the drawer,
-	but not in ERPNext, and not in this close. None when there are none."""
+	but not in ERPNext, and not in this close. None when there are none. HTML, for a comment."""
 	if isinstance(refused, str):
 		refused = json.loads(refused or "[]")
 	rows = [r for r in (refused or []) if isinstance(r, dict)]
@@ -760,17 +760,24 @@ def refused_sales_note(refused) -> str | None:
 	lines = [
 		_(
 			"{0} sale(s) paid at the till were refused by ERPNext and are not in this close, {1} in all."
-		).format(len(rows), fmt_money(total)),
+		).format(len(rows), fmt_money(total, currency=currency)),
 		_("The cash for them is in the drawer, so the close shows it over by that. A manager settles each."),
 	]
 	lines += [
-		f"{r.get('local_id')}: {fmt_money(flt(r.get('grand_total')))}: {r.get('error') or ''}" for r in rows
+		f"{frappe.utils.escape_html(str(r.get('local_id')))}: "
+		f"{fmt_money(flt(r.get('grand_total')), currency=currency)}: "
+		f"{frappe.utils.escape_html(str(r.get('error') or ''))}"
+		for r in rows
 	]
-	return "\n".join(lines)
+	# A comment is HTML: one line each, not one run-on paragraph.
+	return "<br>".join(lines)
 
 
 def note_refused_sales(closing_name: str, refused) -> None:
 	"""Put the refused sales on the close's timeline, where a manager reviewing it sees them."""
-	note = refused_sales_note(refused)
+	closing = frappe.get_doc("POS Closing Shift", closing_name)
+	company = closing.get("company")
+	currency = frappe.get_cached_value("Company", company, "default_currency") if company else None
+	note = refused_sales_note(refused, currency)
 	if note:
-		frappe.get_doc("POS Closing Shift", closing_name).add_comment("Comment", note)
+		closing.add_comment("Comment", note)

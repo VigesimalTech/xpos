@@ -644,7 +644,10 @@ class TestRefusedSalesNote(unittest.TestCase):
 
 		from xpos.api import shifts
 
-		with patch.object(shifts, "fmt_money", side_effect=lambda v: f"{v:.2f}"):
+		with (
+			patch.object(shifts, "fmt_money", side_effect=lambda v, currency=None: f"{v:.2f}"),
+			patch.object(shifts.frappe, "utils", SimpleNamespace(escape_html=lambda v: v)),
+		):
 			note = shifts.refused_sales_note(
 				[
 					{"local_id": "inv_a", "grand_total": 100, "error": "Posting date is in a closed period"},
@@ -655,3 +658,4 @@ class TestRefusedSalesNote(unittest.TestCase):
 		self.assertIn("150.50", note)
 		self.assertIn("inv_a: 100.00: Posting date is in a closed period", note)
 		self.assertIn("inv_b: 50.50", note)
+		self.assertIn("<br>", note)
