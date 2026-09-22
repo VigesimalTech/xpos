@@ -239,6 +239,33 @@ describe("closing a shift on the till", () => {
 		expect(sale).toMatchObject({ status: "pending", retry_count: 0 });
 	});
 
+	it("the shift is priced as ERPNext prices it: the profile's taxes and the rounding setting", async () => {
+		await execute(
+			"INSERT INTO `pos_profiles` (`name`, `company`, `disabled`, `taxes_and_charges`, `tax_inclusive`) VALUES (?, 'Test Company', 0, 'VAT 5', 0) ON DUPLICATE KEY UPDATE `taxes_and_charges` = 'VAT 5'",
+			[PROFILE],
+		);
+		await execute(
+			"INSERT INTO `sales_taxes_charges` (`name`, `parent`, `charge_type`, `account_head`, `rate`, `idx`) VALUES ('vat5-1', 'VAT 5', 'On Net Total', 'VAT - TC', 5, 1)",
+		);
+		await execute(
+			"INSERT INTO `sync_meta` (`key`, `value`) VALUES ('erp_settings', ?) ON DUPLICATE KEY UPDATE `value` = VALUES(`value`)",
+			[JSON.stringify({ global_defaults: { disable_rounded_total: 1 } })],
+		);
+		await openShift();
+
+		const shift = await invoke<Record<string, any>>("db:check-open-shift", CASHIER);
+
+		expect(shift.taxes).toMatchObject([
+			{ charge_type: "On Net Total", rate: 5, account_head: "VAT - TC" },
+		]);
+		expect(shift.disable_rounded_total).toBe(true);
+
+		// Not cleared between tests: leave no taxes or settings behind.
+		await execute("DELETE FROM `sales_taxes_charges` WHERE `parent` = 'VAT 5'");
+		await execute("DELETE FROM `sync_meta` WHERE `key` = 'erp_settings'");
+		await execute("UPDATE `pos_profiles` SET `taxes_and_charges` = NULL WHERE `name` = ?", [PROFILE]);
+	});
+
 	it("sends shifts and closes under the till's UUIDs, not its numeric ids", async () => {
 		const shift = await openShift();
 		await closeOnTill(shift, 1000);

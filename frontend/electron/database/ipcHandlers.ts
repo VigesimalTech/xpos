@@ -7,6 +7,7 @@
  */
 
 import { ipcMain, net } from "electron";
+import { shiftPricing } from "./shiftTaxes";
 import { refusedOf } from "./refusedSales";
 import { profilesForUser, type PosUserProfiles } from "./openingProfiles";
 import {
@@ -1201,9 +1202,16 @@ export function registerDbHandlers(): void {
 				default_currency: (profileData.currency as string) || "",
 			},
 			stock_settings: {},
-			taxes: [],
-			tax_inclusive: false,
-			disable_rounded_total: false,
+			// Priced as ERPNext prices it (shiftTaxes.ts), not without tax.
+			...shiftPricing(
+				profileData,
+				profileData.taxes_and_charges
+					? await query("SELECT * FROM `sales_taxes_charges` WHERE `parent` = ? ORDER BY `idx`", [
+							profileData.taxes_and_charges as string,
+						])
+					: [],
+				await getMeta("erp_settings"),
+			),
 			print_settings: null,
 		};
 	});
