@@ -11,6 +11,7 @@ import __ from "@/lib/translate";
 import {
 	getReportDefinitions,
 	isReportAccessible,
+	isReportOffered,
 	type ReportCategory,
 	type ReportDefinition,
 } from "@/services/reports";
@@ -18,7 +19,7 @@ import {
 const router = useRouter();
 const searchTerm = ref("");
 
-const reportDefinitions = computed(() => getReportDefinitions());
+const reportDefinitions = computed(() => getReportDefinitions().filter((report) => isReportOffered(report)));
 
 const filteredReports = computed(() => {
 	const query = searchTerm.value.trim().toLowerCase();
@@ -67,8 +68,8 @@ const categoryAccent: Record<ReportCategory, { accent: string; chip: string; ico
 	},
 };
 
+// A report the role lacks asks for a manager's PIN when it opens (ReportViewerView).
 function openReport(report: ReportDefinition) {
-	if (!isReportAccessible(report)) return;
 	router.push(`/reports/${report.slug}`);
 }
 
@@ -212,17 +213,16 @@ function clearSearch() {
 								<div class="flex items-center justify-end gap-2 pt-1">
 									<Badge
 										v-if="!isReportAccessible(report)"
-										variant="destructive"
+										variant="outline"
 										class="gap-1.5"
 									>
 										<Lock class="h-3 w-3" />
-										{{ __("Locked") }}
+										{{ __("Manager's PIN") }}
 									</Badge>
 									<Button
 										variant="outline"
 										size="sm"
 										class="gap-1.5"
-										:disabled="!isReportAccessible(report)"
 										@click="openReport(report)"
 									>
 										{{ __("Open") }}

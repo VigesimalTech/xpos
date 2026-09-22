@@ -292,6 +292,20 @@ export const useItemStore = defineStore("items", () => {
 			if (isElectron()) {
 				const lower = barcode.toLowerCase();
 				const posStoreRef = usePosStore();
+				// Every barcode an item has is in the till's item_barcodes; the item's own barcode
+				// column holds one at most. Searching only that missed the others (bug hunt).
+				const byBarcode = (await window.electronAPI!.db.getItemByBarcode(barcode)) as {
+					item_code?: string;
+				} | null;
+				if (byBarcode?.item_code) {
+					const withPrice = (await window.electronAPI!.db.getItems({
+						search: byBarcode.item_code,
+						priceList: posStoreRef.sellingPriceList || undefined,
+						warehouse: posStoreRef.warehouse || undefined,
+					})) as POSItem[];
+					const hit = withPrice.find((i) => i.item_code === byBarcode.item_code);
+					if (hit) return hit;
+				}
 				const all = (await window.electronAPI!.db.getItems({
 					search: barcode,
 					priceList: posStoreRef.sellingPriceList || undefined,

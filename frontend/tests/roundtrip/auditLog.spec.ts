@@ -35,7 +35,7 @@ const site: Site = configPath
 const CASHIER = "rt-cashier@example.com"; // on the first shop
 const OTHER_SHOP_CASHIER = "rt-other@example.com"; // on the second shop only
 const SUPERVISOR = "rt-supervisor@example.com"; // Manager on the first shop: may approve
-const BOTH_SHOPS_CASHIER = "rt-both@example.com"; // Cashier role: may not approve
+const BOTH_SHOPS_CASHIER = "rt-both@example.com"; // Cashier in the first shop (a Manager in the second): may not approve here
 
 type AuditEvent = {
 	name: string;

@@ -626,3 +626,36 @@ class TestTillShiftSync(unittest.TestCase):
 
 if __name__ == "__main__":
 	unittest.main()
+
+
+class TestRefusedSalesNote(unittest.TestCase):
+	"""A sale ERPNext refused is not in the close; the close says so, with the amount the
+	drawer will be over by (decided 21 Sep 2026)."""
+
+	def test_nothing_to_say_when_none_were_refused(self):
+		from xpos.api.shifts import refused_sales_note
+
+		self.assertIsNone(refused_sales_note([]))
+		self.assertIsNone(refused_sales_note(None))
+		self.assertIsNone(refused_sales_note("[]"))
+
+	def test_lists_each_with_its_amount_and_reason(self):
+		from unittest.mock import patch
+
+		from xpos.api import shifts
+
+		with (
+			patch.object(shifts, "fmt_money", side_effect=lambda v, currency=None: f"{v:.2f}"),
+			patch.object(shifts.frappe, "utils", SimpleNamespace(escape_html=lambda v: v)),
+		):
+			note = shifts.refused_sales_note(
+				[
+					{"local_id": "inv_a", "grand_total": 100, "error": "Posting date is in a closed period"},
+					{"local_id": "inv_b", "grand_total": "50.5", "error": None},
+				]
+			)
+		self.assertIn("2 sale(s)", note)
+		self.assertIn("150.50", note)
+		self.assertIn("inv_a: 100.00: Posting date is in a closed period", note)
+		self.assertIn("inv_b: 50.50", note)
+		self.assertIn("<br>", note)

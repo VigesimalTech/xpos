@@ -59,11 +59,20 @@ contextBridge.exposeInMainWorld("electronAPI", {
 		return () => ipcRenderer.removeListener("sync-status", handler);
 	},
 
-	onSyncError: (callback: (error: { message: string; table?: string }) => void) => {
-		const handler = (_event: Electron.IpcRendererEvent, error: { message: string; table?: string }) =>
-			callback(error);
+	onSyncError: (callback: (error: { message: string; table?: string; unreachable?: boolean }) => void) => {
+		const handler = (
+			_event: Electron.IpcRendererEvent,
+			error: { message: string; table?: string; unreachable?: boolean },
+		) => callback(error);
 		ipcRenderer.on("sync-error", handler);
 		return () => ipcRenderer.removeListener("sync-error", handler);
+	},
+
+	/** Whether ERPNext is answering the till, when that changes. */
+	onSyncReachability: (callback: (state: { reachable: boolean }) => void) => {
+		const handler = (_event: Electron.IpcRendererEvent, state: { reachable: boolean }) => callback(state);
+		ipcRenderer.on("sync-reachability", handler);
+		return () => ipcRenderer.removeListener("sync-reachability", handler);
 	},
 
 	onSyncComplete: (callback: (summary: { pulled: number; pushed: number }) => void) => {
@@ -319,7 +328,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
 			ipcRenderer.invoke("db:upsert-pos-payment-methods", rows),
 
 		getPosUsers: () => ipcRenderer.invoke("db:get-pos-users"),
-		getPosUser: (username: string) => ipcRenderer.invoke("db:get-pos-user", username),
+		getPosUser: (username: string, posProfile?: string) =>
+			ipcRenderer.invoke("db:get-pos-user", username, posProfile),
 		upsertPosUsers: (rows: Record<string, unknown>[]) => ipcRenderer.invoke("db:upsert-pos-users", rows),
 		verifyPassword: (username: string, password: string) =>
 			ipcRenderer.invoke("db:verify-password", username, password),
@@ -360,7 +370,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 			ipcRenderer.invoke("db:create-pos-opening-shift", shift),
 		getOpenShift: (user: string) => ipcRenderer.invoke("db:get-open-shift", user),
 		checkOpenShift: (user: string) => ipcRenderer.invoke("db:check-open-shift", user),
-		getOpeningData: () => ipcRenderer.invoke("db:get-opening-data"),
+		getOpeningData: (user?: string) => ipcRenderer.invoke("db:get-opening-data", user),
 		closePosShift: (localId: string) => ipcRenderer.invoke("db:close-pos-shift", localId),
 		getPosOpeningShifts: (opts?: { user?: string; status?: string }) =>
 			ipcRenderer.invoke("db:get-pos-opening-shifts", opts),

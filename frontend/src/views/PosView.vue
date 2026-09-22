@@ -179,6 +179,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { usePosStore } from "@/stores/posStore";
+import { isElectron } from "@/services/electronBridge";
 import { useMoney } from "@/composables/useMoney";
 import { useItemStore } from "@/stores/itemStore";
 import { useCartStore } from "@/stores/cartStore";
@@ -243,7 +244,27 @@ const groupAutocompleteOptions = computed(() => {
 	return [allOption, ...groupOptions];
 });
 
+/**
+ * On the till the grid's stock comes from the till's own tables, read when items load. Show
+ * what a sync or a stock change brought in: the grid kept the stock it opened with until a
+ * restart, so a returned or restocked item stayed "Out of stock" (bug hunt).
+ */
+const stopStockRefresh: (() => void)[] = [];
+let stockRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+function refreshItemStock() {
+	if (stockRefreshTimer) clearTimeout(stockRefreshTimer);
+	stockRefreshTimer = setTimeout(() => {
+		if (posStore.isReady) itemStore.fetchItems(posStore.profileName);
+	}, 1000);
+}
+
 onMounted(() => {
+	if (isElectron() && window.electronAPI) {
+		stopStockRefresh.push(
+			window.electronAPI.onSyncComplete(refreshItemStock),
+			window.electronAPI.onStockUpdated(refreshItemStock),
+		);
+	}
 	enableCartDraft(useAuthStore().userName);
 	if (posStore.isReady) {
 		loadInitialData();
@@ -257,6 +278,8 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+	stopStockRefresh.splice(0).forEach((stop) => stop());
+	if (stockRefreshTimer) clearTimeout(stockRefreshTimer);
 	document.removeEventListener("keydown", handleGlobalKeydown);
 	window.removeEventListener("xpos:toggle-view", handleToggleView as EventListener);
 	window.removeEventListener("xpos:focus-barcode", handleFocusBarcode as EventListener);

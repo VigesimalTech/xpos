@@ -564,7 +564,21 @@
 
 					<div class="flex gap-2" :class="showChangeAllocator ? 'mt-2' : 'mt-auto'">
 						<div
-							v-if="changeAmount > 0 && !showChangeAllocator"
+							v-if="cardOverpaid > 0"
+							class="flex-1 bg-destructive/10 border border-destructive/30 rounded-xl p-3 text-center text-destructive"
+							data-testid="card-overpaid"
+						>
+							<p class="text-sm font-semibold">
+								{{
+									__("A card payment cannot be more than the amount due: {0} over.", [
+										formatWithSymbol(invoiceCurrency, cardOverpaid),
+									])
+								}}
+							</p>
+							<p class="text-xs mt-0.5">{{ __("Change can only be given from cash.") }}</p>
+						</div>
+						<div
+							v-else-if="changeAmount > 0 && !showChangeAllocator"
 							class="flex-1 bg-emerald-500/5 border border-emerald-500/20 rounded-xl p-3 text-center"
 						>
 							<p class="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 mb-0.5">
@@ -764,6 +778,7 @@ import {
 	tenderBaseTotal,
 	toInvoicePayments,
 	type TenderContext,
+	nonCashExcess,
 } from "@/services/tenderLegs";
 import type { InvoiceChangeLeg, InvoiceData, InvoicePayment, TenderLeg } from "@/types/pos.types";
 import { isOnline, extractErrorMessage, isTabConflictError } from "@/utils";
@@ -902,6 +917,18 @@ const remainingAmount = computed(() => {
 
 const hasRecordedPayment = computed(() => roundCurrency(effectiveTendered.value) > 0);
 
+/** Card and other non-cash tender beyond the amount due: change comes only out of cash. */
+const cardOverpaid = computed(() =>
+	cartStore.isReturnMode
+		? 0
+		: nonCashExcess(
+				activeLegs.value,
+				cartStore.grandTotal,
+				(mode) => posStore.cashTenderModes.some((m) => m.mode_of_payment === mode),
+				invoiceCurrency.value,
+			),
+);
+
 const defaultChangeMode = computed(() => {
 	const modes = posStore.cashTenderModes;
 	const configured = modes.find((mode) => mode.mode_of_payment === posStore.cashModeOfPayment);
@@ -993,6 +1020,7 @@ const canSubmit = computed(() => {
 		return canSubmitOutstanding.value;
 	}
 	if (!changeAllocationValid.value) return false;
+	if (cardOverpaid.value > 0) return false;
 	if (!isSplitPayment.value && !selectedMethod.value) return false;
 	return roundCurrency(effectiveTendered.value) >= total;
 });

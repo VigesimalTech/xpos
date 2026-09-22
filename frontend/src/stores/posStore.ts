@@ -59,8 +59,10 @@ export const usePosStore = defineStore("pos", () => {
 		watch(profileName, (name) => setTillIdentity({ posProfile: name || undefined }), { immediate: true });
 	}
 
+	// A user on two POS Profiles may have a different role on each: their rights follow the
+	// profile of the shift that is open.
 	watch(profileName, async (name, prev) => {
-		if (isElectron() || !name || name === prev) return;
+		if (!name || name === prev) return;
 		const { useAuthStore } = await import("@/stores/authStore");
 		await loadPermissions(useAuthStore().userName, name);
 	});
@@ -86,7 +88,13 @@ export const usePosStore = defineStore("pos", () => {
 
 	const foreignTenderModes = computed(() => paymentMethods.value.filter((m) => m.is_foreign_tender));
 
-	const cashTenderModes = computed(() => paymentMethods.value.filter((m) => m.type === "Cash"));
+	// Change comes only out of these. Where a row carries no type (the till's own rows did not),
+	// the profile's cash mode is cash: without it the till could give no change (22 Sep 2026).
+	const cashTenderModes = computed(() =>
+		paymentMethods.value.filter((m) =>
+			m.type ? m.type === "Cash" : m.mode_of_payment === cashModeOfPayment.value,
+		),
+	);
 
 	const allowMixedCurrencyTender = computed(
 		() => !!posProfile.value?.pos_mixed_currency_tender && foreignTenderModes.value.length > 0,
@@ -184,6 +192,11 @@ export const usePosStore = defineStore("pos", () => {
 
 	const allowPurchasing = computed(() => !!posProfile.value?.xpos_allow_purchasing);
 
+	// The POS Profile's Allow Rate Change rules price changes: off, no one changes a price.
+	const allowRateChange = computed(() => !!Number(posProfile.value?.allow_rate_change));
+	// Its Allow Discount Change rules line discounts the same way.
+	const allowDiscountChange = computed(() => !!Number(posProfile.value?.allow_discount_change));
+
 	const fetchCoupon = computed(() => !!posProfile.value?.auto_fetch_coupons_gifts);
 
 	const showTemplateItems = computed(() => !!posProfile.value?.show_template_items);
@@ -253,6 +266,10 @@ export const usePosStore = defineStore("pos", () => {
 				const { useAuthStore } = await import("@/stores/authStore");
 				const authStore = useAuthStore();
 				const currentUser = authStore.userName;
+				// At start the till may ask before it has signed its last cashier back in:
+				// as "Guest" it found no shift and offered a new one. Decide nothing until
+				// the cashier is known; App.vue asks again then (release sweep, 22 Sep 2026).
+				if (!currentUser || currentUser === "Guest") return;
 
 				const result = (await window.electronAPI!.db.checkOpenShift(
 					currentUser,
@@ -359,7 +376,11 @@ export const usePosStore = defineStore("pos", () => {
 	async function fetchOpeningData(): Promise<OpeningData | undefined> {
 		try {
 			if (isElectron()) {
-				const data = (await window.electronAPI!.db.getOpeningData()) as unknown as OpeningData;
+				const { useAuthStore } = await import("@/stores/authStore");
+				// Only the profiles the signed-in user is on, as the web POS asks ERPNext.
+				const data = (await window.electronAPI!.db.getOpeningData(
+					useAuthStore().userName,
+				)) as unknown as OpeningData;
 				openingData.value = data;
 				return data;
 			}
@@ -641,6 +662,8 @@ export const usePosStore = defineStore("pos", () => {
 		allowCashDeposit,
 		askForScreens,
 		allowPurchasing,
+		allowRateChange,
+		allowDiscountChange,
 		fetchCoupon,
 		showTemplateItems,
 		hideVariantsItems,

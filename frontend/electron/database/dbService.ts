@@ -242,6 +242,7 @@ async function runMigrations(): Promise<void> {
 
 	const posProfileMigrations: [string, string][] = [
 		["allow_rate_change", "TINYINT(1) NOT NULL DEFAULT 0"],
+		["allow_discount_change", "TINYINT(1) NOT NULL DEFAULT 0"],
 		["allow_change_posting_date", "TINYINT(1) NOT NULL DEFAULT 0"],
 		["hide_images", "TINYINT(1) NOT NULL DEFAULT 0"],
 		["hide_unavailable_items", "TINYINT(1) NOT NULL DEFAULT 0"],
@@ -282,6 +283,9 @@ async function runMigrations(): Promise<void> {
 		// K27: what a cashier sees of the screens their role lacks, and whether purchasing is on.
 		["xpos_screen_access", "VARCHAR(40) DEFAULT 'Hide'"],
 		["xpos_allow_purchasing", "TINYINT(1) DEFAULT 0"],
+		// What may go out of the drawer on the till (cashOutGuard.ts).
+		["cash_movement_max_amount", "DECIMAL(18,6) DEFAULT 0"],
+		["xpos_cash_out_within_drawer", "TINYINT(1) DEFAULT 1"],
 		["pos_mixed_currency_tender", "TINYINT(1) DEFAULT 0"],
 		["print_backup_receipt", "TINYINT(1) DEFAULT 0"],
 		["require_cash_movement_remarks", "TINYINT(1) DEFAULT 0"],
@@ -368,6 +372,10 @@ async function runMigrations(): Promise<void> {
 		["barcode_printer", "TINYINT(1) DEFAULT 0"],
 		["price_checker", "TINYINT(1) DEFAULT 0"],
 		["purchasing", "TINYINT(1) DEFAULT 0"],
+		// Every POS Profile the user is on (JSON list): the only ones a shift may open on.
+		["pos_profiles", "TEXT DEFAULT NULL"],
+		// Per POS Profile, the user's role, discount limit, PIN and permissions (profileAccess.ts).
+		["profile_access", "LONGTEXT DEFAULT NULL"],
 		// Till PIN: hash and salt come from ERPNext (xpos.api.pin); the lockout is local.
 		["pin_hash", "VARCHAR(255) DEFAULT NULL"],
 		["pin_salt", "VARCHAR(64) DEFAULT NULL"],

@@ -108,20 +108,47 @@ function stripHtml(value: string): string {
  */
 export async function refreshCsrfToken(): Promise<string | null> {
 	try {
-		const response = await fetch(`${getApiBaseUrlSync()}/api/method/xpos.api.auth.get_csrf_token`, {
-			method: "GET",
-			headers: { Accept: "application/json" },
-			credentials: isElectron() ? "include" : "same-origin",
-			cache: "no-store",
-		});
+		const { response, body } = await fetchWithin(
+			`${getApiBaseUrlSync()}/api/method/xpos.api.auth.get_csrf_token`,
+			{
+				method: "GET",
+				headers: { Accept: "application/json" },
+				credentials: isElectron() ? "include" : "same-origin",
+				cache: "no-store",
+			},
+			(r) => (r.ok ? r.json() : Promise.resolve(null)),
+		);
 		if (!response.ok) return null;
-		const token = (await response.json())?.message;
+		const token = body?.message;
 		if (typeof token !== "string" || !token) return null;
 		window.xpos = window.xpos || ({} as XPosGlobal);
 		window.xpos.csrf_token = token;
 		return token;
 	} catch {
 		return null;
+	}
+}
+
+/**
+ * How long a call to ERPNext may take before it counts as offline. A connection that is
+ * taken and never answered (a dead Wi-Fi link) otherwise left the screen waiting forever.
+ */
+export const REQUEST_TIMEOUT_MS = 30_000;
+
+/** fetch with a time limit: the body is read inside it too, since that can hang as well. */
+async function fetchWithin<T>(
+	url: string,
+	init: RequestInit,
+	read: (r: Response) => Promise<T>,
+	ms = REQUEST_TIMEOUT_MS,
+) {
+	const controller = new AbortController();
+	const timer = setTimeout(() => controller.abort(), ms);
+	try {
+		const response = await fetch(url, { ...init, signal: controller.signal });
+		return { response, body: await read(response) };
+	} finally {
+		clearTimeout(timer);
 	}
 }
 
@@ -161,19 +188,25 @@ async function postMethod(
 	const baseUrl = getApiBaseUrlSync();
 	const url = `${baseUrl}/api/method/${method}`;
 
-	let response: Response;
+	// No answer in time counts as offline, which every caller already handles.
+	let result: { response: Response; body: Record<string, any> };
 	try {
-		response = await fetch(url, {
-			method: "POST",
-			headers,
-			body: JSON.stringify(args),
-			credentials: isElectron() ? "include" : "same-origin",
-		});
+		result = await fetchWithin(
+			url,
+			{
+				method: "POST",
+				headers,
+				body: JSON.stringify(args),
+				credentials: isElectron() ? "include" : "same-origin",
+			},
+			(r) => r.json(),
+		);
 	} catch (fetchError) {
+		if ((fetchError as Error)?.name === "SyntaxError") throw fetchError;
 		throw new Error("__offline__");
 	}
 
-	return { response, data: await response.json() };
+	return { response: result.response, data: result.body };
 }
 
 function handleResponse<T>(

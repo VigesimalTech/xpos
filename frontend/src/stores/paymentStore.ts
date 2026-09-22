@@ -131,7 +131,8 @@ export const usePaymentStore = defineStore("payment", () => {
 			kind === "expense" ? "expense" : "bank_drop",
 			Number(data.amount) || 0,
 		);
-		if (!approval.ok) throw new Error(__("Not recorded: a manager did not approve it."));
+		if (!approval.ok)
+			throw new Error(approval.problem || __("Not recorded: a manager did not approve it."));
 		const record = {
 			to_account: kind === "expense" ? data.expense_account : data.target_account,
 			amount: data.amount,

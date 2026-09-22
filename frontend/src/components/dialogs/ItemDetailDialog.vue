@@ -65,7 +65,7 @@
 							{{ __("Price") }}
 						</label>
 						<NumberInput
-							v-if="canDoOrAsk('allow_change_price')"
+							v-if="posStore.allowRateChange && canDoOrAsk('allow_change_price')"
 							v-model="priceInput"
 							:min="0"
 							:precision="ratePrecision"

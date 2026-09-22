@@ -68,7 +68,11 @@ export interface ElectronAPI {
 	onSyncStatus: (
 		callback: (status: { phase: string; table?: string; progress?: number }) => void,
 	) => () => void;
-	onSyncError: (callback: (error: { message: string; table?: string }) => void) => () => void;
+	onSyncError: (
+		callback: (error: { message: string; table?: string; unreachable?: boolean }) => void,
+	) => () => void;
+	/** Whether ERPNext is answering the till, when that changes. */
+	onSyncReachability?: (callback: (state: { reachable: boolean }) => void) => () => void;
 	onSyncComplete: (callback: (summary: { pulled: number; pushed: number }) => void) => () => void;
 	onSyncDeadLetter: (
 		callback: (info: {
@@ -335,7 +339,8 @@ export interface ElectronDbAPI {
 		itemCode: string,
 		company: string,
 	) => Promise<{ item_tax_template: string; item_tax_map: Record<string, number> } | null>;
-	getPosUser: (username: string) => Promise<Record<string, unknown> | null>;
+	/** As the user stands on `posProfile`, or on the profile of their open shift. */
+	getPosUser: (username: string, posProfile?: string) => Promise<Record<string, unknown> | null>;
 	verifyPassword: (username: string, password: string) => Promise<boolean>;
 	cachePasswordFromServer: (
 		username: string,
@@ -350,7 +355,7 @@ export interface ElectronDbAPI {
 	createPosOpeningShift: (shift: Record<string, unknown>) => Promise<Record<string, unknown>>;
 	getOpenShift: (user: string) => Promise<Record<string, unknown> | null>;
 	checkOpenShift: (user: string) => Promise<Record<string, unknown> | null>;
-	getOpeningData: () => Promise<Record<string, unknown>>;
+	getOpeningData: (user?: string) => Promise<Record<string, unknown>>;
 	getCountries: () => Promise<Record<string, unknown>[]>;
 	getCurrencies: () => Promise<Record<string, unknown>[]>;
 	clearCachedData: () => Promise<boolean>;

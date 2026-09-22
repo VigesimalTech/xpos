@@ -43,7 +43,7 @@ const site: Site = configPath
 const CASHIER = "rt-cashier@example.com"; // on the first shop, limit 10%
 const OTHER_SHOP_CASHIER = "rt-other@example.com"; // on the second shop only, limit 0
 const SUPERVISOR = "rt-supervisor@example.com"; // Manager on the first shop, limit 30%
-const BOTH_SHOPS_CASHIER = "rt-both@example.com"; // Cashier role on both shops: may not approve
+const BOTH_SHOPS_CASHIER = "rt-both@example.com"; // Cashier in the first shop (a Manager in the second): may not approve here
 
 type ServerInvoice = {
 	name: string;
@@ -205,16 +205,18 @@ describe.skipIf(!configPath)("K18: the server checks each sale against the cashi
 		);
 	});
 
-	it("refuses an out-of-policy sale where the POS Profile says Reject, and the till keeps it", async () => {
-		// Limit 0: no discount without a manager.
+	it("books and flags a till's out-of-policy sale where the POS Profile says Reject: it was already paid", async () => {
+		// Limit 0: no discount without a manager. Refusing it would strand money taken at the
+		// till and leave the shift's close short of it (decided 21 Sep 2026).
 		const localId = await ringUpSale(site.pos_profile_2, shop2Shift, OTHER_SHOP_CASHIER, 5);
 
 		await syncAsTill(site.pos_profile_2);
 
 		const local = await localRow(localId);
-		expect(local.status).not.toBe("synced");
-		expect(local.error).toContain("outside the POS Profile's policy");
-		expect(await invoiceFor(localId)).toBeUndefined();
+		expect(local, `sync error: ${local?.error}`).toMatchObject({ status: "synced" });
+		const invoice = await invoiceFor(localId);
+		expect(invoice).toMatchObject({ docstatus: 1 });
+		expect(invoice?.xpos_policy_flags).toContain("already paid at the till");
 	});
 
 	it("accepts a sale within policy on the Reject shop", async () => {
@@ -294,10 +296,12 @@ describe.skipIf(!configPath)("K19: a manager's approval, checked again on the se
 	});
 
 	it("records an expense the cashier's role does not allow, with the manager who approved it", async () => {
+		// One remark per run: a site that has run this before already holds the earlier ones.
+		const remark = `Approved on the till ${Date.now()}`;
 		const approved = await invoke<{ id: number }>("db:create-expense", {
 			to_account: site.expense_account,
 			amount: 5,
-			remarks: "Approved on the till",
+			remarks: remark,
 			user: CASHIER,
 			approved_by: SUPERVISOR,
 			pos_opening_entry_id: shift,
@@ -327,7 +331,7 @@ describe.skipIf(!configPath)("K19: a manager's approval, checked again on the se
 		expect(refused.sync_status).not.toBe("synced");
 		expect(refused.error).toContain("not permitted to record");
 
-		const filters = encodeURIComponent(JSON.stringify([["remarks", "=", "Approved on the till"]]));
+		const filters = encodeURIComponent(JSON.stringify([["remarks", "=", remark]]));
 		const fields = encodeURIComponent(JSON.stringify(["name", "user", "approved_by"]));
 		const res = await fetch(
 			`${site.url}/api/resource/POS Cash Movement?filters=${filters}&fields=${fields}`,

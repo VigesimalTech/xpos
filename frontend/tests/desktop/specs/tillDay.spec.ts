@@ -8,6 +8,7 @@
  */
 import { expect, test, type Page } from "@playwright/test";
 import {
+	databaseRelay,
 	erpList,
 	eventually,
 	launchTill,
@@ -17,6 +18,7 @@ import {
 	signIn,
 	site,
 	tillDb,
+	type DatabaseRelay,
 	type Till,
 } from "../support/till";
 
@@ -25,6 +27,9 @@ test.skip(!site, "needs a seeded site: XPOS_RT_CONFIG and XPOS_RT_URL (see tests
 
 let till: Till;
 let page: Page;
+/** Relays a restarted till's database goes through: kept open until the till closes. */
+const relays: DatabaseRelay[] = [];
+const tillProfile = newProfile();
 /** Requests that went somewhere other than the till's ERPNext: the setup must reach every one. */
 const strayRequests: string[] = [];
 
@@ -37,17 +42,22 @@ async function addItem(name: string) {
 	await expect(page.locator("[data-cart-index]").filter({ visible: true })).toHaveCount(1);
 }
 
-test.beforeAll(async () => {
-	till = await launchTill(newProfile());
-	page = till.page;
+function watchRequests() {
 	page.on("request", (request) => {
 		const url = request.url();
 		if (url.startsWith("http") && !url.startsWith(site!.url)) strayRequests.push(url);
 	});
+}
+
+test.beforeAll(async () => {
+	till = await launchTill(tillProfile);
+	page = till.page;
+	watchRequests();
 });
 
 test.afterAll(async () => {
 	await till?.close();
+	for (const relay of relays) await relay.stop();
 });
 
 test("a new till is set up and a cashier signs in with their ERPNext password", async () => {
@@ -57,19 +67,67 @@ test("a new till is set up and a cashier signs in with their ERPNext password", 
 });
 
 test("the cashier opens a shift on their POS Profile", async () => {
-	await page.getByText("Select...").click();
-	await page.getByRole("option", { name: `${site!.pos_profile} (${site!.company})` }).click();
+	// Only the user's own profiles are offered; with one, it is already chosen.
+	const profile = `${site!.pos_profile} (${site!.company})`;
+	await expect(page.getByText(profile).or(page.getByText("Select...")).first()).toBeVisible();
+	if (await page.getByText("Select...").isVisible()) {
+		await page.getByText("Select...").click();
+		await page.getByRole("option", { name: profile }).click();
+	}
 	await page.getByRole("button", { name: "Open Shift" }).click();
 	await expect(page.getByText(site!.customer).first()).toBeVisible();
 });
 
+test("restarted mid-shift, the till comes back to its shift, every time", async () => {
+	// A crash or a power cut. The till reopens signed in as the last cashier, or at sign-in;
+	// either way it must find the shift still open, not ask for a new one. It asked whenever
+	// its database answered a moment late, as after a power cut: the shift was looked up
+	// before the cashier was known (bug hunt, release sweep, 22 Sep 2026).
+	for (const databaseLate of [false, true, false]) {
+		await till.close();
+		const relay = databaseLate ? await databaseRelay() : null;
+		till = await launchTill(tillProfile, { fresh: false, dbPort: relay?.port });
+		page = till.page;
+		watchRequests();
+		if (relay) {
+			await page.waitForTimeout(2000);
+			await relay.start();
+			relays.push(relay);
+		}
+		// The sale screen: its cart names the customer (a hidden layout has a copy too).
+		const pos = page.getByText(site!.customer).filter({ visible: true }).first();
+		const openShift = page.getByText("Open your shift to get started");
+		const signInScreen = page
+			.getByText("Use password instead")
+			.or(page.getByPlaceholder("Enter your password"));
+		await expect(pos.or(signInScreen).or(openShift).first()).toBeVisible({ timeout: 30_000 });
+		if (await signInScreen.first().isVisible()) {
+			await signIn(page, site!.supervisor, site!.cashier_password);
+		}
+		await expect(pos, `database late: ${databaseLate}`).toBeVisible({ timeout: 30_000 });
+		await expect(openShift).not.toBeVisible();
+	}
+});
+
 let saleLocalId = "";
 
-test("a cash sale prints its receipt on the till and reaches ERPNext", async () => {
+test("a cash sale with change prints its receipt on the till and reaches ERPNext", async () => {
 	await addItem("Round-trip Item");
 	await page.getByRole("button", { name: /^Pay/ }).click();
 	const dialog = page.getByRole("dialog");
 	await expect(dialog.getByText("Amount Due")).toBeVisible();
+	// More cash than is due: the till gives the rest back. It refused, calling the cash a
+	// card overpayment, when its payment rows carried no type (release sweep, 22 Sep 2026).
+	const change = 50;
+	const tendered = dialog
+		.getByText("Tendered", { exact: true })
+		.locator("xpath=../..")
+		.locator("input")
+		.first();
+	await tendered.fill(String(site!.rate + change));
+	await expect(dialog.getByText("Change", { exact: true })).toBeVisible();
+	await expect(dialog.getByText(/50\.00/).first()).toBeVisible();
+	await expect(dialog.getByTestId("card-overpaid")).toHaveCount(0);
 	await dialog.getByRole("button", { name: /Save & Print/ }).click();
 	await expect(dialog).toBeHidden();
 
@@ -83,11 +141,16 @@ test("a cash sale prints its receipt on the till and reaches ERPNext", async () 
 	const [invoice] = await eventually(
 		page,
 		async () => {
-			const rows = await erpList<{ name: string; grand_total: number; docstatus: number }>(
+			const rows = await erpList<{
+				name: string;
+				grand_total: number;
+				docstatus: number;
+				change_amount: number;
+			}>(
 				site!,
 				"Sales Invoice",
 				[["xpos_local_id", "=", saleLocalId]],
-				["name", "grand_total", "docstatus"],
+				["name", "grand_total", "docstatus", "change_amount"],
 			);
 			return rows.length ? rows : null;
 		},
@@ -95,6 +158,7 @@ test("a cash sale prints its receipt on the till and reaches ERPNext", async () 
 	);
 	expect(invoice.docstatus).toBe(1);
 	expect(invoice.grand_total).toBe(site!.rate);
+	expect(invoice.change_amount).toBe(change);
 });
 
 test("a held order is kept on the till, not sent, and restored into the cart", async () => {
@@ -203,6 +267,9 @@ test("the shift closes on the till, its summary prints on the till, and ERPNext 
 });
 
 test("after setup, the till talked to no server but its own ERPNext", async () => {
-	// The branding request fires before the wizard, when there is no server yet.
-	expect(strayRequests.filter((url) => !url.includes("get_xpos_branding"))).toEqual([]);
+	// The branding request fires before the wizard, when there is no server yet. The till's
+	// fonts come from Google Fonts, allowed by its CSP (index.electron.html).
+	const allowed = (url: string) =>
+		url.includes("get_xpos_branding") || /^https:\/\/fonts\.(googleapis|gstatic)\.com\//.test(url);
+	expect(strayRequests.filter((url) => !allowed(url))).toEqual([]);
 });

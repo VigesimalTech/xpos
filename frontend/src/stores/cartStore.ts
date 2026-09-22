@@ -227,7 +227,8 @@ export const useCartStore = defineStore("cart", () => {
 		}, 0),
 	);
 
-	const calculatedTaxes = computed(() => {
+	/** The taxes before the cart's own discount; `onNet` marks those charged at a rate. */
+	const preDiscountTaxes = computed(() => {
 		const posStore = usePosStore();
 		const taxDetails = posStore.taxes || [];
 		const taxInclusive = posStore.taxInclusiveMode;
@@ -249,10 +250,14 @@ export const useCartStore = defineStore("cart", () => {
 
 		if (itemNets.length === 0) return [];
 
-		const result: CalculatedTax[] = [];
+		const result: (CalculatedTax & { onNet: boolean })[] = [];
 
 		for (const tax of taxDetails) {
-			const isIncluded = tax.included_in_print_rate === 1;
+			// As ERPNext books it (invoice_processing/creation.py): included exactly when the POS
+			// Profile is tax inclusive, whatever the template's own flag, and an Actual charge
+			// never. By the flag, an inclusive profile was charged the VAT on top (release
+			// sweep, 22 Sep 2026).
+			const isIncluded = taxInclusive && tax.charge_type !== "Actual";
 			let totalTaxAmount = 0;
 
 			for (const { net, taxMap } of itemNets) {
@@ -262,9 +267,9 @@ export const useCartStore = defineStore("cart", () => {
 				}
 
 				if (tax.charge_type === "On Net Total") {
-					if (taxInclusive && isIncluded) {
+					if (isIncluded) {
 						totalTaxAmount += (net * effectiveRate) / (100 + effectiveRate);
-					} else if (!isIncluded) {
+					} else {
 						totalTaxAmount += (net * effectiveRate) / 100;
 					}
 				}
@@ -278,8 +283,9 @@ export const useCartStore = defineStore("cart", () => {
 				result.push({
 					description: tax.description || "Tax",
 					rate: tax.rate,
-					amount: Math.round(totalTaxAmount * 100) / 100,
+					amount: totalTaxAmount,
 					included_in_print_rate: isIncluded,
+					onNet: tax.charge_type === "On Net Total",
 				});
 			}
 		}
@@ -302,13 +308,49 @@ export const useCartStore = defineStore("cart", () => {
 				result.push({
 					description: desc,
 					rate: 0,
-					amount: Math.round(amount * 100) / 100,
+					amount,
 					included_in_print_rate: false,
+					onNet: true,
 				});
 			}
 		}
 
 		return result;
+	});
+
+	/**
+	 * The cart's own discount as ERPNext applies it (taxes_and_totals.apply_discount_amount):
+	 * taken from the net total, or from the grand total less fixed-amount taxes, it lowers every
+	 * line's net amount by the same factor, and the taxes charged at a rate with it. The till
+	 * took tax on the undiscounted net: the VAT it printed was not the VAT ERPNext booked, and
+	 * with the discount on the net total it charged more than ERPNext's total (bug hunt).
+	 */
+	const cartDiscountFactor = computed(() => {
+		const pre = preDiscountTaxes.value;
+		const rateTaxAdded = pre
+			.filter((t) => t.onNet && !t.included_in_print_rate)
+			.reduce((sum, t) => sum + t.amount, 0);
+		const includedTax = pre.filter((t) => t.included_in_print_rate).reduce((sum, t) => sum + t.amount, 0);
+		const base =
+			applyDiscountOn.value === "Net Total"
+				? subtotal.value - includedTax
+				: subtotal.value + rateTaxAdded;
+		const amount =
+			discountPercentage.value > 0
+				? (base * discountPercentage.value) / 100
+				: discountAmount.value > 0
+					? discountAmount.value
+					: 0;
+		if (!amount || base <= 0) return 1;
+		return Math.max(0, 1 - amount / base);
+	});
+
+	const calculatedTaxes = computed<CalculatedTax[]>(() => {
+		const f = cartDiscountFactor.value;
+		return preDiscountTaxes.value.map(({ onNet, ...tax }) => ({
+			...tax,
+			amount: Math.round((onNet ? tax.amount * f : tax.amount) * 100) / 100,
+		}));
 	});
 
 	const taxAmount = computed(() => {
@@ -329,7 +371,8 @@ export const useCartStore = defineStore("cart", () => {
 
 	const grandTotal = computed(() => {
 		const posStore = usePosStore();
-		let total = subtotal.value + taxAmount.value;
+		// The cart's discount lowers the lines by cartDiscountFactor, and the taxes with them.
+		let total = subtotal.value * cartDiscountFactor.value + taxAmount.value;
 
 		// Apply offer item-level discounts
 		if (offerItemDiscountTotal.value > 0) {
@@ -341,12 +384,6 @@ export const useCartStore = defineStore("cart", () => {
 			total -= (total * offerGrandTotalDiscountPct.value) / 100;
 		}
 
-		if (discountPercentage.value > 0) {
-			const base = applyDiscountOn.value === "Net Total" ? subtotal.value : total;
-			total -= (base * discountPercentage.value) / 100;
-		} else if (discountAmount.value > 0) {
-			total -= discountAmount.value;
-		}
 		if (!isReturnMode.value && redeemLoyaltyPoints.value && loyaltyAmount.value > 0) {
 			total -= loyaltyAmount.value;
 		}
@@ -1779,7 +1816,10 @@ export const useCartStore = defineStore("cart", () => {
 		});
 
 		const itemDiscountTotal = snapshotItems.reduce((sum, it) => sum + (it.discount_amount || 0), 0);
-		const totalDiscount = Math.round((itemDiscountTotal + (discountAmount.value || 0)) * 100) / 100;
+		// The cart's discount as it comes off the lines (cartDiscountFactor), as ERPNext books it.
+		const f = cartDiscountFactor.value;
+		const cartDiscountOffLines = subtotal.value * (1 - f);
+		const totalDiscount = Math.round((itemDiscountTotal + cartDiscountOffLines) * 100) / 100;
 		const totalQty = items.value.reduce((sum: number, item: CartItem) => sum + item.qty, 0);
 		const paid = totalPayments.value;
 		const change = paid - grandTotal.value;
@@ -1814,7 +1854,9 @@ export const useCartStore = defineStore("cart", () => {
 				})),
 			subtotal: Math.round(subtotal.value * 100) / 100,
 			total_discount: totalDiscount,
-			net_total: Math.round((subtotal.value + includedTaxAmount.value) * 100) / 100,
+			// Without the VAT included in the prices, as ERPNext books it (it added it: 104.75
+			// for a 99.99 sale with 4.76 VAT in it; release sweep, 22 Sep 2026).
+			net_total: Math.round((subtotal.value * f - includedTaxAmount.value) * 100) / 100,
 			grand_total: grandTotal.value,
 			total_qty: totalQty,
 			change: change > 0.01 && !isReturnMode.value ? Math.round(change * 100) / 100 : 0,

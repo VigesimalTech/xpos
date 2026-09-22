@@ -122,6 +122,19 @@ export function buildReceiptHtml(snapshot: ReceiptSnapshot, ctx: ReceiptContext)
         </div>`
 			: "";
 
+	// What rounding the total took off or added, so the receipt adds up line by line. The net
+	// is without every tax, included in the prices or not.
+	const allTaxes = (snapshot.taxes || []).reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+	const rounding = Math.abs(snapshot.grand_total) - (Math.abs(snapshot.net_total) + Math.abs(allTaxes));
+	const roundingRow =
+		Math.abs(rounding) > 0.001 && Math.abs(rounding) < 1
+			? `
+        <div class="total-row">
+            <span class="total-label">Rounding</span>
+            <span class="total-value">${rounding < 0 ? "-" : ""}${money(Math.abs(rounding))}</span>
+        </div>`
+			: "";
+
 	const paymentRowHtml = (p: ReceiptSnapshot["payments"][number]) => {
 		const isForeign = !!p.currency && p.currency !== currency && p.native_amount !== undefined;
 		const headline = isForeign
@@ -266,6 +279,7 @@ export function buildReceiptHtml(snapshot: ReceiptSnapshot, ctx: ReceiptContext)
         ${discountRow}
         ${netTotalRow}
         ${taxesHtml}
+        ${roundingRow}
         <hr class="div-solid">
         <div class="total-row highlight">
             <span class="total-label">${isReturn ? "REFUND" : "TOTAL"}</span>

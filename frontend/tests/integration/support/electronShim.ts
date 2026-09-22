@@ -31,6 +31,7 @@ class ShimResponse extends EventEmitter {
 class ShimRequest extends EventEmitter {
 	private headers: Record<string, string> = {};
 	private chunks: string[] = [];
+	private req: http.ClientRequest | null = null;
 
 	constructor(private options: { method?: string; url: string }) {
 		super();
@@ -55,11 +56,22 @@ class ShimRequest extends EventEmitter {
 				this.emit("response", response);
 				res.on("data", (chunk: Buffer) => response.emit("data", chunk));
 				res.on("end", () => response.emit("end"));
+				// As Electron's: an answer cut short is an error on the response.
+				res.on("aborted", () =>
+					response.emit("error", new Error("net::ERR_CONTENT_LENGTH_MISMATCH")),
+				);
 			},
 		);
 		req.on("error", (err) => this.emit("error", err));
 		for (const chunk of this.chunks) req.write(chunk);
 		req.end();
+		this.req = req;
+	}
+
+	/** As Electron's: stop the request; emits "abort", not "error". */
+	abort(): void {
+		this.req?.destroy();
+		this.emit("abort");
 	}
 }
 

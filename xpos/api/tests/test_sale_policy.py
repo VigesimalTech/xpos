@@ -159,3 +159,134 @@ class TestResolveCashier(unittest.TestCase):
 		self.signed_in_with("token key:secret")
 		cashier = self.sale_policy.resolve_cashier({"pos_opening_shift": "SHIFT-1"})
 		self.assertEqual(cashier, "shift-cashier@example.com")
+
+
+class TestRejectOnlyWhatIsNotPaidYet(unittest.TestCase):
+	"""Reject stops a sale being made on the web POS. A sale with a till's local id was paid
+	at the till before ERPNext saw it: it is booked and flagged, not refused (21 Sep 2026)."""
+
+	def run_policy(self, local_id):
+		from unittest.mock import patch
+
+		from xpos.api import sale_policy
+
+		doc = {"xpos_local_id": local_id}
+
+		class Doc(dict):
+			def get(self, key, default=None):
+				return dict.get(self, key, default)
+
+			def __setattr__(self, key, value):
+				self[key] = value
+
+		invoice = Doc(doc)
+		pos = {"xpos_out_of_policy_action": "Reject"}
+		with (
+			patch.object(sale_policy, "resolve_cashier", return_value="cashier@example.com"),
+			patch.object(sale_policy, "check_sale_policy", return_value=["Discount 5% is over the limit."]),
+			patch("xpos.api.approval.resolve_approver", return_value=None),
+		):
+			sale_policy.apply_sale_policy(invoice, {}, pos)
+		return invoice
+
+	def test_a_web_sale_being_made_is_refused(self):
+		from unittest.mock import patch
+
+		import frappe
+
+		with patch.object(frappe, "throw", side_effect=RuntimeError("refused"), create=True):
+			with self.assertRaises(RuntimeError):
+				self.run_policy(None)
+
+	def test_a_sale_paid_at_the_till_is_booked_and_flagged(self):
+		invoice = self.run_policy("inv_1")
+		self.assertIn("Discount 5% is over the limit.", invoice["xpos_policy_flags"])
+		self.assertIn("already paid at the till", invoice["xpos_policy_flags"])
+
+
+class TestTheProfileRulesPriceChanges(unittest.TestCase):
+	"""The POS Profile's Allow Rate Change rules: off, a changed price is flagged whatever
+	the role allows; on, the Change Price permission decides (22 Sep 2026)."""
+
+	def flags(self, rights, allows):
+		return policy_exceptions(
+			sale([line(rate=80.0)]),
+			cashier="cashier@example.com",
+			pos_profile="Shop 1",
+			on_profile=True,
+			rights=rights,
+			discount_limit=100,
+			list_prices=PRICES,
+			profile_allows_rate_change=allows,
+		)
+
+	def test_off_flags_even_with_the_permission(self):
+		self.assertTrue(any("does not allow rate changes" in f for f in self.flags(ALL_RIGHTS, False)))
+
+	def test_on_the_permission_decides(self):
+		self.assertFalse(any("price changed" in f for f in self.flags(ALL_RIGHTS, True)))
+		self.assertTrue(any("Change Price permission" in f for f in self.flags(NO_RIGHTS, True)))
+
+
+class TestTheProfileRulesLineDiscounts(unittest.TestCase):
+	"""The POS Profile's Allow Discount Change rules line discounts as Allow Rate Change rules
+	prices: off, a line discount is flagged whatever the role allows; on, the Edit Discount
+	permission decides (22 Sep 2026)."""
+
+	def flags(self, rights, allows, **disc):
+		return policy_exceptions(
+			sale([line(**disc)]),
+			cashier="cashier@example.com",
+			pos_profile="Shop 1",
+			on_profile=True,
+			rights=rights,
+			discount_limit=100,
+			list_prices=PRICES,
+			profile_allows_discount_change=allows,
+		)
+
+	def test_off_flags_a_percentage_or_an_amount_even_with_the_permission(self):
+		for disc in ({"discount_percentage": 5}, {"discount_amount": 5.0}):
+			self.assertTrue(
+				any("does not allow discount changes" in f for f in self.flags(ALL_RIGHTS, False, **disc)),
+				disc,
+			)
+
+	def test_on_the_permission_decides(self):
+		self.assertFalse(
+			any("discount given" in f for f in self.flags(ALL_RIGHTS, True, discount_percentage=5))
+		)
+		self.assertTrue(
+			any("Edit Discount permission" in f for f in self.flags(NO_RIGHTS, True, discount_percentage=5))
+		)
+
+	def test_off_leaves_a_line_without_a_discount_alone(self):
+		self.assertFalse(any("discount" in f for f in self.flags(ALL_RIGHTS, False)))
+
+
+class TestAllowDiscountChangeOnForExistingProfiles(unittest.TestCase):
+	"""ERPNext leaves Allow Discount Change off and X POS ignored it, so the upgrade switches
+	it on once for every profile; new profiles default to on."""
+
+	def test_the_patch_switches_it_on_where_it_is_off(self):
+		from unittest.mock import patch
+
+		from xpos.patches import allow_discount_change_on
+
+		with patch.object(allow_discount_change_on.frappe.db, "sql") as sql:
+			allow_discount_change_on.execute()
+		query = sql.call_args[0][0]
+		self.assertIn("SET `allow_discount_change` = 1", query)
+		self.assertIn("IFNULL(`allow_discount_change`, 0) = 0", query)
+
+	def test_new_profiles_default_to_on(self):
+		import json
+		import os
+
+		path = os.path.join(os.path.dirname(__file__), "..", "..", "x_pos", "custom", "pos_profile.json")
+		with open(path) as f:
+			setters = json.load(f)["property_setters"]
+		self.assertIn(
+			("allow_discount_change", "default", "1"),
+			[(s["field_name"], s["property"], s["value"]) for s in setters],
+		)

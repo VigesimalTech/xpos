@@ -3,16 +3,15 @@ import frappe
 
 def execute():
 	"""Post change amount as its own ledger entry, and audit currency-tagged payment modes."""
-	settings = frappe.get_single("POS Settings")
-	if settings.post_change_gl_entries:
-		print("POS Settings.post_change_gl_entries already enabled")
-	else:
-		settings.post_change_gl_entries = 1
-		settings.save(ignore_permissions=True)
+	from xpos.install import enable_change_gl_entries
+
+	if enable_change_gl_entries():
 		print(
 			"Enabled POS Settings.post_change_gl_entries so change posts its own ledger entry. "
-			"This is required for mixed-currency cash tender to post correctly."
+			"This is required for cash sales that give change to post correctly."
 		)
+	else:
+		print("POS Settings.post_change_gl_entries already enabled")
 
 	_audit_tender_modes()
 

@@ -61,6 +61,21 @@ DEFAULT_ROLES = (
 def after_install():
 	seed_pos_permissions()
 	seed_default_roles()
+	enable_change_gl_entries()
+
+
+def enable_change_gl_entries() -> bool:
+	"""Post change as its own ledger entry (POS Settings). Returns whether it was off.
+
+	Without it, a cash sale that gives change is refused by ERPNext (tender.py's
+	validate_change_gl_safety). It was only set by a patch, and a fresh install marks the
+	patches it ships with as done without running them: on a new site every such sale was
+	refused (bug hunt, 22 Sep 2026). So it is set here too.
+	"""
+	if frappe.db.get_single_value("POS Settings", "post_change_gl_entries"):
+		return False
+	frappe.db.set_single_value("POS Settings", "post_change_gl_entries", 1)
+	return True
 
 
 def seed_pos_permissions(only=None):

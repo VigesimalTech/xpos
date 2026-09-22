@@ -5,10 +5,18 @@
  */
 import { __ } from "@/lib/translate";
 import { ensureAllowed } from "@/services/ensureAllowed";
+import { cashOutProblem } from "@/services/cashOutGuard";
 
 export type CashMovementKind = "expense" | "bank_drop";
 
-export function approveCashMovement(kind: CashMovementKind, amount: number) {
+export async function approveCashMovement(
+	kind: CashMovementKind,
+	amount: number,
+): Promise<{ ok: boolean; approvedBy?: string; problem?: string }> {
+	// Limits first: no one, manager or not, hands out more than the profile or the drawer
+	// allows. `problem` says why, for the caller to show.
+	const problem = await cashOutProblem(amount);
+	if (problem) return { ok: false, problem };
 	const what =
 		kind === "expense"
 			? __("An expense of {0}", [String(amount)])

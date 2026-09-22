@@ -87,6 +87,25 @@ export function tenderBaseTotal(legs: TenderLeg[], invoiceCurrency: string): num
 	);
 }
 
+/**
+ * How far card, transfer and other non-cash tender goes beyond the amount due. Change only
+ * comes out of cash: the till gave cash change against a card payment, ERPNext refused the
+ * sale ("change of 0 is due") and the drawer was short (bug hunt). Must be 0 to save.
+ */
+export function nonCashExcess(
+	legs: TenderLeg[],
+	due: number,
+	isCash: (mode: string) => boolean,
+	invoiceCurrency: string,
+): number {
+	const nonCash = tenderBaseTotal(
+		legs.filter((leg) => !isCash(leg.mode_of_payment)),
+		invoiceCurrency,
+	);
+	const excess = roundFor(invoiceCurrency, nonCash - Math.abs(due));
+	return excess >= minorUnitFor(invoiceCurrency) ? excess : 0;
+}
+
 export interface CurrencyGroup {
 	currency: string;
 	native: number;

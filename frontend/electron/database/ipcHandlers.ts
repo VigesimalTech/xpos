@@ -7,6 +7,9 @@
  */
 
 import { ipcMain, net } from "electron";
+import { shiftPricing, shiftStockSettings } from "./shiftTaxes";
+import { refusedOf } from "./refusedSales";
+import { profilesForUser, type PosUserProfiles } from "./openingProfiles";
 import {
 	query,
 	queryOne,
@@ -23,12 +26,14 @@ import {
 import { createLogger } from "../logger";
 import { recordPinFailure } from "../audit/auditLog";
 import {
+	countWaitingSales,
 	isHeldOrderData,
 	parseJsonColumn,
 	saleFromPending,
 	shiftOfSale,
 	summarizeShift,
 } from "./shiftSummary";
+import { onProfile, pinsOf } from "./profileAccess";
 
 const log = createLogger("DB-IPC");
 
@@ -106,25 +111,34 @@ export async function checkTillPin(username: string, pin: string): Promise<PinRe
 		enabled: number;
 		pin_hash: string | null;
 		pin_salt: string | null;
+		profile_access: string | null;
 		pin_failures: number | null;
 		locked: number;
 		pin_locked_until: Date | string | null;
 	}>(
-		`SELECT \`name\`, \`enabled\`, \`pin_hash\`, \`pin_salt\`, \`pin_failures\`, \`pin_locked_until\`,
-                COALESCE(\`pin_locked_until\` > NOW(), 0) AS \`locked\`
+		`SELECT \`name\`, \`enabled\`, \`pin_hash\`, \`pin_salt\`, \`profile_access\`, \`pin_failures\`,
+                \`pin_locked_until\`, COALESCE(\`pin_locked_until\` > NOW(), 0) AS \`locked\`
            FROM \`pos_users\` WHERE \`username\` = ? OR \`name\` = ?`,
 		[username, username],
 	);
 	if (!row) return { ok: false, reason: "unknown_user" };
 	if (!row.enabled) return { ok: false, reason: "disabled" };
-	// No salt means no PIN: never fall back to the legacy unsalted password check.
-	if (!row.pin_hash || !row.pin_salt) return { ok: false, reason: "no_pin" };
+	// No salt means no PIN: never fall back to the legacy unsalted password check. A PIN set
+	// on any of the user's POS Profiles is theirs (profileAccess.ts).
+	const pins = pinsOf(row);
+	if (!pins.length) return { ok: false, reason: "no_pin" };
 	if (Number(row.locked)) {
 		return { ok: false, reason: "locked", lockedUntil: String(row.pin_locked_until) };
 	}
 
 	const { verifyPassword } = await import("./passwordHash");
-	const { valid } = await verifyPassword(String(pin ?? ""), row.pin_hash, row.pin_salt);
+	let valid = false;
+	for (const { hash, salt } of pins) {
+		if ((await verifyPassword(String(pin ?? ""), hash, salt)).valid) {
+			valid = true;
+			break;
+		}
+	}
 	if (valid) {
 		await execute(
 			"UPDATE `pos_users` SET `pin_failures` = 0, `pin_locked_until` = NULL WHERE `name` = ?",
@@ -452,12 +466,14 @@ export function registerDbHandlers(): void {
 		return true;
 	});
 
-	ipcMain.handle("db:count-pending-invoices", async () => {
-		const row = await queryOne<{ cnt: number }>(
-			"SELECT COUNT(*) as cnt FROM `pending_invoices` WHERE `status` IN ('pending','failed')",
-		);
-		return row?.cnt ?? 0;
-	});
+	// The offline pill's "N sales waiting": held orders wait too, but are not sales yet.
+	ipcMain.handle("db:count-pending-invoices", async () =>
+		countWaitingSales(
+			await query<{ data: unknown }>(
+				"SELECT `data` FROM `pending_invoices` WHERE `status` IN ('pending','failed')",
+			),
+		),
+	);
 
 	ipcMain.handle(
 		"db:add-pending-purchase",
@@ -899,8 +915,22 @@ export function registerDbHandlers(): void {
 		return query("SELECT * FROM `pos_users` ORDER BY `full_name`");
 	});
 
-	ipcMain.handle("db:get-pos-user", async (_e, username: string) => {
-		return queryOne("SELECT * FROM `pos_users` WHERE `username` = ? OR `name` = ?", [username, username]);
+	// As the user stands on `posProfile`, or else on the profile of their open shift here.
+	ipcMain.handle("db:get-pos-user", async (_e, username: string, posProfile?: string) => {
+		const row = await queryOne<Record<string, unknown>>(
+			"SELECT * FROM `pos_users` WHERE `username` = ? OR `name` = ?",
+			[username, username],
+		);
+		if (!row) return row;
+		const profile =
+			posProfile ||
+			(
+				await queryOne<{ pos_profile: string }>(
+					"SELECT `pos_profile` FROM `pos_opening_shifts` WHERE `user` = ? AND `status` = 'Open' ORDER BY `id` DESC LIMIT 1",
+					[row.name],
+				)
+			)?.pos_profile;
+		return onProfile(row, profile);
 	});
 
 	ipcMain.handle("db:upsert-pos-users", async (_e, rows: Record<string, unknown>[]) => {
@@ -1163,7 +1193,12 @@ export function registerDbHandlers(): void {
 		const profileData = profile || { name: posProfileName, company: shift.company, disabled: 0 };
 
 		const payments = await query<Record<string, unknown>>(
-			"SELECT `mode_of_payment`, `default` FROM `pos_payment_methods` WHERE `parent` = ?",
+			// With the Mode of Payment's type, as ERPNext gives the web POS: change comes only
+			// out of cash, and without it no method was cash (release sweep, 22 Sep 2026).
+			`SELECT pm.\`mode_of_payment\`, pm.\`default\`, mop.\`type\`
+					   FROM \`pos_payment_methods\` pm
+					   LEFT JOIN \`modes_of_payment\` mop ON mop.\`name\` = pm.\`mode_of_payment\`
+					  WHERE pm.\`parent\` = ?`,
 			[posProfileName],
 		);
 		const profileWithPayments = { ...profileData, payments };
@@ -1198,24 +1233,44 @@ export function registerDbHandlers(): void {
 				company_name: companyName,
 				default_currency: (profileData.currency as string) || "",
 			},
-			stock_settings: {},
-			taxes: [],
-			tax_inclusive: false,
-			disable_rounded_total: false,
+			stock_settings: shiftStockSettings(await getMeta("erp_settings")),
+			// Priced as ERPNext prices it (shiftTaxes.ts), not without tax.
+			...shiftPricing(
+				profileData,
+				profileData.taxes_and_charges
+					? await query("SELECT * FROM `sales_taxes_charges` WHERE `parent` = ? ORDER BY `idx`", [
+							profileData.taxes_and_charges as string,
+						])
+					: [],
+				await getMeta("erp_settings"),
+			),
 			print_settings: null,
 		};
 	});
 
-	ipcMain.handle("db:get-opening-data", async () => {
-		const profiles = await query<Record<string, unknown>>(
+	ipcMain.handle("db:get-opening-data", async (_e, user?: string) => {
+		const all = await query<Record<string, unknown>>(
 			"SELECT * FROM `pos_profiles` WHERE `disabled` = 0 ORDER BY `name`",
 		);
+		// Only the profiles the signed-in user is on (openingProfiles.ts).
+		const posUser = user
+			? await queryOne<PosUserProfiles>(
+					"SELECT `pos_profile`, `pos_profiles` FROM `pos_users` WHERE `username` = ? OR `name` = ?",
+					[user, user],
+				)
+			: null;
+		const profiles = profilesForUser(all, posUser);
 		const companies = await query<Record<string, unknown>>("SELECT * FROM `companies` ORDER BY `name`");
 
 		const profilesWithPayments = await Promise.all(
 			profiles.map(async (p) => {
 				const payments = await query<Record<string, unknown>>(
-					"SELECT `mode_of_payment`, `default` FROM `pos_payment_methods` WHERE `parent` = ?",
+					// With the Mode of Payment's type, as ERPNext gives the web POS: change comes only
+					// out of cash, and without it no method was cash (release sweep, 22 Sep 2026).
+					`SELECT pm.\`mode_of_payment\`, pm.\`default\`, mop.\`type\`
+					   FROM \`pos_payment_methods\` pm
+					   LEFT JOIN \`modes_of_payment\` mop ON mop.\`name\` = pm.\`mode_of_payment\`
+					  WHERE pm.\`parent\` = ?`,
 					[p.name as string],
 				);
 				return { ...p, payments };
@@ -1267,14 +1322,23 @@ export function registerDbHandlers(): void {
 			[Number(shiftId), Number(shiftId)],
 		);
 		// P9: closing is allowed with records still waiting, but the cashier is told first.
-		const unsentSales = (
-			await query<{ data: unknown }>(
-				"SELECT `data` FROM `pending_invoices` WHERE `status` IN ('pending', 'syncing', 'failed', 'dead_letter')",
+		const waiting = (
+			await query<{
+				data: unknown;
+				status: string;
+				local_id: string;
+				grand_total: unknown;
+				error: unknown;
+			}>(
+				"SELECT `data`, `status`, `local_id`, `grand_total`, `error` FROM `pending_invoices` WHERE `status` IN ('pending', 'syncing', 'failed', 'dead_letter')",
 			)
 		).filter(({ data }) => {
 			const sale = parseJsonColumn(data);
 			return !isHeldOrderData(sale) && shiftOfSale(sale) === String(shiftId);
-		}).length;
+		});
+		const unsentSales = waiting.filter((s) => s.status !== "dead_letter").length;
+		// Refused by ERPNext: they will not sync on their own and are not in the close.
+		const refusedSales = refusedOf(waiting);
 		const [unsentMovements] = await query<{ n: number }>(
 			`SELECT (SELECT COUNT(*) FROM \`expenses\` WHERE \`pos_opening_entry_id\` = ? AND \`sync_status\` <> 'synced')
 			      + (SELECT COUNT(*) FROM \`bank_drops\` WHERE \`pos_opening_entry_id\` = ? AND \`sync_status\` <> 'synced') AS n`,
@@ -1282,6 +1346,7 @@ export function registerDbHandlers(): void {
 		);
 		return {
 			unsent_count: unsentSales + Number(unsentMovements?.n || 0),
+			refused_sales: refusedSales,
 			...summarizeShift({
 				sales,
 				openingBalances,

@@ -3,7 +3,13 @@
  * (electron/startup/setupState.ts): the setup wizard, a wait for the local
  * database, or on to the normal sign-in checks.
  */
-import { isElectron } from "@/services/electronBridge";
+import {
+	clearApiCredentialsCache,
+	clearServerUrlCache,
+	getApiBaseUrl,
+	isElectron,
+	warmApiCredentials,
+} from "@/services/electronBridge";
 
 export type SetupState = "ready" | "setup" | "waiting-for-database";
 
@@ -38,7 +44,24 @@ export async function checkSetupState(): Promise<SetupState> {
 		state = "waiting-for-database";
 	}
 	if (state !== "waiting-for-database") checked = state;
+	if (state === "ready") await readConnection();
 	return state;
+}
+
+/**
+ * The server's address and API keys live in the till's database, and were read once at
+ * start. Asked before the database answered, the address came back as the default
+ * http://localhost:8000 and the keys as nothing, for the whole session (bug hunt, release
+ * sweep, 22 Sep 2026). Read them again now that it answers.
+ */
+async function readConnection(): Promise<void> {
+	clearServerUrlCache();
+	clearApiCredentialsCache();
+	try {
+		await Promise.all([getApiBaseUrl(), warmApiCredentials()]);
+	} catch (err) {
+		console.warn("[XPOS] Could not read the server's address and keys:", err);
+	}
 }
 
 /** Ask again at the next navigation (the wait ended). */

@@ -203,6 +203,11 @@ export function isHeldOrderData(data: Record<string, unknown>): boolean {
 	return Boolean(data.is_draft);
 }
 
+/** Queued sales still to reach ERPNext, from their rows: held orders are not sales yet. */
+export function countWaitingSales(rows: { data: unknown }[]): number {
+	return rows.filter((row) => !isHeldOrderData(parseJsonColumn(row.data))).length;
+}
+
 /** The till's id for the shift a queued sale was made in. */
 export function shiftOfSale(data: Record<string, unknown>): string {
 	return String(data.pos_opening_shift_local_id ?? data.pos_opening_shift ?? "");

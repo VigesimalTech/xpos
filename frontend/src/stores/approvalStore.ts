@@ -34,11 +34,16 @@ export const useApprovalStore = defineStore("approval", () => {
 	const loading = ref(false);
 	let settle: ((approver: string | null) => void) | null = null;
 
+	/** What goes to the main process: plain data, as Electron's IPC can only copy that. */
 	function ask() {
 		const pos = usePosStore();
 		const shift = pos.posOpeningShift?.name;
+		const { permissions, ...rest } = need.value;
 		return {
-			...need.value,
+			...rest,
+			// A reactive list of permissions could not be sent ("An object could not be
+			// cloned"): no approvers were found (release sweep, 22 Sep 2026).
+			...(permissions ? { permissions: [...permissions] } : {}),
 			cashier: useAuthStore().userName,
 			posProfile: pos.posProfile?.name ?? "",
 			// K20: the audit log records what was approved, and in which shift.

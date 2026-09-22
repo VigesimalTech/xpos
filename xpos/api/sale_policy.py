@@ -15,6 +15,7 @@ looks up what they need and applies the POS Profile's choice.
 
 import frappe
 from frappe import _
+from frappe.utils import cint
 
 from xpos.api.till import sent_by_till
 
@@ -50,6 +51,8 @@ def policy_exceptions(
 	rights: dict,
 	discount_limit: float,
 	list_prices: dict,
+	profile_allows_rate_change: bool = True,
+	profile_allows_discount_change: bool = True,
 ) -> list[str]:
 	"""Every way this sale goes beyond what the cashier may do alone. Empty means in policy.
 
@@ -86,13 +89,29 @@ def policy_exceptions(
 		else:
 			paid = rate
 
-		if list_price is not None and abs(rate - base) > _TOLERANCE and not rights.get("allow_change_price"):
+		price_changed = list_price is not None and abs(rate - base) > _TOLERANCE
+		# The POS Profile's Allow Rate Change rules: off, no one changes a price on it (22 Sep 2026).
+		if price_changed and not profile_allows_rate_change:
+			flags.append(
+				_(
+					"Item {0}: price changed from {1} to {2}, and the POS Profile does not allow rate changes."
+				).format(code, _fmt(base), _fmt(rate))
+			)
+		elif price_changed and not rights.get("allow_change_price"):
 			flags.append(
 				_("Item {0}: price changed from {1} to {2} without the Change Price permission.").format(
 					code, _fmt(base), _fmt(rate)
 				)
 			)
-		if (disc_pct or disc_amt) and not rights.get("show_edit_discount_field"):
+		# The POS Profile's Allow Discount Change rules line discounts, as Allow Rate Change
+		# rules prices (22 Sep 2026).
+		if (disc_pct or disc_amt) and not profile_allows_discount_change:
+			flags.append(
+				_("Item {0}: discount given, and the POS Profile does not allow discount changes.").format(
+					code
+				)
+			)
+		elif (disc_pct or disc_amt) and not rights.get("show_edit_discount_field"):
 			flags.append(_("Item {0}: discount given without the Edit Discount permission.").format(code))
 
 		if base > 0:
@@ -197,6 +216,8 @@ def check_sale_policy(data: dict, pos, cashier: str) -> list[str]:
 		rights=rights,
 		discount_limit=effective_discount_limit(cashier_limit, pos.get("max_discount_percentage_allowed")),
 		list_prices=_list_prices(data, pos.get("selling_price_list")),
+		profile_allows_rate_change=bool(cint(pos.get("allow_rate_change"))),
+		profile_allows_discount_change=bool(cint(pos.get("allow_discount_change"))),
 	)
 
 
@@ -221,8 +242,16 @@ def apply_sale_policy(invoice_doc, data: dict, pos) -> None:
 		invoice_doc.xpos_policy_flags = None
 		return
 	if (pos.get("xpos_out_of_policy_action") or "Flag") == "Reject":
-		frappe.throw(
-			_("This sale is outside the POS Profile's policy: {0}").format(" ".join(flags)),
-			title=_("Sale outside policy"),
-		)
+		# Reject stops a sale the cashier is still making (the web POS online). A sale with a
+		# till's local id was paid at the till before ERPNext saw it: refusing it would strand
+		# money already taken, and leave the shift's close short of it. Flag it for review.
+		if not invoice_doc.get("xpos_local_id"):
+			frappe.throw(
+				_("This sale is outside the POS Profile's policy: {0}").format(" ".join(flags)),
+				title=_("Sale outside policy"),
+			)
+		flags = [
+			*flags,
+			_("Outside policy and the POS Profile says Reject, but it was already paid at the till."),
+		]
 	invoice_doc.xpos_policy_flags = "\n".join(flags)

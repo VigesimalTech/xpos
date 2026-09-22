@@ -7,6 +7,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const perms = vi.hoisted(() => ({ value: {} as Record<string, boolean> }));
+// The drawer and profile limits are tested on their own (cashOutGuard.spec.ts).
+vi.mock("@/services/cashOutGuard", () => ({ cashOutProblem: vi.fn(async () => null) }));
 vi.mock("@/services/userRights", () => ({ hasPermission: (k: string) => perms.value[k] ?? false }));
 const approval = vi.hoisted(() => ({ requestApproval: vi.fn() }));
 vi.mock("@/stores/approvalStore", () => ({ useApprovalStore: () => approval }));

@@ -508,3 +508,32 @@ class TestValidateReturnInvoice(unittest.TestCase):
 
 if __name__ == "__main__":
 	unittest.main()
+
+
+class TestFindInvoiceByLocalId(unittest.TestCase):
+	"""A till re-sends a sale whose answer was lost. The retry must find the invoice the
+	first try made: the till sends no warehouse, so the lookup cannot depend on one (bug
+	hunt: every retry hit the unique index and the till gave the sale up as failed)."""
+
+	@patch("xpos.api.invoices.frappe")
+	def test_found_by_local_id_alone(self, mock_frappe):
+		mock_frappe.db.get_value.side_effect = lambda dt, filters, field: (
+			"ACC-SINV-0011" if dt == "Sales Invoice" and filters.get("xpos_local_id") == "inv_1" else None
+		)
+		self.assertEqual(invoices.find_invoice_by_local_id("inv_1"), ("Sales Invoice", "ACC-SINV-0011"))
+		filters = mock_frappe.db.get_value.call_args_list[0].args[1]
+		self.assertNotIn("set_warehouse", filters)
+		self.assertEqual(filters["docstatus"], ["<", 2])
+
+	@patch("xpos.api.invoices.frappe")
+	def test_nothing_without_a_local_id(self, mock_frappe):
+		self.assertIsNone(invoices.find_invoice_by_local_id(None))
+		mock_frappe.db.get_value.assert_not_called()
+
+	@patch("xpos.api.invoices.frappe")
+	def test_a_resent_sale_returns_the_first_invoice(self, mock_frappe):
+		mock_frappe.db.get_value.return_value = "ACC-SINV-0011"
+		mock_frappe.get_doc.return_value = SimpleNamespace(name="ACC-SINV-0011")
+		with patch("xpos.api.invoices._build_invoice_response", return_value={"name": "ACC-SINV-0011"}):
+			result = invoices.create_invoice({"local_id": "inv_1", "pos_profile": "Shop", "items": [{}]})
+		self.assertEqual(result, {"name": "ACC-SINV-0011", "duplicate": True})

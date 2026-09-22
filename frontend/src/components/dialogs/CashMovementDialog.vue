@@ -303,7 +303,8 @@ async function submit() {
 		depositAccount.value = "";
 		close();
 	} catch (error) {
-		showError(__("Failed to record cash movement"));
+		// Say why (a limit, a refused approval), not only that it failed.
+		showError((error as Error)?.message || __("Failed to record cash movement"));
 	} finally {
 		isSubmitting.value = false;
 	}
