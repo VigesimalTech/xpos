@@ -202,3 +202,27 @@ class TestRejectOnlyWhatIsNotPaidYet(unittest.TestCase):
 		invoice = self.run_policy("inv_1")
 		self.assertIn("Discount 5% is over the limit.", invoice["xpos_policy_flags"])
 		self.assertIn("already paid at the till", invoice["xpos_policy_flags"])
+
+
+class TestTheProfileRulesPriceChanges(unittest.TestCase):
+	"""The POS Profile's Allow Rate Change rules: off, a changed price is flagged whatever
+	the role allows; on, the Change Price permission decides (22 Sep 2026)."""
+
+	def flags(self, rights, allows):
+		return policy_exceptions(
+			sale([line(rate=80.0)]),
+			cashier="cashier@example.com",
+			pos_profile="Shop 1",
+			on_profile=True,
+			rights=rights,
+			discount_limit=100,
+			list_prices=PRICES,
+			profile_allows_rate_change=allows,
+		)
+
+	def test_off_flags_even_with_the_permission(self):
+		self.assertTrue(any("does not allow rate changes" in f for f in self.flags(ALL_RIGHTS, False)))
+
+	def test_on_the_permission_decides(self):
+		self.assertFalse(any("price changed" in f for f in self.flags(ALL_RIGHTS, True)))
+		self.assertTrue(any("Change Price permission" in f for f in self.flags(NO_RIGHTS, True)))

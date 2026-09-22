@@ -15,6 +15,7 @@ looks up what they need and applies the POS Profile's choice.
 
 import frappe
 from frappe import _
+from frappe.utils import cint
 
 from xpos.api.till import sent_by_till
 
@@ -50,6 +51,7 @@ def policy_exceptions(
 	rights: dict,
 	discount_limit: float,
 	list_prices: dict,
+	profile_allows_rate_change: bool = True,
 ) -> list[str]:
 	"""Every way this sale goes beyond what the cashier may do alone. Empty means in policy.
 
@@ -86,7 +88,15 @@ def policy_exceptions(
 		else:
 			paid = rate
 
-		if list_price is not None and abs(rate - base) > _TOLERANCE and not rights.get("allow_change_price"):
+		price_changed = list_price is not None and abs(rate - base) > _TOLERANCE
+		# The POS Profile's Allow Rate Change rules: off, no one changes a price on it (22 Sep 2026).
+		if price_changed and not profile_allows_rate_change:
+			flags.append(
+				_(
+					"Item {0}: price changed from {1} to {2}, and the POS Profile does not allow rate changes."
+				).format(code, _fmt(base), _fmt(rate))
+			)
+		elif price_changed and not rights.get("allow_change_price"):
 			flags.append(
 				_("Item {0}: price changed from {1} to {2} without the Change Price permission.").format(
 					code, _fmt(base), _fmt(rate)
@@ -197,6 +207,7 @@ def check_sale_policy(data: dict, pos, cashier: str) -> list[str]:
 		rights=rights,
 		discount_limit=effective_discount_limit(cashier_limit, pos.get("max_discount_percentage_allowed")),
 		list_prices=_list_prices(data, pos.get("selling_price_list")),
+		profile_allows_rate_change=bool(cint(pos.get("allow_rate_change"))),
 	)
 
 

@@ -35,7 +35,11 @@
 			</p>
 
 			<div class="flex items-center gap-1 mt-0.5 flex-wrap">
-				<template v-if="canDoOrAsk('allow_change_price') && !item.pos_is_free_item">
+				<template
+					v-if="
+						posStore.allowRateChange && canDoOrAsk('allow_change_price') && !item.pos_is_free_item
+					"
+				>
 					<span class="text-[11px] text-muted-foreground">{{ currencySymbol }}</span>
 					<input
 						ref="rateInput"

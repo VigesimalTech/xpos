@@ -184,6 +184,9 @@ export const usePosStore = defineStore("pos", () => {
 
 	const allowPurchasing = computed(() => !!posProfile.value?.xpos_allow_purchasing);
 
+	// The POS Profile's Allow Rate Change rules price changes: off, no one changes a price.
+	const allowRateChange = computed(() => !!Number(posProfile.value?.allow_rate_change));
+
 	const fetchCoupon = computed(() => !!posProfile.value?.auto_fetch_coupons_gifts);
 
 	const showTemplateItems = computed(() => !!posProfile.value?.show_template_items);
@@ -645,6 +648,7 @@ export const usePosStore = defineStore("pos", () => {
 		allowCashDeposit,
 		askForScreens,
 		allowPurchasing,
+		allowRateChange,
 		fetchCoupon,
 		showTemplateItems,
 		hideVariantsItems,
