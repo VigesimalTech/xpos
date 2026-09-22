@@ -142,13 +142,12 @@ def _should_block(pos_profile):
 	if allow_negative:
 		return False
 
-	block_sale = 1
-	if pos_profile:
-		block_sale = cint(
-			frappe.db.get_value("POS Profile", pos_profile, "block_sale_beyond_available_qty") or 1
-		)
-
-	return bool(block_sale)
+	# The POS Profile's Block Sale Beyond Available Qty decides; unset counts as on. It read
+	# `value or 1`, so a profile that switched it off was blocked all the same.
+	if not pos_profile:
+		return True
+	value = frappe.db.get_value("POS Profile", pos_profile, "block_sale_beyond_available_qty")
+	return True if value is None else bool(cint(value))
 
 
 def validate_stock_on_invoice(invoice_doc):

@@ -2,7 +2,7 @@
 	<Card
 		class="group relative overflow-hidden select-none transition-all duration-200"
 		:class="[
-			isOutOfStock && !allowNegativeStock
+			isOutOfStock && blocksBeyondStock
 				? 'cursor-not-allowed opacity-60 grayscale-[30%]'
 				: highlighted
 					? 'cursor-pointer shadow-md border-orange-400 ring-2 ring-orange-400/50 -translate-y-0.5 bg-orange-50/50 dark:bg-orange-500/10 dark:border-orange-500 dark:ring-orange-500/40'
@@ -34,7 +34,7 @@
 			</Badge>
 
 			<div
-				v-if="isOutOfStock && !allowNegativeStock"
+				v-if="isOutOfStock && blocksBeyondStock"
 				class="absolute inset-0 bg-background/60 backdrop-blur-[1px] flex items-center justify-center"
 			>
 				<div
@@ -49,7 +49,7 @@
 				class="absolute inset-0 bg-primary/0 group-hover:bg-primary/10 transition-all duration-300 flex items-center justify-center gap-2"
 			>
 				<div
-					v-if="!isOutOfStock || allowNegativeStock"
+					v-if="!isOutOfStock || !blocksBeyondStock"
 					class="w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 scale-75 group-hover:scale-100 transition-all duration-300 shadow-lg"
 				>
 					<Plus class="w-5 h-5" />
@@ -107,6 +107,9 @@ const { money } = useMoney();
 const showStock = computed(() => true);
 const showItemCode = computed(() => posStore.displayItemCode);
 const allowNegativeStock = computed(() => posStore.stockSettings?.allow_negative_stock);
+// The same rule as the cart's (checkAvailability): the POS Profile's Block Sale Beyond
+// Available Qty decides, unless ERPNext allows negative stock anyway.
+const blocksBeyondStock = computed(() => !allowNegativeStock.value && posStore.blockSaleBeyondAvailableQty);
 const hideImages = computed(() => posStore.hideImages);
 
 const isNonStockItem = computed(() => Number(props.item.is_stock_item) === 0);
@@ -131,7 +134,7 @@ const stockLabel = computed(() => {
 });
 
 function handleClick() {
-	if (isOutOfStock.value && !allowNegativeStock.value) {
+	if (isOutOfStock.value && blocksBeyondStock.value) {
 		return;
 	}
 	emit("click", props.item);

@@ -258,3 +258,28 @@ class TestConsolidationStockGuard(unittest.TestCase):
 
 			with self.assertRaises(NegativeStockRaised):
 				self.log.assert_no_negative_stock(docs)
+
+
+class TestBlockSaleFollowsThePosProfile(unittest.TestCase):
+	"""Block Sale Beyond Available Qty on the POS Profile decides, unless ERPNext allows
+	negative stock. It read `value or 1`, so switching it off changed nothing."""
+
+	def should_block(self, profile_value, allow_negative=0):
+		from unittest.mock import patch
+
+		with patch.object(stock_module, "frappe") as frappe_mock:
+			frappe_mock.db.get_single_value.return_value = allow_negative
+			frappe_mock.db.get_value.return_value = profile_value
+			return stock_module._should_block("Shop POS")
+
+	def test_on_blocks(self):
+		self.assertTrue(self.should_block(1))
+
+	def test_off_lets_the_sale_through(self):
+		self.assertFalse(self.should_block(0))
+
+	def test_unset_blocks(self):
+		self.assertTrue(self.should_block(None))
+
+	def test_negative_stock_allowed_never_blocks(self):
+		self.assertFalse(self.should_block(1, allow_negative=1))
