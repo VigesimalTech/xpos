@@ -226,3 +226,67 @@ class TestTheProfileRulesPriceChanges(unittest.TestCase):
 	def test_on_the_permission_decides(self):
 		self.assertFalse(any("price changed" in f for f in self.flags(ALL_RIGHTS, True)))
 		self.assertTrue(any("Change Price permission" in f for f in self.flags(NO_RIGHTS, True)))
+
+
+class TestTheProfileRulesLineDiscounts(unittest.TestCase):
+	"""The POS Profile's Allow Discount Change rules line discounts as Allow Rate Change rules
+	prices: off, a line discount is flagged whatever the role allows; on, the Edit Discount
+	permission decides (22 Sep 2026)."""
+
+	def flags(self, rights, allows, **disc):
+		return policy_exceptions(
+			sale([line(**disc)]),
+			cashier="cashier@example.com",
+			pos_profile="Shop 1",
+			on_profile=True,
+			rights=rights,
+			discount_limit=100,
+			list_prices=PRICES,
+			profile_allows_discount_change=allows,
+		)
+
+	def test_off_flags_a_percentage_or_an_amount_even_with_the_permission(self):
+		for disc in ({"discount_percentage": 5}, {"discount_amount": 5.0}):
+			self.assertTrue(
+				any("does not allow discount changes" in f for f in self.flags(ALL_RIGHTS, False, **disc)),
+				disc,
+			)
+
+	def test_on_the_permission_decides(self):
+		self.assertFalse(
+			any("discount given" in f for f in self.flags(ALL_RIGHTS, True, discount_percentage=5))
+		)
+		self.assertTrue(
+			any("Edit Discount permission" in f for f in self.flags(NO_RIGHTS, True, discount_percentage=5))
+		)
+
+	def test_off_leaves_a_line_without_a_discount_alone(self):
+		self.assertFalse(any("discount" in f for f in self.flags(ALL_RIGHTS, False)))
+
+
+class TestAllowDiscountChangeOnForExistingProfiles(unittest.TestCase):
+	"""ERPNext leaves Allow Discount Change off and X POS ignored it, so the upgrade switches
+	it on once for every profile; new profiles default to on."""
+
+	def test_the_patch_switches_it_on_where_it_is_off(self):
+		from unittest.mock import patch
+
+		from xpos.patches import allow_discount_change_on
+
+		with patch.object(allow_discount_change_on.frappe.db, "sql") as sql:
+			allow_discount_change_on.execute()
+		query = sql.call_args[0][0]
+		self.assertIn("SET `allow_discount_change` = 1", query)
+		self.assertIn("IFNULL(`allow_discount_change`, 0) = 0", query)
+
+	def test_new_profiles_default_to_on(self):
+		import json
+		import os
+
+		path = os.path.join(os.path.dirname(__file__), "..", "..", "x_pos", "custom", "pos_profile.json")
+		with open(path) as f:
+			setters = json.load(f)["property_setters"]
+		self.assertIn(
+			("allow_discount_change", "default", "1"),
+			[(s["field_name"], s["property"], s["value"]) for s in setters],
+		)

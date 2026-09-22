@@ -188,6 +188,8 @@ export const usePosStore = defineStore("pos", () => {
 
 	// The POS Profile's Allow Rate Change rules price changes: off, no one changes a price.
 	const allowRateChange = computed(() => !!Number(posProfile.value?.allow_rate_change));
+	// Its Allow Discount Change rules line discounts the same way.
+	const allowDiscountChange = computed(() => !!Number(posProfile.value?.allow_discount_change));
 
 	const fetchCoupon = computed(() => !!posProfile.value?.auto_fetch_coupons_gifts);
 
@@ -651,6 +653,7 @@ export const usePosStore = defineStore("pos", () => {
 		askForScreens,
 		allowPurchasing,
 		allowRateChange,
+		allowDiscountChange,
 		fetchCoupon,
 		showTemplateItems,
 		hideVariantsItems,

@@ -215,6 +215,7 @@ def setup(out="/tmp/xpos-rt.json"):
 					for u in users
 				],
 				"use_offline_mode": 1,
+				"allow_discount_change": 1,
 			}
 		)
 		profile.insert(ignore_permissions=True)

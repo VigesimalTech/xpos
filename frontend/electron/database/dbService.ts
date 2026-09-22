@@ -242,6 +242,7 @@ async function runMigrations(): Promise<void> {
 
 	const posProfileMigrations: [string, string][] = [
 		["allow_rate_change", "TINYINT(1) NOT NULL DEFAULT 0"],
+		["allow_discount_change", "TINYINT(1) NOT NULL DEFAULT 0"],
 		["allow_change_posting_date", "TINYINT(1) NOT NULL DEFAULT 0"],
 		["hide_images", "TINYINT(1) NOT NULL DEFAULT 0"],
 		["hide_unavailable_items", "TINYINT(1) NOT NULL DEFAULT 0"],

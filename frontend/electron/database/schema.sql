@@ -338,6 +338,7 @@ CREATE TABLE IF NOT EXISTS `pos_profiles` (
   `apply_discount_on` VARCHAR(50) DEFAULT NULL,
   `disabled` TINYINT(1) DEFAULT 0,
   `allow_rate_change` TINYINT(1) DEFAULT 0,
+  `allow_discount_change` TINYINT(1) DEFAULT 0,
   `allow_change_posting_date` TINYINT(1) DEFAULT 0,
   `hide_images` TINYINT(1) DEFAULT 0,
   `hide_unavailable_items` TINYINT(1) DEFAULT 0,

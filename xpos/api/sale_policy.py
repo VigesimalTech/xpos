@@ -52,6 +52,7 @@ def policy_exceptions(
 	discount_limit: float,
 	list_prices: dict,
 	profile_allows_rate_change: bool = True,
+	profile_allows_discount_change: bool = True,
 ) -> list[str]:
 	"""Every way this sale goes beyond what the cashier may do alone. Empty means in policy.
 
@@ -102,7 +103,15 @@ def policy_exceptions(
 					code, _fmt(base), _fmt(rate)
 				)
 			)
-		if (disc_pct or disc_amt) and not rights.get("show_edit_discount_field"):
+		# The POS Profile's Allow Discount Change rules line discounts, as Allow Rate Change
+		# rules prices (22 Sep 2026).
+		if (disc_pct or disc_amt) and not profile_allows_discount_change:
+			flags.append(
+				_("Item {0}: discount given, and the POS Profile does not allow discount changes.").format(
+					code
+				)
+			)
+		elif (disc_pct or disc_amt) and not rights.get("show_edit_discount_field"):
 			flags.append(_("Item {0}: discount given without the Edit Discount permission.").format(code))
 
 		if base > 0:
@@ -208,6 +217,7 @@ def check_sale_policy(data: dict, pos, cashier: str) -> list[str]:
 		discount_limit=effective_discount_limit(cashier_limit, pos.get("max_discount_percentage_allowed")),
 		list_prices=_list_prices(data, pos.get("selling_price_list")),
 		profile_allows_rate_change=bool(cint(pos.get("allow_rate_change"))),
+		profile_allows_discount_change=bool(cint(pos.get("allow_discount_change"))),
 	)
 
 

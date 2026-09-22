@@ -231,6 +231,7 @@ export const SYNC_TABLES: SyncTableConfig[] = [
 			"apply_discount_on",
 			"disabled",
 			"allow_rate_change",
+			"allow_discount_change",
 			"hide_images",
 			"hide_unavailable_items",
 			"block_sale_beyond_available_qty",

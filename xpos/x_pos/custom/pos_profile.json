@@ -6914,6 +6914,29 @@
    "property_type": "Data",
    "row_name": null,
    "value": "[\"company\", \"customer\", \"country\", \"disabled\", \"column_break_9\", \"warehouse\", \"company_address\", \"accounting_tab\", \"section_break_11\", \"payments\", \"set_grand_total_to_default_mop\", \"price_list_and_currency_section\", \"currency\", \"column_break_bptt\", \"selling_price_list\", \"write_off_section\", \"write_off_account\", \"column_break_ukpz\", \"write_off_cost_center\", \"column_break_pkca\", \"write_off_limit\", \"income_and_expense_account\", \"income_account\", \"column_break_byzk\", \"expense_account\", \"taxes_section\", \"taxes_and_charges\", \"column_break_cjpp\", \"tax_category\", \"section_break_19\", \"account_for_change_amount\", \"disable_rounded_total\", \"column_break_23\", \"apply_discount_on\", \"allow_partial_payment\", \"accounting_dimensions_section\", \"cost_center\", \"dimension_col_break\", \"project\", \"pos_configurations_tab\", \"section_break_14\", \"action_on_new_invoice\", \"validate_stock_on_save\", \"column_break_16\", \"update_stock\", \"ignore_pricing_rule\", \"print_receipt_on_order_complete\", \"pos_item_selector_section\", \"hide_images\", \"column_break_rpny\", \"hide_unavailable_items\", \"column_break_stcl\", \"auto_add_item_to_cart\", \"pos_item_details_section\", \"allow_rate_change\", \"column_break_hwfg\", \"allow_discount_change\", \"section_break_15\", \"applicable_for_users\", \"section_break_23\", \"item_groups\", \"column_break_25\", \"customer_groups\", \"more_info_tab\", \"section_break_16\", \"print_format\", \"letter_head\", \"print_backup_receipt\", \"print_discount_amount\", \"column_break0\", \"tc_name\", \"select_print_heading\", \"utm_analytics_section\", \"utm_source\", \"column_break_tvls\", \"utm_campaign\", \"column_break_xygw\", \"utm_medium\", \"pos_settings\", \"settings_section\", \"apply_customer_discount\", \"use_server_cache\", \"auto_set_batch\", \"hide_closing_shift\", \"column_break_cnwjh\", \"server_cache_duration\", \"default_view\", \"display_additional_notes\", \"selling\", \"allow_zero_rated_items\", \"tax_inclusive\", \"allow_duplicate_customer_names\", \"input_qty\", \"show_template_items\", \"allow_credit_sale\", \"allow_free_batch_return\", \"display_item_code\", \"allow_sales_order\", \"hide_variants_items\", \"allow_return_without_invoice\", \"allow_return\", \"enable_return_validity\", \"allow_delete_draft_invoices\", \"allow_open_tab_recall\", \"allow_delete_offline_invoice\", \"allow_submissions_in_background_job\", \"block_sale_beyond_available_qty\", \"use_offline_mode\", \"auto_fetch_coupons_gifts\", \"auto_create_referral_for_new_customers\", \"allow_change_posting_date\", \"auto_set_delivery_charges\", \"enable_cashier_settlement\", \"use_delivery_charges\", \"force_price_from_customer_price_list\", \"custom_column_break_ycung\", \"allowed_sales_persons\", \"return_validity_days\", \"max_discount_percentage_allowed\", \"purchasing\", \"column_break_tgaeu\", \"allow_create_purchase_items\", \"allow_purchase_order\", \"allow_purchase_receipt\", \"allow_create_purchase_suppliers\", \"update_selling_price\", \"update_buying_price\", \"column_break_pvbpj\", \"default_purchase_uom\", \"purchase_taxes\", \"pos_payments_section\", \"show_customer_balance\", \"use_cashback\", \"use_customer_credit\", \"pos_mixed_currency_tender\", \"allow_multi_currency\", \"allow_cash_deposit\", \"use_pos_payments\", \"allow_reconcile_payments\", \"column_break_aebm5\", \"allow_outstanding_settlement\", \"allow_write_off_change\", \"hide_expected_amount\", \"allow_make_new_payments\", \"enable_cash_movement\", \"allow_pos_expense\", \"allow_cancel_submitted_cash_movement\", \"allow_delete_cancelled_cash_movement\", \"require_cash_movement_remarks\", \"allow_source_account_override\", \"column_break_zfglz\", \"allowed_expense_accounts\", \"allowed_source_accounts\", \"cash_movement_max_amount\", \"default_source_account\", \"cash_mode_of_payment\", \"back_office_cash_account\", \"default_pos_expense_account\", \"fbr_integration_section\", \"enable_fbr_integration\", \"fbr_local_service_url\", \"fbr_api_url\", \"fbr_bearer_token\", \"fbr_pos_id\", \"custom_column_break_2d17v\", \"fbr_environment\", \"fbr_skip_ssl_verification\", \"referral_settings\", \"print_format_rules\", \"default_print_format\"]"
+  },
+  {
+   "_assign": null,
+   "_comments": null,
+   "_liked_by": null,
+   "_user_tags": null,
+   "creation": "2026-09-22 00:00:00.000000",
+   "default_value": null,
+   "doc_type": "POS Profile",
+   "docstatus": 0,
+   "doctype_or_field": "DocField",
+   "field_name": "allow_discount_change",
+   "idx": 0,
+   "is_system_generated": 0,
+   "modified": "2026-09-22 00:00:00.000000",
+   "modified_by": "Administrator",
+   "module": null,
+   "name": "POS Profile-allow_discount_change-default",
+   "owner": "Administrator",
+   "property": "default",
+   "property_type": "Text",
+   "row_name": null,
+   "value": "1"
   }
  ],
  "sync_on_migrate": 1

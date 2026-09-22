@@ -154,7 +154,13 @@
 					{{ __("Auto") }}
 				</span>
 
-				<template v-if="canDoOrAsk('show_edit_discount_field') && !item.pos_is_free_item">
+				<template
+					v-if="
+						posStore.allowDiscountChange &&
+						canDoOrAsk('show_edit_discount_field') &&
+						!item.pos_is_free_item
+					"
+				>
 					<button
 						@click="showDiscountInput = !showDiscountInput"
 						class="ms-1 px-1.5 py-0.5 rounded text-[10px] font-medium transition-all"
@@ -171,7 +177,11 @@
 			</div>
 
 			<div
-				v-if="showDiscountInput && canDoOrAsk('show_edit_discount_field')"
+				v-if="
+					showDiscountInput &&
+					posStore.allowDiscountChange &&
+					canDoOrAsk('show_edit_discount_field')
+				"
 				class="mt-1.5 p-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-md border border-emerald-200 dark:border-emerald-800"
 			>
 				<div class="flex items-center gap-2">
