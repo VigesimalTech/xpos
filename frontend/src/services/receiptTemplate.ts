@@ -122,11 +122,10 @@ export function buildReceiptHtml(snapshot: ReceiptSnapshot, ctx: ReceiptContext)
         </div>`
 			: "";
 
-	// What rounding the total took off or added, so the receipt adds up line by line.
-	const addedTaxes = (snapshot.taxes || [])
-		.filter((t) => !t.included_in_print_rate)
-		.reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
-	const rounding = Math.abs(snapshot.grand_total) - (Math.abs(snapshot.net_total) + Math.abs(addedTaxes));
+	// What rounding the total took off or added, so the receipt adds up line by line. The net
+	// is without every tax, included in the prices or not.
+	const allTaxes = (snapshot.taxes || []).reduce((sum, t) => sum + (Number(t.amount) || 0), 0);
+	const rounding = Math.abs(snapshot.grand_total) - (Math.abs(snapshot.net_total) + Math.abs(allTaxes));
 	const roundingRow =
 		Math.abs(rounding) > 0.001 && Math.abs(rounding) < 1
 			? `

@@ -253,7 +253,11 @@ export const useCartStore = defineStore("cart", () => {
 		const result: (CalculatedTax & { onNet: boolean })[] = [];
 
 		for (const tax of taxDetails) {
-			const isIncluded = tax.included_in_print_rate === 1;
+			// As ERPNext books it (invoice_processing/creation.py): included exactly when the POS
+			// Profile is tax inclusive, whatever the template's own flag, and an Actual charge
+			// never. By the flag, an inclusive profile was charged the VAT on top (release
+			// sweep, 22 Sep 2026).
+			const isIncluded = taxInclusive && tax.charge_type !== "Actual";
 			let totalTaxAmount = 0;
 
 			for (const { net, taxMap } of itemNets) {
@@ -263,9 +267,9 @@ export const useCartStore = defineStore("cart", () => {
 				}
 
 				if (tax.charge_type === "On Net Total") {
-					if (taxInclusive && isIncluded) {
+					if (isIncluded) {
 						totalTaxAmount += (net * effectiveRate) / (100 + effectiveRate);
-					} else if (!isIncluded) {
+					} else {
 						totalTaxAmount += (net * effectiveRate) / 100;
 					}
 				}
@@ -1850,7 +1854,9 @@ export const useCartStore = defineStore("cart", () => {
 				})),
 			subtotal: Math.round(subtotal.value * 100) / 100,
 			total_discount: totalDiscount,
-			net_total: Math.round((subtotal.value * f + includedTaxAmount.value) * 100) / 100,
+			// Without the VAT included in the prices, as ERPNext books it (it added it: 104.75
+			// for a 99.99 sale with 4.76 VAT in it; release sweep, 22 Sep 2026).
+			net_total: Math.round((subtotal.value * f - includedTaxAmount.value) * 100) / 100,
 			grand_total: grandTotal.value,
 			total_qty: totalQty,
 			change: change > 0.01 && !isReturnMode.value ? Math.round(change * 100) / 100 : 0,

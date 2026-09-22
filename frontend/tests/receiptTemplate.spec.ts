@@ -211,3 +211,26 @@ describe("buildReceiptHtml - mixed-currency tender", () => {
 		expect(text).toMatch(/Rounding -\S*0\.49/);
 	});
 });
+
+describe("a sale with VAT included in its prices", () => {
+	// 3 x 33.33 with 5% VAT included, rounded to 100, as ERPNext books it: net 95.23, VAT
+	// 4.76. The receipt must add up: net + VAT + rounding = total (release sweep, 22 Sep 2026).
+	const inclusive = {
+		...snapshot,
+		items: [{ item_code: "D", item_name: "Decimal", qty: 3, rate: 33.33, amount: 99.99, uom: "Nos" }],
+		taxes: [{ description: "VAT", rate: 5, amount: 4.76, included_in_print_rate: true }],
+		subtotal: 99.99,
+		total_discount: 0,
+		net_total: 95.23,
+		grand_total: 100,
+		change: 0,
+	};
+	const text = (html: string) => html.replace(/<style[\s\S]*?<\/style>/g, "").replace(/<[^>]+>/g, " ");
+
+	it("shows the net without the VAT, the VAT as included, and the rounding", () => {
+		const t = text(buildReceiptHtml(inclusive as never, context));
+		expect(t).toMatch(/Net Total\s+[^\d]*95\.23/);
+		expect(t).toMatch(/Rounding\s+[^\d-]*0\.01/);
+		expect(t).not.toMatch(/Rounding\s+-/);
+	});
+});
