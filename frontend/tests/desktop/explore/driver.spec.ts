@@ -80,6 +80,25 @@ test("explore", async () => {
 		const main = t.app.process();
 		main.stdout?.on("data", (d) => add("main", d));
 		main.stderr?.on("data", (d) => add("main:err", d));
+		// Whatever takes the page away from under the driver, as the main process sees it.
+		await t.app.evaluate(({ BrowserWindow }) => {
+			for (const w of BrowserWindow.getAllWindows()) {
+				const wc = w.webContents;
+				wc.on("render-process-gone", (_e, d) =>
+					console.log(`[watch] renderer gone: ${d.reason} (${d.exitCode})`),
+				);
+				wc.on("did-start-navigation", (d) =>
+					console.log(
+						`[watch] navigation to ${d.url} main=${d.isMainFrame} same=${d.isSameDocument}`,
+					),
+				);
+				wc.on("unresponsive", () => console.log("[watch] renderer unresponsive"));
+				w.on("closed", () => console.log("[watch] window closed"));
+			}
+		});
+		page.on("framenavigated", (f) => {
+			if (f === page.mainFrame()) add("page:navigated", f.url());
+		});
 		// launchTill records print:receipt; record the other print channels too.
 		await t.app.evaluate(({ ipcMain }) => {
 			const g = globalThis as Record<string, unknown>;
