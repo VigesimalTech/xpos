@@ -67,6 +67,10 @@ test("explore", async () => {
 		page = t.page;
 		page.on("console", (m) => add(`page:${m.type()}`, m.text()));
 		page.on("pageerror", (e) => add("page:exception", e.stack || e.message));
+		// A till's window must not go away on its own: say when and how it did.
+		page.on("crash", () => add("page:crash", "the renderer process crashed"));
+		page.on("close", () => add("page:closed", "the till's window closed"));
+		t.app.on("window", (w) => add("app:window", `new window ${w.url()}`));
 		page.on("requestfailed", (r) =>
 			add("net:failed", `${r.method()} ${r.url()} ${r.failure()?.errorText}`),
 		);
