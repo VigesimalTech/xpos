@@ -88,7 +88,13 @@ export const usePosStore = defineStore("pos", () => {
 
 	const foreignTenderModes = computed(() => paymentMethods.value.filter((m) => m.is_foreign_tender));
 
-	const cashTenderModes = computed(() => paymentMethods.value.filter((m) => m.type === "Cash"));
+	// Change comes only out of these. Where a row carries no type (the till's own rows did not),
+	// the profile's cash mode is cash: without it the till could give no change (22 Sep 2026).
+	const cashTenderModes = computed(() =>
+		paymentMethods.value.filter((m) =>
+			m.type ? m.type === "Cash" : m.mode_of_payment === cashModeOfPayment.value,
+		),
+	);
 
 	const allowMixedCurrencyTender = computed(
 		() => !!posProfile.value?.pos_mixed_currency_tender && foreignTenderModes.value.length > 0,

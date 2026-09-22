@@ -1190,7 +1190,12 @@ export function registerDbHandlers(): void {
 		const profileData = profile || { name: posProfileName, company: shift.company, disabled: 0 };
 
 		const payments = await query<Record<string, unknown>>(
-			"SELECT `mode_of_payment`, `default` FROM `pos_payment_methods` WHERE `parent` = ?",
+			// With the Mode of Payment's type, as ERPNext gives the web POS: change comes only
+			// out of cash, and without it no method was cash (release sweep, 22 Sep 2026).
+			`SELECT pm.\`mode_of_payment\`, pm.\`default\`, mop.\`type\`
+					   FROM \`pos_payment_methods\` pm
+					   LEFT JOIN \`modes_of_payment\` mop ON mop.\`name\` = pm.\`mode_of_payment\`
+					  WHERE pm.\`parent\` = ?`,
 			[posProfileName],
 		);
 		const profileWithPayments = { ...profileData, payments };
@@ -1257,7 +1262,12 @@ export function registerDbHandlers(): void {
 		const profilesWithPayments = await Promise.all(
 			profiles.map(async (p) => {
 				const payments = await query<Record<string, unknown>>(
-					"SELECT `mode_of_payment`, `default` FROM `pos_payment_methods` WHERE `parent` = ?",
+					// With the Mode of Payment's type, as ERPNext gives the web POS: change comes only
+					// out of cash, and without it no method was cash (release sweep, 22 Sep 2026).
+					`SELECT pm.\`mode_of_payment\`, pm.\`default\`, mop.\`type\`
+					   FROM \`pos_payment_methods\` pm
+					   LEFT JOIN \`modes_of_payment\` mop ON mop.\`name\` = pm.\`mode_of_payment\`
+					  WHERE pm.\`parent\` = ?`,
 					[p.name as string],
 				);
 				return { ...p, payments };

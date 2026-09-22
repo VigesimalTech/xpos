@@ -111,11 +111,23 @@ test("restarted mid-shift, the till comes back to its shift, every time", async 
 
 let saleLocalId = "";
 
-test("a cash sale prints its receipt on the till and reaches ERPNext", async () => {
+test("a cash sale with change prints its receipt on the till and reaches ERPNext", async () => {
 	await addItem("Round-trip Item");
 	await page.getByRole("button", { name: /^Pay/ }).click();
 	const dialog = page.getByRole("dialog");
 	await expect(dialog.getByText("Amount Due")).toBeVisible();
+	// More cash than is due: the till gives the rest back. It refused, calling the cash a
+	// card overpayment, when its payment rows carried no type (release sweep, 22 Sep 2026).
+	const change = 50;
+	const tendered = dialog
+		.getByText("Tendered", { exact: true })
+		.locator("xpath=../..")
+		.locator("input")
+		.first();
+	await tendered.fill(String(site!.rate + change));
+	await expect(dialog.getByText("Change", { exact: true })).toBeVisible();
+	await expect(dialog.getByText(/50\.00/).first()).toBeVisible();
+	await expect(dialog.getByTestId("card-overpaid")).toHaveCount(0);
 	await dialog.getByRole("button", { name: /Save & Print/ }).click();
 	await expect(dialog).toBeHidden();
 
@@ -129,11 +141,16 @@ test("a cash sale prints its receipt on the till and reaches ERPNext", async () 
 	const [invoice] = await eventually(
 		page,
 		async () => {
-			const rows = await erpList<{ name: string; grand_total: number; docstatus: number }>(
+			const rows = await erpList<{
+				name: string;
+				grand_total: number;
+				docstatus: number;
+				change_amount: number;
+			}>(
 				site!,
 				"Sales Invoice",
 				[["xpos_local_id", "=", saleLocalId]],
-				["name", "grand_total", "docstatus"],
+				["name", "grand_total", "docstatus", "change_amount"],
 			);
 			return rows.length ? rows : null;
 		},
@@ -141,6 +158,7 @@ test("a cash sale prints its receipt on the till and reaches ERPNext", async () 
 	);
 	expect(invoice.docstatus).toBe(1);
 	expect(invoice.grand_total).toBe(site!.rate);
+	expect(invoice.change_amount).toBe(change);
 });
 
 test("a held order is kept on the till, not sent, and restored into the cart", async () => {
