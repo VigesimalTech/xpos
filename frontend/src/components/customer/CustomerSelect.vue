@@ -277,6 +277,7 @@
 </template>
 
 <script setup lang="ts">
+import { isNetworkError } from "@/utils";
 import { imageSrc } from "@/utils/imageSrc";
 import { ref, computed, watch, onMounted, nextTick } from "vue";
 import { useCartStore } from "@/stores/cartStore";
@@ -353,7 +354,9 @@ const defaultNewCustomer = () => ({
 	city: "",
 	country: "",
 	email_id: "",
-	gender: "Male",
+	// Not chosen for the customer: left empty unless the cashier picks one. "Male" by default
+	// was a guess, and on a site without that Gender record every new customer failed.
+	gender: "",
 	referral_code: "",
 	birthday: "",
 	customer_group: "Individual",
@@ -530,7 +533,11 @@ async function createAndSelect() {
 		showSuccess(__("Customer created successfully!"));
 		close();
 	} catch (error: unknown) {
-		showError(__("Failed to create customer: ") + ((error as Error)?.message || error));
+		showError(
+			isNetworkError(error)
+				? __("ERPNext is not reachable: a new customer can be added once the till is back online.")
+				: __("Failed to create customer: ") + ((error as Error)?.message || error),
+		);
 	} finally {
 		isCreating.value = false;
 	}
