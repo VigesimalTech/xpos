@@ -1,4 +1,5 @@
 import { call } from "@/services/api";
+import { offlineMessage } from "@/lib/offlineMessage";
 
 export {
 	addDays,
@@ -177,6 +178,7 @@ export function get_full_url(url: string): string {
  */
 export function extractErrorMessage(error: unknown): string {
 	if (!error) return "Unknown error";
+	if (isNetworkError(error)) return offlineMessage();
 	if (typeof error === "string") return error;
 
 	const err = error as Record<string, unknown>;

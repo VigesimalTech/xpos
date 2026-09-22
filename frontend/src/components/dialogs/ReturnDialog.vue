@@ -63,7 +63,7 @@
 						v-else-if="searchTerm.length >= 2"
 						class="text-center text-sm text-muted-foreground py-8"
 					>
-						{{ __("No invoices found") }}
+						{{ searchError || __("No invoices found") }}
 					</p>
 					<p v-else class="text-center text-sm text-muted-foreground py-8">
 						{{ __("Enter an invoice number or customer name to search") }}
@@ -170,6 +170,7 @@ import { useCartStore } from "@/stores/cartStore";
 import { usePosStore } from "@/stores/posStore";
 import { useMoney } from "@/composables/useMoney";
 import { call } from "@/services/api";
+import { extractErrorMessage, isNetworkError } from "@/utils";
 import {
 	Dialog,
 	DialogContent,
@@ -214,6 +215,7 @@ interface ReturnItem {
 const searchTerm = ref("");
 const invoices = ref<SearchInvoice[]>([]);
 const isSearching = ref(false);
+const searchError = ref("");
 const selectedInvoice = ref<SearchInvoice | null>(null);
 const returnItems = ref<ReturnItem[]>([]);
 
@@ -243,8 +245,16 @@ async function searchInvoices() {
 			},
 		);
 		invoices.value = result?.invoices || [];
+		searchError.value = "";
 	} catch (error) {
 		console.error("Error searching invoices:", error);
+		invoices.value = [];
+		// Returns are looked up in ERPNext: say so, not "No invoices found".
+		searchError.value = isNetworkError(error)
+			? __(
+					"Returns are looked up in ERPNext, which this till cannot reach now. Try again once it is back online.",
+				)
+			: extractErrorMessage(error);
 	} finally {
 		isSearching.value = false;
 	}

@@ -1,5 +1,6 @@
 import { toast } from "vue-sonner";
 import { h, defineComponent } from "vue";
+import { plainMessage } from "@/lib/offlineMessage";
 
 function htmlComponent(html: string) {
 	return defineComponent({ render: () => h("div", { innerHTML: html }) });
@@ -77,7 +78,7 @@ export function showSuccess(message: string): void {
 
 export function showError(message: string): void {
 	const { error } = useToast();
-	error(message);
+	error(plainMessage(String(message)));
 }
 
 export function showInfo(message: string): void {
