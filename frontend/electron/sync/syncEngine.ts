@@ -196,6 +196,15 @@ async function apiCall<T = unknown>(
 				responseBody += chunk.toString();
 			});
 
+			// The line dropped part way through the answer (bug hunt: an uncaught
+			// ERR_CONTENT_LENGTH_MISMATCH in the main process, and the step waited out its limit).
+			response.on("error", (err: Error) =>
+				finish(() => {
+					setReachable(false);
+					reject(new ServerUnreachable(err.message));
+				}),
+			);
+
 			response.on("end", () =>
 				finish(() => {
 					let data: ReturnType<typeof JSON.parse>;

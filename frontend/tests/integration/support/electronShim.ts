@@ -56,6 +56,10 @@ class ShimRequest extends EventEmitter {
 				this.emit("response", response);
 				res.on("data", (chunk: Buffer) => response.emit("data", chunk));
 				res.on("end", () => response.emit("end"));
+				// As Electron's: an answer cut short is an error on the response.
+				res.on("aborted", () =>
+					response.emit("error", new Error("net::ERR_CONTENT_LENGTH_MISMATCH")),
+				);
 			},
 		);
 		req.on("error", (err) => this.emit("error", err));

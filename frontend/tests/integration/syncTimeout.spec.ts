@@ -52,4 +52,34 @@ describe("a server that never answers", () => {
 		await runSyncCyclePublic();
 		expect(held.length).toBeGreaterThan(before);
 	}, 60_000);
+
+	it("an answer cut off part way fails the step at once, as ERPNext not answering", async () => {
+		// Headers and the start of a body, then the line drops.
+		const cut = createServer((socket) =>
+			socket.once("data", () => {
+				socket.write(
+					'HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 500\r\n\r\n{"message": [',
+				);
+				setTimeout(() => socket.destroy(), 20);
+			}),
+		);
+		await new Promise<void>((r) => cut.listen(0, "127.0.0.1", () => r()));
+		const cutUrl = `http://127.0.0.1:${(cut.address() as { port: number }).port}`;
+		stopSyncEngine();
+		setRequestTimeout(30_000);
+		initSyncEngine({ serverUrl: cutUrl, csrfToken: "", sessionCookies: "", apiKey: "k", apiSecret: "s" });
+		rendererEvents.length = 0;
+
+		const started = Date.now();
+		await runSyncCyclePublic();
+		expect(Date.now() - started).toBeLessThan(10_000);
+		// Reported as ERPNext not answering, not as the record's own failure.
+		expect(rendererEvents).toContainEqual(
+			expect.objectContaining({
+				channel: "sync-error",
+				data: expect.objectContaining({ unreachable: true }),
+			}),
+		);
+		await new Promise((r) => cut.close(r));
+	}, 60_000);
 });
