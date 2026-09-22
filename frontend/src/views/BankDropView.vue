@@ -738,7 +738,10 @@ async function handleSave() {
 		if (isElectronMode) {
 			// K19: beyond the cashier's role, a manager approves with their PIN.
 			const approval = await approveCashMovement("bank_drop", form.value.amount);
-			if (!approval.ok) return;
+			if (!approval.ok) {
+				if (approval.problem) showError(approval.problem);
+				return;
+			}
 			await createBankDrop({
 				approved_by: approval.approvedBy,
 				to_account: form.value.target_account,

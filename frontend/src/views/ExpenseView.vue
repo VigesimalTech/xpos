@@ -640,7 +640,10 @@ async function handleSave(values: { expense_account: string; amount: number; rea
 		if (isElectronMode) {
 			// K19: beyond the cashier's role, a manager approves with their PIN.
 			const approval = await approveCashMovement("expense", values.amount);
-			if (!approval.ok) return;
+			if (!approval.ok) {
+				if (approval.problem) showError(approval.problem);
+				return;
+			}
 			await createExpense({
 				approved_by: approval.approvedBy,
 				to_account: values.expense_account,
