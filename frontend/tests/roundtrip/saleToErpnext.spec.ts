@@ -51,6 +51,7 @@ async function invoicesFor(localId: string) {
 			"is_pos",
 			"update_stock",
 			"pos_profile",
+			"change_amount",
 		]),
 	);
 	const { data } = await erp<{ data: Record<string, unknown>[] }>(
@@ -82,8 +83,10 @@ async function openShift(): Promise<number> {
 	return id;
 }
 
-async function ringUpSale(shiftId: number, qty: number): Promise<string> {
+async function ringUpSale(shiftId: number, qty: number, tendered?: number): Promise<string> {
 	const total = qty * site.rate;
+	const paid = tendered ?? total;
+	const change = paid - total;
 	const { local_id } = await invoke<{ local_id: string }>("db:add-pending-invoice", {
 		data: {
 			pos_profile: site.pos_profile,
@@ -97,7 +100,21 @@ async function ringUpSale(shiftId: number, qty: number): Promise<string> {
 					uom: "Nos",
 				},
 			],
-			payments: [{ mode_of_payment: "Cash", amount: total }],
+			payments: [{ mode_of_payment: "Cash", amount: paid }],
+			...(change > 0
+				? {
+						change_amount: change,
+						pos_change_legs: [
+							{
+								mode_of_payment: "Cash",
+								currency: "NGN",
+								amount: change,
+								exchange_rate: 1,
+								base_amount: change,
+							},
+						],
+					}
+				: {}),
 			pos_opening_shift_local_id: shiftId,
 			is_return: 0,
 		},
@@ -152,6 +169,24 @@ describe.skipIf(!configPath)("O2: a sale from the till lands correctly in ERPNex
 			paid_amount: 2 * site.rate,
 		});
 		expect(await stockQty()).toBe(stockBefore - 2);
+	});
+
+	it("a cash sale that gives change lands, with its change", async () => {
+		// Paying 150 for 100. On a freshly installed site this was refused twice over: the
+		// change ledger setting was never switched on, and then the change row lost its
+		// currency to an empty fetch from the payment mode (bug hunt, 22 Sep 2026).
+		const localId = await ringUpSale(shiftId, 1, site.rate + 50);
+
+		await sync();
+
+		const [local] = await query<{ status: string; error: string | null }>(
+			"SELECT `status`, `error` FROM `pending_invoices` WHERE `local_id` = ?",
+			[localId],
+		);
+		expect(local, `sync error: ${local?.error}`).toMatchObject({ status: "synced" });
+		expect(await invoicesFor(localId)).toMatchObject([
+			{ docstatus: 1, grand_total: site.rate, paid_amount: site.rate + 50, change_amount: 50 },
+		]);
 	});
 
 	it("does not create a second invoice when the till sends the same sale again", async () => {

@@ -148,3 +148,17 @@ class TestChangeLedgerSetting(unittest.TestCase):
 		):
 			install.after_install()
 		enable.assert_called_once()
+
+
+class TestChangeLegCurrency(unittest.TestCase):
+	"""The change row's currency is fetched from the payment mode's tender currency only when
+	empty. Always fetching blanked it for ordinary Cash, and every sale with change was refused."""
+
+	def test_currency_is_fetched_only_when_empty(self):
+		import json
+		from pathlib import Path
+
+		doctype = Path(__file__).parents[2] / "x_pos" / "doctype" / "pos_change_leg" / "pos_change_leg.json"
+		field = next(f for f in json.loads(doctype.read_text())["fields"] if f["fieldname"] == "currency")
+		self.assertEqual(field.get("fetch_from"), "mode_of_payment.pos_tender_currency")
+		self.assertEqual(field.get("fetch_if_empty"), 1)
