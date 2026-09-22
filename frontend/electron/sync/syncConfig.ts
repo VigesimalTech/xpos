@@ -271,6 +271,8 @@ export const SYNC_TABLES: SyncTableConfig[] = [
 			"xpos_allow_self_approval",
 			"xpos_screen_access",
 			"xpos_allow_purchasing",
+			"cash_movement_max_amount",
+			"xpos_cash_out_within_drawer",
 			"pos_mixed_currency_tender",
 			"print_backup_receipt",
 			"require_cash_movement_remarks",

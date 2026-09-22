@@ -15,3 +15,4 @@ xpos.patches.profile_discount_zero_means_none
 xpos.patches.add_approval_permissions
 xpos.patches.add_screen_permissions
 xpos.patches.ensure_pos_change_gl_entries
+xpos.patches.print_discount_amount_on
