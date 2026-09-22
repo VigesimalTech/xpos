@@ -296,10 +296,12 @@ describe.skipIf(!configPath)("K19: a manager's approval, checked again on the se
 	});
 
 	it("records an expense the cashier's role does not allow, with the manager who approved it", async () => {
+		// One remark per run: a site that has run this before already holds the earlier ones.
+		const remark = `Approved on the till ${Date.now()}`;
 		const approved = await invoke<{ id: number }>("db:create-expense", {
 			to_account: site.expense_account,
 			amount: 5,
-			remarks: "Approved on the till",
+			remarks: remark,
 			user: CASHIER,
 			approved_by: SUPERVISOR,
 			pos_opening_entry_id: shift,
@@ -329,7 +331,7 @@ describe.skipIf(!configPath)("K19: a manager's approval, checked again on the se
 		expect(refused.sync_status).not.toBe("synced");
 		expect(refused.error).toContain("not permitted to record");
 
-		const filters = encodeURIComponent(JSON.stringify([["remarks", "=", "Approved on the till"]]));
+		const filters = encodeURIComponent(JSON.stringify([["remarks", "=", remark]]));
 		const fields = encodeURIComponent(JSON.stringify(["name", "user", "approved_by"]));
 		const res = await fetch(
 			`${site.url}/api/resource/POS Cash Movement?filters=${filters}&fields=${fields}`,
