@@ -70,7 +70,7 @@ export function screenOfRoute(name: unknown): Screen | undefined {
 }
 
 /** A manager may approve it here: on the till, when the POS Profile shows such screens. */
-function managerMayApprove(): boolean {
+export function managerMayApprove(): boolean {
 	return isElectron() && usePosStore().askForScreens;
 }
 

@@ -38,6 +38,7 @@ import {
 	getVisibleReportColumns,
 	hydrateReportFiltersFromQuery,
 	isReportAccessible,
+	approveReport,
 	isReportTotalRow,
 	normalizeReportFilters,
 	normalizeReportRows,
@@ -55,7 +56,13 @@ const reportCurrency = computed(() => posStore.invoiceCurrency || posStore.curre
 
 const activeReport = computed(() => getReportDefinition(route.params.reportSlug));
 const isReportVisible = computed(() => Boolean(activeReport.value));
-const isReportAllowed = computed(() => (activeReport.value ? isReportAccessible(activeReport.value) : false));
+// A manager's approval (Screens the Role Lacks: Ask) holds while this report is open.
+const approvedSlug = ref("");
+const isReportAllowed = computed(() =>
+	activeReport.value
+		? isReportAccessible(activeReport.value) || approvedSlug.value === activeReport.value.slug
+		: false,
+);
 
 const filters = ref<ReportFilterDefinition[]>([]);
 const filterState = reactive<Record<string, unknown>>({});
@@ -142,6 +149,7 @@ function resetState() {
 	errorMessage.value = "";
 	searchTerm.value = "";
 	sortState.value = null;
+	approvedSlug.value = "";
 	currentPage.value = 1;
 	lastRefreshedAt.value = null;
 }
@@ -157,8 +165,12 @@ async function loadReport() {
 
 	document.title = `${report.title} | X POS`;
 	if (!isReportAccessible(report)) {
-		errorMessage.value = __("You do not have access to this report.");
-		return;
+		if (await approveReport(report)) {
+			approvedSlug.value = report.slug;
+		} else {
+			errorMessage.value = __("You do not have access to this report.");
+			return;
+		}
 	}
 
 	try {
@@ -195,7 +207,7 @@ async function runReport() {
 	const report = activeReport.value;
 	if (!report) return;
 
-	if (!isReportAccessible(report)) {
+	if (!isReportAllowed.value) {
 		errorMessage.value = __("You do not have access to this report.");
 		showError(errorMessage.value);
 		return;

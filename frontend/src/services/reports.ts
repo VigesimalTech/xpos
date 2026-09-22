@@ -1,6 +1,7 @@
 import { call } from "@/services/api";
 import { __ } from "@/lib/utils";
 import { hasPermission, type PosPermissions } from "@/services/userRights";
+import { managerMayApprove } from "@/services/screenAccess";
 import { formatWithSymbol } from "@/composables/useCurrency";
 import { formatFloat, formatInt } from "@/utils/numberFormat";
 
@@ -236,6 +237,24 @@ export function getAccessibleReports(): ReportDefinition[] {
 
 export function isReportAccessible(report: ReportDefinition): boolean {
 	return !report.permissionKey || hasPermission(report.permissionKey);
+}
+
+/**
+ * Whether to list a report. One that needs a permission the role lacks follows the POS
+ * Profile's Screens the Role Lacks, as the screens do (K27): hidden, or listed and opened
+ * with a manager's PIN on the till. They were listed as Locked whatever it said.
+ */
+export function isReportOffered(report: ReportDefinition): boolean {
+	return isReportAccessible(report) || managerMayApprove();
+}
+
+/** Whether the report may open now: the role allows it, or a manager approves it here. */
+export async function approveReport(report: ReportDefinition): Promise<boolean> {
+	if (isReportAccessible(report)) return true;
+	if (!report.permissionKey || !managerMayApprove()) return false;
+	const { ensureAllowed } = await import("@/services/ensureAllowed");
+	const { ok } = await ensureAllowed(report.permissionKey, __("Open {0}", [report.title]));
+	return ok;
 }
 
 export function buildInitialReportFilters(
