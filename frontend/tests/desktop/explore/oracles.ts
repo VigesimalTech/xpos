@@ -45,13 +45,14 @@ async function sales(site: Site, problems: string[], counts: Record<string, numb
 				name: string;
 				xpos_local_id: string;
 				grand_total: number;
+				rounded_total: number;
 				docstatus: number;
 				is_return: number;
 			}>(
 				site,
 				"Sales Invoice",
 				[["xpos_local_id", "in", localIds]],
-				["name", "xpos_local_id", "grand_total", "docstatus", "is_return"],
+				["name", "xpos_local_id", "grand_total", "rounded_total", "docstatus", "is_return"],
 			)
 		: [];
 	counts.erp_sales = erp.length;
@@ -67,9 +68,11 @@ async function sales(site: Site, problems: string[], counts: Record<string, numb
 				problems.push(
 					`Sale ${row.local_id} reached ERPNext ${live.length} times: ${live.map((e) => e.name).join(", ")}.`,
 				);
-			if (live[0] && !close(Math.abs(live[0].grand_total), Math.abs(Number(row.grand_total))))
+			// The till keeps what the customer was charged: ERPNext's rounded total when it rounds.
+			const charged = live[0] ? live[0].rounded_total || live[0].grand_total : 0;
+			if (live[0] && !close(Math.abs(charged), Math.abs(Number(row.grand_total))))
 				problems.push(
-					`Sale ${row.local_id}: till total ${row.grand_total}, ERPNext ${live[0].grand_total}.`,
+					`Sale ${row.local_id}: till total ${row.grand_total}, ERPNext ${charged} (grand ${live[0].grand_total}).`,
 				);
 			if (live[0] && row.server_name && row.server_name !== live[0].name)
 				problems.push(
