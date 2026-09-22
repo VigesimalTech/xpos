@@ -1812,7 +1812,10 @@ export const useCartStore = defineStore("cart", () => {
 		});
 
 		const itemDiscountTotal = snapshotItems.reduce((sum, it) => sum + (it.discount_amount || 0), 0);
-		const totalDiscount = Math.round((itemDiscountTotal + (discountAmount.value || 0)) * 100) / 100;
+		// The cart's discount as it comes off the lines (cartDiscountFactor), as ERPNext books it.
+		const f = cartDiscountFactor.value;
+		const cartDiscountOffLines = subtotal.value * (1 - f);
+		const totalDiscount = Math.round((itemDiscountTotal + cartDiscountOffLines) * 100) / 100;
 		const totalQty = items.value.reduce((sum: number, item: CartItem) => sum + item.qty, 0);
 		const paid = totalPayments.value;
 		const change = paid - grandTotal.value;
@@ -1847,7 +1850,7 @@ export const useCartStore = defineStore("cart", () => {
 				})),
 			subtotal: Math.round(subtotal.value * 100) / 100,
 			total_discount: totalDiscount,
-			net_total: Math.round((subtotal.value + includedTaxAmount.value) * 100) / 100,
+			net_total: Math.round((subtotal.value * f + includedTaxAmount.value) * 100) / 100,
 			grand_total: grandTotal.value,
 			total_qty: totalQty,
 			change: change > 0.01 && !isReturnMode.value ? Math.round(change * 100) / 100 : 0,

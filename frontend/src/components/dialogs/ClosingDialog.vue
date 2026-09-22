@@ -128,7 +128,7 @@
 									tax.description || tax.account_head
 								}}</span>
 								<span class="font-medium text-foreground">{{
-									money(tax.tax_amount ?? 0)
+									money(tax.amount ?? tax.tax_amount ?? 0)
 								}}</span>
 							</div>
 						</div>

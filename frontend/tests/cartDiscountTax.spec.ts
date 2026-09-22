@@ -70,4 +70,12 @@ describe("a discount with tax, as ERPNext books it", () => {
 		expect(c.calculatedTaxes).toMatchObject([{ amount: 5 }]);
 		expect(c.grandTotal).toBeCloseTo(104.99, 2);
 	});
+
+	it("the receipt records the whole-sale discount off the lines, and the discounted net", () => {
+		const r = cart(10, "Grand Total").getReceiptSnapshot("LOCAL-1");
+		// 10.50 off the grand total is 10.00 off the lines and 0.50 off the VAT.
+		expect(r.total_discount).toBeCloseTo(10.0, 2);
+		expect(r.net_total).toBeCloseTo(89.99, 2);
+		expect(r.taxes).toMatchObject([{ amount: 4.5 }]);
+	});
 });

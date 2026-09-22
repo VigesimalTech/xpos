@@ -192,4 +192,22 @@ describe("buildReceiptHtml - mixed-currency tender", () => {
 		expect(html).not.toContain("change-leg-row");
 		expect(html).not.toContain("payment-rate-line");
 	});
+
+	it("a discounted, taxed, rounded sale adds up line by line: discount, net, VAT, rounding", () => {
+		const html = buildReceiptHtml(
+			{
+				...snapshot,
+				subtotal: 99.99,
+				total_discount: 10,
+				net_total: 89.99,
+				taxes: [{ description: "VAT @ 5", rate: 5, amount: 4.5, included_in_print_rate: false }],
+				grand_total: 94,
+			},
+			context,
+		);
+		const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+		expect(text).toMatch(/Total Discount -\S*10\.00/);
+		expect(text).toMatch(/Net Total \S*89\.99/);
+		expect(text).toMatch(/Rounding -\S*0\.49/);
+	});
 });
