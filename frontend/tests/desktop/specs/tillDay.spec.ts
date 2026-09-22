@@ -208,6 +208,9 @@ test("the shift closes on the till, its summary prints on the till, and ERPNext 
 });
 
 test("after setup, the till talked to no server but its own ERPNext", async () => {
-	// The branding request fires before the wizard, when there is no server yet.
-	expect(strayRequests.filter((url) => !url.includes("get_xpos_branding"))).toEqual([]);
+	// The branding request fires before the wizard, when there is no server yet. The till's
+	// fonts come from Google Fonts, allowed by its CSP (index.electron.html).
+	const allowed = (url: string) =>
+		url.includes("get_xpos_branding") || /^https:\/\/fonts\.(googleapis|gstatic)\.com\//.test(url);
+	expect(strayRequests.filter((url) => !allowed(url))).toEqual([]);
 });
