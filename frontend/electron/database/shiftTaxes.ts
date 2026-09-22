@@ -21,6 +21,21 @@ export interface ShiftPricing {
 	disable_rounded_total: boolean;
 }
 
+/**
+ * ERPNext's Stock Settings as the till last cached them: whether a sale may take stock below
+ * zero. The till returned none, so it never knew ERPNext allowed negative stock.
+ */
+export function shiftStockSettings(erpSettings: string | null | undefined): {
+	allow_negative_stock: boolean;
+} {
+	try {
+		const settings = JSON.parse(erpSettings || "null");
+		return { allow_negative_stock: Boolean(Number(settings?.stock_settings?.allow_negative_stock || 0)) };
+	} catch {
+		return { allow_negative_stock: false };
+	}
+}
+
 export function shiftPricing(
 	profile: { taxes_and_charges?: unknown; tax_inclusive?: unknown } | null | undefined,
 	charges: {

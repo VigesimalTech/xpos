@@ -4,7 +4,7 @@
  * was short, and ERPNext refused it as part-paid (bug hunt, 22 Sep 2026).
  */
 import { describe, expect, it } from "vitest";
-import { shiftPricing } from "../electron/database/shiftTaxes";
+import { shiftPricing, shiftStockSettings } from "../electron/database/shiftTaxes";
 
 const vat = [
 	{
@@ -54,5 +54,12 @@ describe("pricing a till's sale as ERPNext does", () => {
 			false,
 		);
 		expect(shiftPricing({}, [], "not json").disable_rounded_total).toBe(false);
+	});
+
+	it("the till knows whether ERPNext allows negative stock", () => {
+		expect(shiftStockSettings(JSON.stringify({ stock_settings: { allow_negative_stock: 1 } }))).toEqual({
+			allow_negative_stock: true,
+		});
+		expect(shiftStockSettings(null)).toEqual({ allow_negative_stock: false });
 	});
 });

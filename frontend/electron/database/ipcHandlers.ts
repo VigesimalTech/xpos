@@ -7,7 +7,7 @@
  */
 
 import { ipcMain, net } from "electron";
-import { shiftPricing } from "./shiftTaxes";
+import { shiftPricing, shiftStockSettings } from "./shiftTaxes";
 import { refusedOf } from "./refusedSales";
 import { profilesForUser, type PosUserProfiles } from "./openingProfiles";
 import {
@@ -1201,7 +1201,7 @@ export function registerDbHandlers(): void {
 				company_name: companyName,
 				default_currency: (profileData.currency as string) || "",
 			},
-			stock_settings: {},
+			stock_settings: shiftStockSettings(await getMeta("erp_settings")),
 			// Priced as ERPNext prices it (shiftTaxes.ts), not without tax.
 			...shiftPricing(
 				profileData,
