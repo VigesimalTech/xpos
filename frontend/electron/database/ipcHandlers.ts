@@ -32,6 +32,7 @@ import {
 	shiftOfSale,
 	summarizeShift,
 } from "./shiftSummary";
+import { onProfile, pinsOf } from "./profileAccess";
 
 const log = createLogger("DB-IPC");
 
@@ -109,25 +110,34 @@ export async function checkTillPin(username: string, pin: string): Promise<PinRe
 		enabled: number;
 		pin_hash: string | null;
 		pin_salt: string | null;
+		profile_access: string | null;
 		pin_failures: number | null;
 		locked: number;
 		pin_locked_until: Date | string | null;
 	}>(
-		`SELECT \`name\`, \`enabled\`, \`pin_hash\`, \`pin_salt\`, \`pin_failures\`, \`pin_locked_until\`,
-                COALESCE(\`pin_locked_until\` > NOW(), 0) AS \`locked\`
+		`SELECT \`name\`, \`enabled\`, \`pin_hash\`, \`pin_salt\`, \`profile_access\`, \`pin_failures\`,
+                \`pin_locked_until\`, COALESCE(\`pin_locked_until\` > NOW(), 0) AS \`locked\`
            FROM \`pos_users\` WHERE \`username\` = ? OR \`name\` = ?`,
 		[username, username],
 	);
 	if (!row) return { ok: false, reason: "unknown_user" };
 	if (!row.enabled) return { ok: false, reason: "disabled" };
-	// No salt means no PIN: never fall back to the legacy unsalted password check.
-	if (!row.pin_hash || !row.pin_salt) return { ok: false, reason: "no_pin" };
+	// No salt means no PIN: never fall back to the legacy unsalted password check. A PIN set
+	// on any of the user's POS Profiles is theirs (profileAccess.ts).
+	const pins = pinsOf(row);
+	if (!pins.length) return { ok: false, reason: "no_pin" };
 	if (Number(row.locked)) {
 		return { ok: false, reason: "locked", lockedUntil: String(row.pin_locked_until) };
 	}
 
 	const { verifyPassword } = await import("./passwordHash");
-	const { valid } = await verifyPassword(String(pin ?? ""), row.pin_hash, row.pin_salt);
+	let valid = false;
+	for (const { hash, salt } of pins) {
+		if ((await verifyPassword(String(pin ?? ""), hash, salt)).valid) {
+			valid = true;
+			break;
+		}
+	}
 	if (valid) {
 		await execute(
 			"UPDATE `pos_users` SET `pin_failures` = 0, `pin_locked_until` = NULL WHERE `name` = ?",
@@ -902,8 +912,22 @@ export function registerDbHandlers(): void {
 		return query("SELECT * FROM `pos_users` ORDER BY `full_name`");
 	});
 
-	ipcMain.handle("db:get-pos-user", async (_e, username: string) => {
-		return queryOne("SELECT * FROM `pos_users` WHERE `username` = ? OR `name` = ?", [username, username]);
+	// As the user stands on `posProfile`, or else on the profile of their open shift here.
+	ipcMain.handle("db:get-pos-user", async (_e, username: string, posProfile?: string) => {
+		const row = await queryOne<Record<string, unknown>>(
+			"SELECT * FROM `pos_users` WHERE `username` = ? OR `name` = ?",
+			[username, username],
+		);
+		if (!row) return row;
+		const profile =
+			posProfile ||
+			(
+				await queryOne<{ pos_profile: string }>(
+					"SELECT `pos_profile` FROM `pos_opening_shifts` WHERE `user` = ? AND `status` = 'Open' ORDER BY `id` DESC LIMIT 1",
+					[row.name],
+				)
+			)?.pos_profile;
+		return onProfile(row, profile);
 	});
 
 	ipcMain.handle("db:upsert-pos-users", async (_e, rows: Record<string, unknown>[]) => {

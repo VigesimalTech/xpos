@@ -59,8 +59,10 @@ export const usePosStore = defineStore("pos", () => {
 		watch(profileName, (name) => setTillIdentity({ posProfile: name || undefined }), { immediate: true });
 	}
 
+	// A user on two POS Profiles may have a different role on each: their rights follow the
+	// profile of the shift that is open.
 	watch(profileName, async (name, prev) => {
-		if (isElectron() || !name || name === prev) return;
+		if (!name || name === prev) return;
 		const { useAuthStore } = await import("@/stores/authStore");
 		await loadPermissions(useAuthStore().userName, name);
 	});

@@ -328,7 +328,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
 			ipcRenderer.invoke("db:upsert-pos-payment-methods", rows),
 
 		getPosUsers: () => ipcRenderer.invoke("db:get-pos-users"),
-		getPosUser: (username: string) => ipcRenderer.invoke("db:get-pos-user", username),
+		getPosUser: (username: string, posProfile?: string) =>
+			ipcRenderer.invoke("db:get-pos-user", username, posProfile),
 		upsertPosUsers: (rows: Record<string, unknown>[]) => ipcRenderer.invoke("db:upsert-pos-users", rows),
 		verifyPassword: (username: string, password: string) =>
 			ipcRenderer.invoke("db:verify-password", username, password),

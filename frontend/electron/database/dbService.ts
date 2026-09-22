@@ -373,6 +373,8 @@ async function runMigrations(): Promise<void> {
 		["purchasing", "TINYINT(1) DEFAULT 0"],
 		// Every POS Profile the user is on (JSON list): the only ones a shift may open on.
 		["pos_profiles", "TEXT DEFAULT NULL"],
+		// Per POS Profile, the user's role, discount limit, PIN and permissions (profileAccess.ts).
+		["profile_access", "LONGTEXT DEFAULT NULL"],
 		// Till PIN: hash and salt come from ERPNext (xpos.api.pin); the lockout is local.
 		["pin_hash", "VARCHAR(255) DEFAULT NULL"],
 		["pin_salt", "VARCHAR(64) DEFAULT NULL"],

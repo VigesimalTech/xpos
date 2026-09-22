@@ -691,6 +691,7 @@ export const SYNC_TABLES: SyncTableConfig[] = [
 			"price_checker",
 			"purchasing",
 			"pos_profiles",
+			"profile_access",
 		],
 		orderBy: "modified",
 		direction: "pull",

@@ -75,6 +75,30 @@ def profiles_by_user(rows) -> dict[str, list[str]]:
 	return {user: sorted(profiles) for user, profiles in out.items()}
 
 
+def profile_access_by_user(rows, permission_keys) -> dict[str, dict[str, dict]]:
+	"""What each user may do on each POS Profile they are on, from POS Profile User rows.
+
+	{user: {profile: {role, discount_limit, pin_hash, pin_salt, <permission key>: 0|1}}}.
+	The first row of a user on a profile wins, as ERPNext's own lookup does.
+	"""
+	out: dict[str, dict[str, dict]] = {}
+	for row in rows:
+		user, profile = row_value(row, "user"), row_value(row, "pos_profile")
+		if not user or not profile or profile in out.get(user, {}):
+			continue
+		role_name = row_value(row, "pos_role") or DEFAULT_ROLE
+		perms = get_role_permissions(role_name)
+		limit = row_value(row, "discount_limit")
+		out.setdefault(user, {})[profile] = {
+			"role": role_name,
+			"discount_limit": flt(limit) if limit not in (None, "") else DEFAULT_DISCOUNT_LIMIT,
+			"pin_hash": row_value(row, "xpos_pin_hash") or "",
+			"pin_salt": row_value(row, "xpos_pin_salt") or "",
+			**{key: cint(perms.get(key, False)) for key in permission_keys},
+		}
+	return out
+
+
 DEFAULT_ROLE = "Cashier"
 DEFAULT_DISCOUNT_LIMIT = 0  # 0 means no discount without a manager; 100 means no cap
 ROLE_CACHE_KEY = "xpos_role_permissions"
@@ -328,6 +352,31 @@ def get_pos_users(
 				as_dict=True,
 			)
 		)
+	# The role, discount limit and PIN a user has on each of the till's profiles: the till
+	# uses the entry for the profile its shift is open on, where the row above carries only
+	# the first profile's. Newer than older tills know, so sent only when asked by name.
+	user_access = None
+	if "profile_access" in asked_fields(fields):
+		user_access = profile_access_by_user(
+			frappe.db.sql(
+				"""
+				SELECT pu.user, pu.parent AS pos_profile, pu.pos_role, pu.discount_limit,
+				       pu.xpos_pin_hash, pu.xpos_pin_salt
+				FROM `tabPOS Profile User` pu
+				INNER JOIN `tabPOS Profile` pp ON pp.name = pu.parent
+				WHERE pp.disabled = 0 AND pu.user IN %(users)s
+				  AND (%(all_profiles)s = 1 OR pu.parent IN %(profiles)s)
+				ORDER BY pu.parent ASC, pu.idx ASC
+				""",
+				{
+					"users": tuple(r.user for r in profile_users),
+					"all_profiles": 0 if till_profiles else 1,
+					"profiles": tuple(till_profiles) or ("",),
+				},
+				as_dict=True,
+			),
+			permission_keys,
+		)
 	results = []
 	for pu in profile_users:
 		user = user_meta.get(pu.user)
@@ -358,6 +407,8 @@ def get_pos_users(
 		}
 		if user_profiles is not None:
 			row["pos_profiles"] = json.dumps(user_profiles.get(pu.user, [pu.pos_profile]))
+		if user_access is not None:
+			row["profile_access"] = json.dumps(user_access.get(pu.user, {}))
 		results.append(row)
 
 	return results

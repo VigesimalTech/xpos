@@ -11,6 +11,7 @@ import { query, queryOne } from "../database/dbService";
 import { checkTillPin, type PinResult } from "../database/ipcHandlers";
 import { createLogger } from "../logger";
 import { recordAuditEvent, recordPinFailure } from "../audit/auditLog";
+import { onProfile } from "../database/profileAccess";
 import { approvalRefusal, type ApprovalRefusal, type ApproverRow } from "./approvalRules";
 
 const log = createLogger("Approval");
@@ -56,10 +57,12 @@ async function refusalFor(approver: ApproverRow, ask: ApprovalAsk): Promise<Appr
 /** Everyone on this till who may approve `ask`, for the approval dialog. */
 export async function approversFor(ask: ApprovalAsk): Promise<{ name: string; full_name: string }[]> {
 	const users = await query<ApproverRow & { full_name: string }>(
-		"SELECT * FROM `pos_users` WHERE `approve_exceptions` = 1 ORDER BY `full_name`",
+		// Whether they may approve depends on the profile (profileAccess.ts), not only the row.
+		"SELECT * FROM `pos_users` WHERE `approve_exceptions` = 1 OR `profile_access` IS NOT NULL ORDER BY `full_name`",
 	);
 	const eligible = [];
-	for (const user of users) {
+	for (const row of users) {
+		const user = onProfile(row, ask.posProfile);
 		if (!(await refusalFor(user, ask)))
 			eligible.push({ name: user.name, full_name: user.full_name || user.name });
 	}
@@ -76,7 +79,7 @@ export async function verifyApproval(
 		approver,
 	]);
 	if (!row) return { ok: false, reason: "unknown_user" };
-	const refusal = await refusalFor(row, ask);
+	const refusal = await refusalFor(onProfile(row, ask.posProfile), ask);
 	if (refusal) {
 		log.info(`Approval by ${row.name} for ${ask.cashier} refused: ${refusal}`);
 		return { ok: false, reason: refusal };

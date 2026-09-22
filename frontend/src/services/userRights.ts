@@ -93,7 +93,8 @@ export async function loadPermissions(userEmail: string, posProfile?: string): P
 	}
 
 	try {
-		const posUser = await window.electronAPI!.db.getPosUser(userEmail);
+		// Their role and limits on this profile, or on their open shift's (profileAccess.ts).
+		const posUser = await window.electronAPI!.db.getPosUser(userEmail, posProfile);
 		if (posUser) {
 			currentRole.value = ((posUser as Record<string, unknown>).role as string) || "";
 			permissions.value = mergePermissions(posUser);

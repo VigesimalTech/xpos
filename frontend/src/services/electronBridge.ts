@@ -339,7 +339,8 @@ export interface ElectronDbAPI {
 		itemCode: string,
 		company: string,
 	) => Promise<{ item_tax_template: string; item_tax_map: Record<string, number> } | null>;
-	getPosUser: (username: string) => Promise<Record<string, unknown> | null>;
+	/** As the user stands on `posProfile`, or on the profile of their open shift. */
+	getPosUser: (username: string, posProfile?: string) => Promise<Record<string, unknown> | null>;
 	verifyPassword: (username: string, password: string) => Promise<boolean>;
 	cachePasswordFromServer: (
 		username: string,
