@@ -43,7 +43,7 @@ const site: Site = configPath
 const CASHIER = "rt-cashier@example.com"; // on the first shop, limit 10%
 const OTHER_SHOP_CASHIER = "rt-other@example.com"; // on the second shop only, limit 0
 const SUPERVISOR = "rt-supervisor@example.com"; // Manager on the first shop, limit 30%
-const BOTH_SHOPS_CASHIER = "rt-both@example.com"; // Cashier role on both shops: may not approve
+const BOTH_SHOPS_CASHIER = "rt-both@example.com"; // Cashier in the first shop (a Manager in the second): may not approve here
 
 type ServerInvoice = {
 	name: string;

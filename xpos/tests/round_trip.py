@@ -35,7 +35,12 @@ CASHIERS = {
 }
 # The till's cash and close tests: a cashier whose POS Role may record expenses and
 # bank drops and close a shift (the installed Manager role).
-POS_ROLES = {("rt-supervisor@example.com", POS_PROFILE): "Manager"}
+# The cashier in both shops is a Manager in the second only: a till takes their role and
+# limit from the profile of its open shift, not from their first profile.
+POS_ROLES = {
+	("rt-supervisor@example.com", POS_PROFILE): "Manager",
+	("rt-both@example.com", POS_PROFILE_2): "Manager",
+}
 BANK_ACCOUNT = "RT Bank"
 # The sale-policy tests: this cashier may give up to 10% alone; the second shop
 # rejects out-of-policy sales rather than flagging them. The supervisor (Manager, so
@@ -43,6 +48,7 @@ BANK_ACCOUNT = "RT Bank"
 CASHIER_DISCOUNT_LIMIT = {
 	("rt-cashier@example.com", POS_PROFILE): 10,
 	("rt-supervisor@example.com", POS_PROFILE): 30,
+	("rt-both@example.com", POS_PROFILE_2): 25,
 }
 REJECT_PROFILE = POS_PROFILE_2
 # What a till's API user needs to read everything the till pulls with frappe.client.get_list.
