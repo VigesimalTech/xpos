@@ -14,3 +14,4 @@ xpos.patches.move_item_search_settings_to_pos_settings
 xpos.patches.profile_discount_zero_means_none
 xpos.patches.add_approval_permissions
 xpos.patches.add_screen_permissions
+xpos.patches.ensure_pos_change_gl_entries
