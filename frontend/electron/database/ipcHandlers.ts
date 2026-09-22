@@ -26,6 +26,7 @@ import {
 import { createLogger } from "../logger";
 import { recordPinFailure } from "../audit/auditLog";
 import {
+	countWaitingSales,
 	isHeldOrderData,
 	parseJsonColumn,
 	saleFromPending,
@@ -465,12 +466,14 @@ export function registerDbHandlers(): void {
 		return true;
 	});
 
-	ipcMain.handle("db:count-pending-invoices", async () => {
-		const row = await queryOne<{ cnt: number }>(
-			"SELECT COUNT(*) as cnt FROM `pending_invoices` WHERE `status` IN ('pending','failed')",
-		);
-		return row?.cnt ?? 0;
-	});
+	// The offline pill's "N sales waiting": held orders wait too, but are not sales yet.
+	ipcMain.handle("db:count-pending-invoices", async () =>
+		countWaitingSales(
+			await query<{ data: unknown }>(
+				"SELECT `data` FROM `pending_invoices` WHERE `status` IN ('pending','failed')",
+			),
+		),
+	);
 
 	ipcMain.handle(
 		"db:add-pending-purchase",

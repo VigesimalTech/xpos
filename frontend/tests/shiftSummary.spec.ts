@@ -125,3 +125,18 @@ describe("the till's shift summary", () => {
 		expect(summary.tax_summary).toEqual([{ account_head: "VAT", rate: 7.5, amount: -5 }]);
 	});
 });
+
+describe("sales waiting to sync, as the offline pill counts them", () => {
+	it("leaves held orders out: they are not sales until paid", async () => {
+		const { countWaitingSales } = await import("../electron/database/shiftSummary");
+		// One sale and one held order waiting: the pill said "2 sales waiting" (release sweep,
+		// 22 Sep 2026). MariaDB may return the JSON as text or parsed.
+		const rows = [
+			{ data: JSON.stringify({ items: [{}], is_draft: false }) },
+			{ data: JSON.stringify({ items: [{}], is_draft: true }) },
+			{ data: { items: [{}] } },
+		];
+		expect(countWaitingSales(rows)).toBe(2);
+		expect(countWaitingSales([rows[1]])).toBe(0);
+	});
+});
