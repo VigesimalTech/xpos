@@ -75,6 +75,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { isElectron } from "@/services/electronBridge";
 import { canDoOrAsk } from "@/services/userRights";
 import { canOpenScreen } from "@/services/screenAccess";
+import { reachesLevel } from "@/services/roleLevel";
 import __ from "@/lib/translate";
 import { usePrintInvoice } from "@/composables/usePrintInvoice";
 import AboutDialog from "@/components/dialogs/AboutDialog.vue";
@@ -392,6 +393,8 @@ const allMenus = computed<Menu[]>(() => [
 				label: "Settings",
 				icon: Settings,
 				shortcut: "Ctrl+,",
+				// K40: supervisors see the printer settings, administrators everything.
+				hidden: () => !isElectron() || !reachesLevel("supervisor"),
 				action: () => router.push("/settings"),
 			},
 			{

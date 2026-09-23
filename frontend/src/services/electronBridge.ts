@@ -11,7 +11,14 @@ export interface ApprovalAsk {
 
 /** An event for the till's audit log (K20), as a screen records it. */
 export interface AuditRecord {
-	event_type: "line_removed" | "qty_lowered" | "sale_cleared" | "held_order_discarded" | "reprint";
+	event_type:
+		| "line_removed"
+		| "qty_lowered"
+		| "sale_cleared"
+		| "held_order_discarded"
+		| "reprint"
+		| "settings_changed"
+		| "local_data_cleared";
 	pos_profile?: string | null;
 	shift?: string | number | null;
 	cashier?: string | null;
@@ -360,7 +367,9 @@ export interface ElectronDbAPI {
 	getCurrencies: () => Promise<Record<string, unknown>[]>;
 	clearCachedData: () => Promise<boolean>;
 	clearAllData: () => Promise<boolean>;
-	clearPendingData: () => Promise<boolean>;
+	/** K40: refused, with what is waiting, while anything is not yet in ERPNext. */
+	clearPendingData: () => Promise<{ cleared: boolean; unsent: Record<string, number>; waiting: string }>;
+	countUnsent: () => Promise<Record<string, number> & { total: number }>;
 }
 
 declare global {

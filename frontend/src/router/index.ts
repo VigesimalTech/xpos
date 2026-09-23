@@ -11,6 +11,7 @@ import routes from "./routes";
 import { checkSetupState, setupRedirect } from "./setupGuard";
 import { usePosStore } from "@/stores/posStore";
 import { openScreen, screenOfRoute } from "@/services/screenAccess";
+import { reachesLevel } from "@/services/roleLevel";
 
 const history = isElectron() ? createWebHashHistory() : createWebHistory("/xpos");
 
@@ -58,7 +59,8 @@ router.beforeEach(async (to, from, next) => {
 		return;
 	}
 
-	if (to.name === "settings" && !isElectron()) {
+	// K40: the till's settings are for supervisors (the printer) and administrators (the rest).
+	if (to.name === "settings" && (!isElectron() || !reachesLevel("supervisor"))) {
 		next({ name: "pos" });
 		return;
 	}

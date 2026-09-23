@@ -432,9 +432,10 @@ export async function clearCachedData() {
 	return true;
 }
 
-export async function clearPendingData() {
+export async function clearPendingData(): Promise<boolean> {
 	if (isElectron()) {
-		return getDb().clearPendingData();
+		// K40: the till refuses while anything is unsent.
+		return (await getDb().clearPendingData()).cleared;
 	}
 	const idb = await import("./idbService");
 	await idb.clearPendingData();

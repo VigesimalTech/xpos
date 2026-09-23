@@ -36,6 +36,9 @@ EVENT_TYPES = {
 	"pin_failed": "PIN Failed",
 	"no_sale": "No Sale",
 	"void_after_payment": "Void After Payment",
+	# K40: the till's system settings changed, and its local data cleared.
+	"settings_changed": "Settings Changed",
+	"local_data_cleared": "Local Data Cleared",
 }
 OTHER = "Other"
 
