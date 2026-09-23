@@ -98,6 +98,17 @@ function isOnline(): boolean {
 }
 
 /**
+ * With no network on this PC at all, nothing is sent, so no request ever fails to say
+ * ERPNext is out of reach: the screen went on saying Online (K37). Say it here. The first
+ * answer from ERPNext once the network is back says it is reachable again.
+ */
+function noteNoNetwork(): boolean {
+	if (isOnline()) return false;
+	setReachable(false);
+	return true;
+}
+
+/**
  * JSON for Frappe. mysql2 returns DATE/DATETIME columns as Date objects (read as UTC, since the
  * pool uses timezone +00:00), and JSON.stringify turns those into "2026-09-17T00:01:01.000Z",
  * which MariaDB refuses. Send the stored wall-clock value in Frappe's format instead.
@@ -998,7 +1009,7 @@ const NETWORK_ERROR_SQL = [
 
 async function runSyncCycle(): Promise<void> {
 	await inFlightRecovery;
-	if (syncState.isSyncing || !isOnline()) return;
+	if (noteNoNetwork() || syncState.isSyncing) return;
 
 	syncState.isSyncing = true;
 	syncCycleCount++;
@@ -1104,7 +1115,7 @@ async function runSyncCycle(): Promise<void> {
 
 async function runPushCycle(): Promise<void> {
 	await inFlightRecovery;
-	if (syncState.isSyncing || !isOnline()) return;
+	if (noteNoNetwork() || syncState.isSyncing) return;
 
 	const pushTables = SYNC_TABLES.filter((t) => t.direction === "push" || t.direction === "both").sort(
 		(a, b) => a.pullOrder - b.pullOrder,
@@ -1158,7 +1169,8 @@ export function initSyncEngine(context: SyncContext): void {
 	startPeriodicSync();
 
 	const checkOnline = () => {
-		if (isOnline() && !syncState.isSyncing) {
+		if (noteNoNetwork()) return;
+		if (!syncState.isSyncing) {
 			setTimeout(() => {
 				if (isOnline()) runSyncCycle();
 			}, SYNC_DEFAULTS.onlineGracePeriodMs);
@@ -1179,16 +1191,14 @@ export function updateSyncContext(context: Partial<SyncContext>): void {
 function startPeriodicSync(): void {
 	if (syncIntervalId) clearInterval(syncIntervalId);
 	syncIntervalId = setInterval(() => {
-		if (isOnline() && !syncState.isSyncing) {
-			runSyncCycle();
-		}
+		if (noteNoNetwork()) return;
+		if (!syncState.isSyncing) runSyncCycle();
 	}, SYNC_DEFAULTS.intervalMs);
 
 	if (pushIntervalId) clearInterval(pushIntervalId);
 	pushIntervalId = setInterval(() => {
-		if (isOnline() && !syncState.isSyncing) {
-			runPushCycle();
-		}
+		if (noteNoNetwork()) return;
+		if (!syncState.isSyncing) runPushCycle();
 	}, SYNC_DEFAULTS.pushIntervalMs);
 }
 

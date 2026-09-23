@@ -141,6 +141,21 @@ describe("pushing sales to ERPNext", () => {
 		expect((await pendingInvoices())[0].status).toBe("synced");
 	});
 
+	it("K37: with no network at all the screen is told ERPNext is out of reach, and back when it is", async () => {
+		// Nothing is sent without a network, so no request failed to say so: the pill kept
+		// saying Online with the PC's network switched off.
+		await queueSale();
+		setOnline(false);
+
+		await runSyncCyclePublic();
+		expect(rendererEvents).toContainEqual({ channel: "sync-reachability", data: { reachable: false } });
+
+		setOnline(true);
+		await runSyncCyclePublic();
+		expect((await pendingInvoices())[0].status).toBe("synced");
+		expect(rendererEvents).toContainEqual({ channel: "sync-reachability", data: { reachable: true } });
+	});
+
 	it("O1: ERPNext not answering while the till's network is up uses none of a sale's tries", async () => {
 		// The case a till meets most: its network is up, ERPNext is not there. Before the
 		// fix every push counted a try, and a minute of it dead-lettered the sale for good.
