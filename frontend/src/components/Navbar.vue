@@ -126,25 +126,30 @@
 		</TooltipWrapper>
 
 		<div v-if="posStore.useOfflineMode" class="flex items-center gap-1">
-			<TooltipWrapper :content="offlineStore.statusLabel">
+			<TooltipWrapper :content="__(syncView.tooltip)">
 				<Button
 					variant="ghost"
 					size="sm"
-					:class="['gap-1.5', offlineStore.statusColor]"
+					:class="['gap-1.5', SYNC_COLOR[syncView.tone]]"
+					data-testid="sync-status"
 					@click="handleOfflineAction"
 				>
-					<Loader2 v-if="offlineStore.isSyncing" class="w-4 h-4 animate-spin" />
-					<WifiOff v-else-if="!offlineStore.isOnline" class="w-4 h-4" />
-					<CloudUpload v-else-if="offlineStore.hasPending" class="w-4 h-4" />
+					<Loader2 v-if="syncView.busy" class="w-4 h-4 animate-spin" />
+					<WifiOff v-else-if="syncView.tone === 'offline'" class="w-4 h-4" />
+					<AlertTriangle v-else-if="syncView.tone === 'attention'" class="w-4 h-4" />
+					<CloudUpload
+						v-else-if="offlineStore.hasPending && detail !== 'Minimal'"
+						class="w-4 h-4"
+					/>
 					<Wifi v-else class="w-4 h-4" />
 					<Badge
-						v-if="offlineStore.pendingCount > 0"
+						v-if="offlineStore.pendingCount > 0 && detail !== 'Minimal'"
 						variant="destructive"
 						class="h-4 min-w-4 px-1 text-[10px] leading-none"
 					>
 						{{ offlineStore.pendingCount }}
 					</Badge>
-					<span class="hidden lg:inline text-xs">{{ offlineStore.statusLabel }}</span>
+					<span class="hidden lg:inline text-xs">{{ __(syncView.label) }}</span>
 				</Button>
 			</TooltipWrapper>
 		</div>
@@ -268,6 +273,7 @@ import {
 	Wifi,
 	WifiOff,
 	CloudUpload,
+	AlertTriangle,
 	Loader2,
 	LayoutGrid,
 	FileText,
@@ -280,6 +286,7 @@ import {
 import AboutDialog from "@/components/dialogs/AboutDialog.vue";
 import KeyboardShortcutsDialog from "@/components/dialogs/KeyboardShortcutsDialog.vue";
 import { useOfflineStore } from "@/stores/offlineStore";
+import { syncPillView, type SyncTone } from "@/services/syncPill";
 
 import { useBranding } from "@/composables/useBranding";
 import { usePrintInvoice } from "@/composables/usePrintInvoice";
@@ -309,6 +316,31 @@ const themeTooltip = computed(() => {
 	return __("Theme: System ({0}) (click to switch to Light)", [isDark.value ? __("Dark") : __("Light")]);
 });
 const offlineStore = useOfflineStore();
+
+// K37: the same rule as the till's pill, at the POS Profile's Sync Status Detail.
+const detail = computed(() => posStore.syncStatusDetail);
+const syncView = computed(() =>
+	syncPillView(
+		{
+			needAttention: offlineStore.deadLetterCount,
+			offline: !offlineStore.isOnline,
+			waiting: offlineStore.pendingCount,
+			syncing: offlineStore.isSyncing,
+			lastError: offlineStore.lastSyncError,
+			errorCycles: offlineStore.errorCycles,
+			lastSyncTime: offlineStore.lastSyncTime
+				? new Date(offlineStore.lastSyncTime).toLocaleTimeString()
+				: null,
+		},
+		detail.value,
+	),
+);
+const SYNC_COLOR: Record<SyncTone, string> = {
+	quiet: "text-emerald-500",
+	syncing: "text-blue-500",
+	offline: "text-amber-500",
+	attention: "text-red-500",
+};
 
 const showAboutDialog = ref(false);
 const showShortcutsDialog = ref(false);

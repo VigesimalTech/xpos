@@ -114,12 +114,18 @@ The sync engine runs in the background and sends the till's records to ERPNext i
 - Sync requests give up after **60 seconds**, and screen requests after **30 seconds**, so a dead link never freezes the till
 
 ### Sync Status Pill
-| Pill | Meaning |
-|---|---|
-| **Synced {time}** | ERPNext is answering, and the last sync finished at that time |
-| **Syncing** | A sync is running |
-| **Offline – N sales waiting** (amber) | ERPNext is not answering. Sales are kept on the till and sent when it is back. Held orders are not counted |
-| **N need attention** | Sales ERPNext refused. Click to open the unsynced-sales panel, review, and requeue |
+How much the pill shows is set by the POS Profile's **Sync Status Detail**. Whatever the setting, clicking the pill opens the unsynced-sales panel with everything in it.
+
+| Pill | Meaning | Shown at |
+|---|---|---|
+| **Online** | ERPNext is answering | Minimal |
+| **Offline** (amber) | ERPNext is not answering. Sales are kept on the till and sent when it is back | Minimal |
+| **N need attention** | Sales ERPNext refused. Click to review them and send them again | Every level |
+| **Sync problem** | Syncing has failed several times in a row, so prices or stock may be out of date. Click for the reason | Minimal |
+| **Syncing** | A sync is running (Detailed also names what is syncing) | Standard, Detailed |
+| **Synced {time}** | The last sync finished at that time | Standard, Detailed |
+| **Offline – N sales waiting** (amber) | As Offline, with the number of sales waiting. Held orders are not counted | Standard, Detailed |
+| **Sync error** | The last sync ended in an error | Standard, Detailed |
 
 Selling offline is normal on a till. Waiting sales are not errors.
 

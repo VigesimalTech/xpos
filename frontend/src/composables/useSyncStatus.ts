@@ -29,6 +29,8 @@ export function useSyncStatus() {
 	const errorLog = ref<SyncErrorEntry[]>([]);
 	const deadLetters = ref<DeadLetterEntry[]>([]);
 	const cycleHadError = ref(false);
+	/** Sync cycles in a row that ended in an error (K37: Minimal shows it after a few). */
+	const errorCycles = ref(0);
 	/** ERPNext is not answering: the till sells offline and sends later. */
 	const unreachable = ref(false);
 
@@ -80,6 +82,7 @@ export function useSyncStatus() {
 			syncPhase.value = "idle";
 			syncTable.value = null;
 			if (!cycleHadError.value) lastError.value = null;
+			errorCycles.value = cycleHadError.value ? errorCycles.value + 1 : 0;
 			lastSyncTime.value = new Date().toLocaleTimeString();
 			syncCompleteCount.value++;
 		});
@@ -125,6 +128,7 @@ export function useSyncStatus() {
 	function clearErrorLog() {
 		errorLog.value = [];
 		lastError.value = null;
+		errorCycles.value = 0;
 	}
 
 	function clearDeadLetters() {
@@ -137,6 +141,7 @@ export function useSyncStatus() {
 		syncTable,
 		lastSyncTime,
 		lastError,
+		errorCycles,
 		unreachable,
 		syncCompleteCount,
 		errorLog,
