@@ -71,6 +71,18 @@ Each entry shows:
 
 ---
 
+## Held Orders on the Desktop Till
+
+On the [Desktop Till](29-desktop-till.md), held orders stay on the till and are never sent to ERPNext:
+- **Hold** saves the order in the till's own database, so holding works offline
+- **Held Invoices** (`F8`) lists them from the till, for this shift or every shift
+- Restoring an order loads it into the cart and takes it off the list
+- Deleting a held order removes it from the till. Discarding one needs the **Remove Items From the Cart** role permission or a manager's PIN, and is recorded in the [Audit Log](31-audit-log.md)
+- Held orders are not counted as sales waiting to sync, and are left out of the shift close
+- If no customer is picked, the POS Profile's default customer is used
+
+---
+
 ## Use Cases
 
 ### Serving Multiple Customers
@@ -96,4 +108,5 @@ Each entry shows:
 - Draft invoices are automatically cleaned up based on your profile settings
 - Use draft orders to manage busy periods efficiently
 - Each draft shows the customer name, item count, and total for quick identification
+- On the desktop till, held orders live on that till only. Restore them there, not from another till
 - Held orders and [Cashier Settlement](26-cashier-settlement.md) bills are kept separate — bills sent to a cashier do not appear in the held-orders list, and vice versa

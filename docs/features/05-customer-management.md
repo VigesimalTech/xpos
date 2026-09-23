@@ -45,7 +45,7 @@ Directly from the Customer Selection Dialog, you can create a new customer witho
 | Tax ID | No | Tax identification number |
 | Mobile No | No | Phone number |
 | Email | No | Email address |
-| Gender | No | Dropdown selection |
+| Gender | No | Dropdown selection. Starts empty and is saved only when chosen |
 | Birthday | No | Date of birth (for birthday promotions) |
 | Referral Code | No | Referral code if referred by another customer |
 | Customer Group | No | Dropdown populated from your system |
@@ -136,4 +136,4 @@ X POS tracks customer credit from two sources:
 
 - When offline mode is enabled, X POS pre-caches up to **1,000 customers** locally
 - Customer search works offline using the cached data
-- New customers created offline are synced when the connection is restored
+- New customers can only be created while ERPNext is reachable. Offline, the form says a customer can be added once the POS is back online

@@ -19,6 +19,7 @@ X POS provides a sophisticated tax engine supporting multiple tax accounts, per-
 - When enabled in your POS Profile, item prices **include tax**
 - The system back-calculates the tax component from the inclusive price
 - Tax lines in the cart summary show an "included" indicator
+- The POS Profile's **Tax Inclusive** setting decides, as it does in ERPNext: taxes are included exactly when the profile is tax inclusive, whatever the template's own *Is this Tax included in Basic Rate?* flag. `Actual` charges are never included
 
 ---
 
@@ -58,8 +59,20 @@ Taxes are calculated in real-time as items are added, modified, or removed from 
    - Check if tax is `included_in_print_rate`:
      - **Included**: Back-calculate tax from inclusive price — `tax = amount - (amount / (1 + rate/100))`
      - **Not included**: Calculate tax additive — `tax = net_amount × rate / 100`
+   - "Included" follows the POS Profile's **Tax Inclusive** setting (see above)
 2. Extra tax accounts from item tax maps (not in the global template) are added as additional tax lines
 3. All amounts are rounded to 2 decimal places
+
+### Discounts and Tax
+Taxes on a discounted sale are worked out as ERPNext books them:
+1. The discount is turned into a factor of the net total (or of the grand total less fixed-amount taxes, when the discount is on the grand total)
+2. Every line's net amount is lowered by that factor
+3. Rate-based taxes are charged on the lowered amounts
+
+For example, 3 × 33.33 with 10% off and 5% VAT charges VAT **4.50**, as ERPNext books it, not 5.00. Without a discount, nothing changes.
+
+### Desktop Till
+- On the [Desktop Till](29-desktop-till.md), a shift uses the POS Profile's **Sales Taxes and Charges Template**, its **Tax Inclusive** setting and Global Defaults' rounding, synced to the till, so offline sales are charged exactly what ERPNext books
 
 ### Cart Summary Display
 Each tax line shows:

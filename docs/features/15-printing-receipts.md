@@ -14,15 +14,43 @@ X POS supports configurable receipt printing with thermal printer compatibility,
 ### Print Last Invoice
 - After a payment, you can reprint the last invoice using the **Print Last** feature (if `allow_print_last_invoice` is enabled)
 - The system stores the last invoice name for quick access
+- Reprinting needs the **Reprint Invoice** role permission. On the desktop till, a cashier without it can reprint with a manager's PIN (see [Cashier Rights & Manager Approval](30-cashier-rights-approval.md))
 
 ### Print from Order History
 - Open any order in the Order History view
 - Click the **Print** button to open its print preview
 - Works for both current and past invoices
 
+### Print a Shift Close
+- After closing a shift, click **Print** to print the close summary: the counted amounts against what was expected
+- The summary prints from the **POS Closing Shift**
+
 ### Print Draft Invoices
 - When enabled, held/draft invoices can be printed before submission
 - Useful for order tickets (kitchen/preparation areas) before payment
+
+---
+
+## Printing Offline (Web POS)
+
+When the POS Profile uses offline mode, receipts print even with no connection:
+- The receipt layout is cached when a shift opens or resumes
+- Each sale queued offline keeps a copy of its receipt beside it (never sent to the server)
+- The receipt prints from that copy and the cached layout, numbered `OFFLINE-<id>` until the sale syncs
+- A failed print does not lose the sale
+
+---
+
+## Printing on the Desktop Till
+
+On the [Desktop Till](29-desktop-till.md), receipts print **silently**, with no print dialog:
+- Choose the printer in **Settings → Receipt Printer**, and press **Test Print** to check it. With none chosen, the operating system's default printer is used
+- A till's own sale prints from the till's copy of it, online or offline
+- An invoice from ERPNext (for example, from Order History) prints from ERPNext's print format, fetched by the till
+- If the receipt layout has not been fetched yet (a new till's first sale), the till fetches it before printing, so the first receipt is the shop's own
+- If a receipt does not print, the cashier is told why. The sale is saved either way
+- Item images and the receipt logo load from the ERPNext server
+- Reports keep the print dialog, since page and orientation matter there
 
 ---
 
@@ -31,7 +59,7 @@ X POS supports configurable receipt printing with thermal printer compatibility,
 ### Available Print Formats
 - X POS lists all available print formats for the invoice doctype (Sales Invoice or POS Invoice)
 - The default print format is configured in the POS Profile
-- The POS Profile can also switch receipt discount labels between percentage and amount using `print_discount_amount`
+- The POS Profile can also switch receipt discount labels between percentage and amount using `print_discount_amount`. It is on by default, and switched on for existing profiles on upgrade, so receipts show discounts as amounts
 
 ### Built-in Print Formats
 X POS ships with:
@@ -136,13 +164,13 @@ When designing print formats, the following data is available:
 - Whether the item was an offer/free item
 
 ### Totals
-- Net total
+- Net total (after a whole-sale discount, as ERPNext books it)
 - Individual tax lines with descriptions and amounts
 - Additional discount
 - Loyalty redemption amount
 - Write-off amount
 - Grand total
-- Rounded total
+- Rounded total (the X POS receipt prints a rounding line when the total was rounded, so it adds up line by line)
 
 ### Payments
 - Each payment method with amount

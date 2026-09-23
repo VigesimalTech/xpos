@@ -18,6 +18,8 @@ The purchasing module provides a complete procurement workflow directly from the
 
 ## Accessing the Purchase Module
 
+- The POS Profile's **Allow Purchasing** must be on (it is off by default). Off, purchasing is hidden from everyone on the profile, whatever their role allows
+- The cashier's POS Role needs the **Purchasing** permission. Without it, the screens are hidden, or opened with a manager's PIN on the desktop till, as the profile's **Screens the Role Lacks** sets (see [Cashier Rights & Manager Approval](30-cashier-rights-approval.md))
 - Navigate to the **Purchase** tab from the POS navigation bar
 - The Purchase View has a three-tab layout:
   1. **Suppliers** — Select or create a supplier
@@ -165,6 +167,7 @@ When received quantities don't match the transferred quantities:
 
 ### Sync Mechanism
 - Pending purchases sync automatically when connectivity returns
+- A purchase order sent twice (for example, after a lost reply) is created **once** in ERPNext, with its receipt and invoice
 - Manual sync available via the **Sync** button in the purchase header
 - Failed purchases can be retried
 

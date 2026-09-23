@@ -18,6 +18,11 @@ There are two ways to initiate a return:
 3. Click the **Return** button on the invoice detail page
 4. You are redirected to the POS view in return mode with items pre-loaded
 
+### On the Desktop Till
+- **File → Return Invoice** or `Ctrl+R` opens the Return Dialog
+- Returns need the **Sale Return** role permission. A cashier without it sees the Return button, and a manager's PIN lets the return go ahead (see [Cashier Rights & Manager Approval](30-cashier-rights-approval.md))
+- Invoices to return are looked up in ERPNext. While ERPNext is out of reach, the dialog says so rather than showing "No invoices found"
+
 ---
 
 ## Return Dialog — Step 1: Search Invoices

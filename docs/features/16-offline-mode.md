@@ -23,6 +23,14 @@ When offline mode is enabled (`use_offline_mode` on POS Profile), X POS:
 
 ---
 
+## Installing the Web POS as an App
+
+- The web POS at `/xpos` is an installable app (PWA). Your browser offers to install it from the address bar
+- Once installed, or after one online visit, a service worker keeps the POS pages cached, so the POS opens and reloads **with no connection**
+- On the [Desktop Till](29-desktop-till.md), none of this applies: the till keeps its data in its own local database
+
+---
+
 ## Data Pre-Caching
 
 When a shift is opened with offline mode enabled, the following data is pre-loaded to your device:
@@ -97,6 +105,15 @@ The app stores offline data in your browser with dedicated storage for:
 - Full invoices are created and validated locally
 - Saved to the `pendingInvoices` queue in IndexedDB
 - Includes all data: items, customer, payments, discounts, taxes, offers
+
+### Receipts
+- Sales completed offline print their receipt from a cached layout (see [Printing & Receipts](15-printing-receipts.md))
+
+### Reloading While Offline
+- Reloading the page, or reopening the installed app, while offline keeps you signed in: the last session the server confirmed is restored
+- The sale being rung up is saved as it changes and restored when the POS opens, for the same cashier on the same day
+- A completed or cleared sale never comes back
+- X POS asks the browser for persistent storage, so queued sales are not evicted when the disk is low
 
 ### Purchase Orders
 - Purchase orders can be created offline
@@ -187,7 +204,26 @@ When connectivity returns:
 | Offers/promotions | Uses cached offers (new offers won't appear until sync) |
 | External payment verification | Requires connectivity |
 | Order history | Only online orders visible in history |
-| Shift closing | Requires connectivity to close the shift |
+| Shift closing | Requires connectivity to close the shift (the desktop till closes offline) |
+
+---
+
+## Offline on the Desktop Till
+
+The [Desktop Till](29-desktop-till.md) is built to sell offline. Its behavior differs from the web POS:
+
+| | Web POS | Desktop Till |
+|---|---|---|
+| Local storage | Browser (IndexedDB) | Local MariaDB on the PC |
+| Sync | Every 5 minutes, and when the connection returns | Background sync engine, continuously |
+| Retries | Up to 3 per invoice | Only an answer from ERPNext counts as a try. If ERPNext does not answer, the sale waits |
+| Status | "{N} pending" | **Offline – N sales waiting** (amber) |
+| Shift close | Needs connectivity | Works offline, sent after the shift's sales |
+| Held orders | Drafts in ERPNext | Kept on the till |
+| Crash mid-sync | — | Half-sent records are sent again at start, and booked once |
+
+- Only an answer from ERPNext itself counts as a failed try. After three, the sale shows under **need attention** in the unsynced-sales panel, where it can be reviewed and requeued
+- On the till, **Retry** and **Requeue** in the panel hand the sale back to the sync engine; the panel never deletes the till's own records of synced sales
 
 ---
 

@@ -13,8 +13,8 @@ The cart is the central workspace of X POS where items are collected, quantities
 
 ### Stock Validation
 - Before adding an item, the system checks available stock in the POS warehouse
-- If the item is out of stock and `block_sale_beyond_available_qty` is enabled, an error message is shown
-- Items with `allow_negative_stock` enabled (in Stock Settings) can be sold even with zero stock
+- If the item is out of stock and `block_sale_beyond_available_qty` is enabled (unset counts as enabled), an error message is shown
+- If `allow_negative_stock` is enabled in Stock Settings, items can be sold even with zero stock, whatever the profile says
 - Batch items check batch-specific quantities
 
 ### Customer Requirement
@@ -37,9 +37,12 @@ The cart is the central workspace of X POS where items are collected, quantities
 - **Inline Quantity Edit** — Click the quantity value to type a custom quantity directly
 - **Arrow Keys** — Use Arrow Up/Down while focused on a quantity input to navigate between cart items
 - **Minimum Quantity** — Quantity cannot go below 1 (use Delete to remove items)
+- The quantity buttons and box are sized for touch screens
 
 ### Rate Editing
-- If `allow_rate_change` is enabled in the POS Profile, the rate/price field is editable
+- If `allow_rate_change` is enabled in the POS Profile, the rate/price field is editable. The cashier's role also needs the **Change Price** permission
+- With `allow_rate_change` off, no price field is offered, and ERPNext flags any changed price, whatever the role
+- A price set below the price list counts as a discount against the cashier's **Discount Limit**
 - Click the rate value to enter a custom price
 - Arrow keys navigate between rate inputs of different cart items
 - Rate changes are reflected immediately in the line total and cart summary
@@ -53,13 +56,24 @@ The cart is the central workspace of X POS where items are collected, quantities
 ### Item-Level Discount
 - Toggle between **percentage (%)** and **amount** discount per line item
 - Enter the discount value — the line total updates in real time
-- The POS Profile can set a `max_discount_percentage_allowed` to cap discounts
+- The POS Profile can set a `max_discount_percentage_allowed` to cap discounts, and each cashier has their own **Discount Limit**; the lower applies
+- Line discounts need the POS Profile's **Allow Discount Change** and the role's **Edit Discount Field** permission
 - Cashiers choose the discount mode directly in the cart when editing a line item
 
 ### Delete Item
 - Hover over a cart item to reveal the **Delete** (trash) button
 - Click to remove the item from the cart
 - No confirmation prompt — removal is instant
+
+### Removing Items on the Desktop Till
+- On the [Desktop Till](29-desktop-till.md), removing anything from the customer's sale needs the **Remove Items From the Cart** role permission, or a manager's PIN:
+  - Deleting a line (its button or the Delete key)
+  - Lowering a quantity to 0
+  - Clearing the sale (the button, the shortcut, or **New Sale**)
+  - Discarding a held order
+- Lowering a quantity (above 0), raising one, free items added by a pricing rule, and lines in a return do not ask
+- Every removal is recorded in the [Audit Log](31-audit-log.md), with the manager who approved it
+- The web POS does not ask for approval
 
 ---
 
@@ -103,6 +117,7 @@ Each tax from the POS Profile's Sales Taxes and Charges template is shown as a s
 
 ### Grand Total
 - The final amount due after all discounts, taxes, loyalty, and write-offs
+- Taxes on a discounted sale are worked out as ERPNext books them: the discount lowers each line's net amount, and the tax is charged on that (see [Tax Handling](13-tax-handling.md))
 - Rounding is applied unless `disable_rounded_total` is set in Global Defaults
 
 ### Multi-Currency
@@ -128,7 +143,7 @@ Each tax from the POS Profile's Sales Taxes and Charges template is shown as a s
 - Error messages are shown for invalid or expired coupons
 
 ### Hold Order (Clock Icon)
-- Saves the current cart as a **draft invoice** on the server
+- Saves the current cart as a **draft invoice** on the server (on the desktop till, the order is kept on the till instead)
 - All cart data is preserved: items, customer, discounts, notes
 - The cart is cleared after holding
 - See [Draft & Held Orders](07-draft-orders.md) for details
@@ -138,7 +153,7 @@ Each tax from the POS Profile's Sales Taxes and Charges template is shown as a s
 - See [Draft & Held Orders](07-draft-orders.md) for details
 
 ### Clear Cart (Trash Icon)
-- Empties all items from the cart
+- Empties all items from the cart (on the desktop till, this may ask for a manager's PIN; see above)
 - Resets discounts, coupons, notes, and other order-level data
 - Customer selection is preserved
 
@@ -146,6 +161,7 @@ Each tax from the POS Profile's Sales Taxes and Charges template is shown as a s
 - Large gradient button at the bottom showing the **grand total**
 - Opens the **Payment Dialog** for checkout
 - Disabled if the cart is empty
+- On the desktop till, a sale beyond the cashier's rights (price change, discount or return) asks for a manager's PIN before the Payment Dialog opens. One approval covers the whole sale. See [Cashier Rights & Manager Approval](30-cashier-rights-approval.md)
 
 ---
 

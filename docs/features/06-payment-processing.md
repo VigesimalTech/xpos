@@ -96,6 +96,12 @@ Clicking a quick button fills the tendered amount and auto-calculates change.
 - Change = Tendered Amount − Grand Total
 - Change is shown prominently so the cashier knows the exact amount to return
 
+### Change Comes Only from Cash
+- Change is given only from a **cash** payment method (Mode of Payment type **Cash**)
+- A card or other non-cash payment cannot be more than the amount due. The dialog blocks saving and shows the reason in place of the change: *"A card payment cannot be more than the amount due: N over. Change can only be given from cash."*
+- In a split payment, cash beside a card still gives change from the cash
+- ERPNext needs **POS Settings → Create Ledger Entries for Change Amount** on to book a sale that gives change. X POS turns it on when it is installed or upgraded
+
 ---
 
 ## Mixed-Currency Cash Payment and Change

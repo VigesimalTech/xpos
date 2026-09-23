@@ -69,7 +69,7 @@ X POS provides multiple ways to find and add items to the cart — from visual b
 - Press **F2** to focus the barcode input field at any time
 - Scan or type the barcode and press Enter
 - The system searches for the barcode across:
-  - Item Barcode records
+  - Item Barcode records (every barcode an item has, including on the desktop till)
   - Direct item code matches
   - Scale barcodes (for weighted items, see [Scale Barcode Support](22-scale-barcodes.md))
 
@@ -138,3 +138,9 @@ The Item Detail Dialog opens when an item requires additional information before
 - Stock levels update when items are sold
 - Items with zero stock can be hidden from the grid through profile settings
 - Selling beyond available stock can be blocked through your profile settings
+- On the desktop till, stock refreshes after each sync, so a delivery or restock in ERPNext shows without restarting the app
+
+### Selling Beyond Stock
+One rule applies everywhere (the item grid, the cart and the server):
+- The POS Profile's **Block Sale Beyond Available Qty** decides. Unset counts as on
+- If ERPNext's **Stock Settings** allow negative stock, out-of-stock items can be sold whatever the profile says
