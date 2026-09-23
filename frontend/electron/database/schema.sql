@@ -378,6 +378,7 @@ CREATE TABLE IF NOT EXISTS `pos_profiles` (
   `xpos_allow_self_approval` TINYINT(1) DEFAULT 0,
   `xpos_screen_access` VARCHAR(40) DEFAULT 'Hide',
   `xpos_allow_purchasing` TINYINT(1) DEFAULT 0,
+  `xpos_show_loyalty` TINYINT(1) DEFAULT 0,
   `cash_movement_max_amount` DECIMAL(18,6) DEFAULT 0,
   `xpos_cash_out_within_drawer` TINYINT(1) DEFAULT 1,
   `pos_mixed_currency_tender` TINYINT(1) DEFAULT 0,

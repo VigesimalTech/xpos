@@ -283,6 +283,7 @@ async function runMigrations(): Promise<void> {
 		// K27: what a cashier sees of the screens their role lacks, and whether purchasing is on.
 		["xpos_screen_access", "VARCHAR(40) DEFAULT 'Hide'"],
 		["xpos_allow_purchasing", "TINYINT(1) DEFAULT 0"],
+		["xpos_show_loyalty", "TINYINT(1) DEFAULT 0"],
 		// What may go out of the drawer on the till (cashOutGuard.ts).
 		["cash_movement_max_amount", "DECIMAL(18,6) DEFAULT 0"],
 		["xpos_cash_out_within_drawer", "TINYINT(1) DEFAULT 1"],

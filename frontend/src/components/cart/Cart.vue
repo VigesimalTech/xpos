@@ -50,7 +50,7 @@
 						class="min-w-0 flex-1 max-w-44"
 					/>
 					<Button
-						v-if="cartStore.customer && !cartStore.isReturnMode"
+						v-if="posStore.showLoyalty && cartStore.customer && !cartStore.isReturnMode"
 						variant="outline"
 						size="sm"
 						class="shrink-0 w-fit justify-start gap-2 border-violet-300 text-violet-600 hover:bg-violet-50 dark:border-violet-700 dark:text-violet-400 dark:hover:bg-violet-900/20"
