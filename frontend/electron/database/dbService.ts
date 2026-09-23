@@ -288,6 +288,8 @@ async function runMigrations(): Promise<void> {
 		["xpos_show_loyalty", "TINYINT(1) DEFAULT 0"],
 		// K37: how much the sync pill shows.
 		["xpos_sync_status_detail", "VARCHAR(20) DEFAULT 'Minimal'"],
+		// K44: minutes idle before the till locks; 0 never.
+		["xpos_idle_lock_minutes", "INT DEFAULT 5"],
 		// What may go out of the drawer on the till (cashOutGuard.ts).
 		["cash_movement_max_amount", "DECIMAL(18,6) DEFAULT 0"],
 		["xpos_cash_out_within_drawer", "TINYINT(1) DEFAULT 1"],

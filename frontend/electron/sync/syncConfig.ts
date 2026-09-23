@@ -275,6 +275,7 @@ export const SYNC_TABLES: SyncTableConfig[] = [
 			"xpos_allow_purchasing",
 			"xpos_show_loyalty",
 			"xpos_sync_status_detail",
+			"xpos_idle_lock_minutes",
 			"cash_movement_max_amount",
 			"xpos_cash_out_within_drawer",
 			"pos_mixed_currency_tender",

@@ -197,6 +197,12 @@ export const usePosStore = defineStore("pos", () => {
 	// K37: how much the sync status shows; unset (an older profile) counts as Minimal.
 	const syncStatusDetail = computed(() => posProfile.value?.xpos_sync_status_detail || "Minimal");
 
+	// K44: minutes idle before the till locks; 0 never; unset (an older profile) counts as 5.
+	const idleLockMinutes = computed(() => {
+		const value = posProfile.value?.xpos_idle_lock_minutes;
+		return value === null || value === undefined ? 5 : Math.max(0, Number(value) || 0);
+	});
+
 	// The Loyalty Program button on the cart, where a cashier enrols a customer. Off by
 	// default: a shop may run a programme in ERPNext without enrolling at the till.
 	const showLoyalty = computed(() => !!posProfile.value?.xpos_show_loyalty);
@@ -672,6 +678,7 @@ export const usePosStore = defineStore("pos", () => {
 		allowCashDeposit,
 		askForScreens,
 		syncStatusDetail,
+		idleLockMinutes,
 		allowPurchasing,
 		showLoyalty,
 		allowRateChange,

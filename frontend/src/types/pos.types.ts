@@ -72,6 +72,8 @@ export interface POSProfile {
 	xpos_allow_purchasing?: boolean | number;
 	/** K37: how much the sync status shows. Unset counts as Minimal. */
 	xpos_sync_status_detail?: "Minimal" | "Standard" | "Detailed";
+	/** K44: minutes idle before the till locks; 0 never. Unset counts as 5. */
+	xpos_idle_lock_minutes?: number | null;
 	max_discount_percentage_allowed?: number;
 	auto_fetch_coupons_gifts?: boolean;
 	hide_closing_shift?: boolean;

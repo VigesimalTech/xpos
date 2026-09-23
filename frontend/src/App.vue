@@ -9,6 +9,8 @@
 		]"
 	>
 		<SplashScreen :show="showSplash" />
+		<!-- K44: left idle, the till locks until the cashier's PIN or password. -->
+		<LockScreen v-if="authStore.locked" />
 
 		<template v-if="isAuthPage || isFullScreen">
 			<router-view v-slot="{ Component }">
@@ -126,6 +128,8 @@ import ManagerApprovalDialog from "@/components/dialogs/ManagerApprovalDialog.vu
 import KeyboardShortcutsDialog from "@/components/dialogs/KeyboardShortcutsDialog.vue";
 import AboutDialog from "@/components/dialogs/AboutDialog.vue";
 import SplashScreen from "@/components/SplashScreen.vue";
+import LockScreen from "@/components/auth/LockScreen.vue";
+import { useIdleLock } from "@/composables/useIdleLock";
 import { useBranding } from "@/composables/useBranding";
 import { TooltipWrapper } from "@/components/ui/tooltip";
 import { AlertTriangle } from "lucide-vue-next";
@@ -149,6 +153,7 @@ const customerStore = useCustomerStore();
 const itemStore = useItemStore();
 const paymentStore = usePaymentStore();
 const authStore = useAuthStore();
+useIdleLock();
 const offlineStore = useOfflineStore();
 const syncStatus = useSyncStatus();
 const isElectronEnv = isElectron();
