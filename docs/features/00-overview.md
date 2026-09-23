@@ -38,6 +38,7 @@
 | 29 | [Desktop Till](29-desktop-till.md) | The installed till app: PIN sign-in, local database, silent printing, background sync |
 | 30 | [Cashier Rights & Manager Approval](30-cashier-rights-approval.md) | POS Role permissions, discount limits, server-side sale checks, manager PIN approval |
 | 31 | [Audit Log](31-audit-log.md) | Deleted lines, cleared sales, reprints, approvals and wrong PINs, stored in ERPNext |
+| 32 | [Exceptions Report](32-exceptions-report.md) | What each cashier took out of sales, returned, discounted and miscounted, by day or week |
 
 ---
 

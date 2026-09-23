@@ -16,7 +16,7 @@ The POS Profile is the central configuration hub for X POS. It controls every as
 | Input Qty | Enable manual quantity input mode |
 | Hide Variants Items | Hide individual variant items in the grid |
 | Show Template Items | Show template (parent) items in the grid |
-| Hide Expected Amount | Hide expected amounts in the closing dialog |
+| Hide Expected Amount | A blind cash-up: the closing dialog and printed close hide what is expected and the difference, and each count starts empty. The difference is still recorded for the supervisor |
 | Hide Closing Shift | Hide the close shift button |
 | Hide Images | Hide item images (text-only display) |
 | Hide Unavailable Items | Hide items with zero stock |
@@ -45,6 +45,7 @@ A discount on the whole order has no profile switch: the role's **Apply Addition
 | Setting | Description |
 |---|---|
 | Auto Fetch Coupons Gifts | Enable coupon entry and automatic cart-offer refresh |
+| Show Loyalty Program | Show the cart's **Loyalty Program** button, where a cashier enrols or unenrols a customer (default off). Points a customer already has are redeemed at payment either way |
 
 ---
 

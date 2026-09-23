@@ -65,6 +65,7 @@ An event with something in **Checks** deserves a manager's look.
 
 ## Tips
 
+- The [Exceptions Report](32-exceptions-report.md) totals these events by cashier and day; start there, and open the log for the detail
 - Review **Line Removed** and **Sale Cleared** events alongside each shift's close. They show value taken out of sales before payment
 - Frequent **PIN Failed** events for one user can mean someone else is trying their PIN
 - Filter on events with **Checks** filled in to find approvals that did not hold up

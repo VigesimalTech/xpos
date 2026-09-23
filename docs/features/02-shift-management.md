@@ -73,6 +73,12 @@ Before closing, you can review a complete summary of the shift:
 - Closing needs the **Close Shift** role permission. On the desktop till, a cashier without it can close with a manager's approval, recorded as **Approved By** on the POS Closing Shift (see [Cashier Rights & Manager Approval](30-cashier-rights-approval.md))
 - After closing, you can **Print** the close summary: the counted amounts against what was expected
 
+### Blind Cash-Up
+With the POS Profile's **Hide Expected Amount** on, the cashier counts the drawer without seeing what it should hold:
+- The **Expected** and **Difference** columns are hidden, and each count starts empty rather than filled in
+- The printed close shows the counted amounts only
+- The difference is still recorded on the POS Closing Shift, for a supervisor to review, and appears in the [Exceptions Report](32-exceptions-report.md)
+
 ### What Happens on Shift Close
 - A **POS Closing Shift** document is created with:
   - All invoices linked as child records (Sales Invoice Reference table)
