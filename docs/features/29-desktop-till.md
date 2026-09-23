@@ -89,7 +89,7 @@ See [Shift Management](02-shift-management.md) for closing a shift on the till.
 
 ## Receipt Printing
 
-- Receipts print **without a print dialog** to the printer chosen in **Settings → Receipt Printer**
+- Receipts print **without a print dialog** to the printer chosen in **Settings → Receipt Printer**, which a supervisor or administrator sets
 - **Test Print** checks the printer
 - With no printer chosen, the operating system's default printer is used
 - If a receipt does not print, the cashier is told why. The sale is saved either way
@@ -132,6 +132,29 @@ Selling offline is normal on a till. Waiting sales are not errors.
 ### When ERPNext Is Out of Reach
 - Screens that need ERPNext (reports, adding a customer, looking up a return) say **"ERPNext is not reachable. This needs ERPNext: try again once the till is back online."**
 - Stock shown in the item grid refreshes after each sync, with no restart
+
+---
+
+## Settings
+
+<!-- audience: supervisor -->
+
+**File → Settings** (`Ctrl+,`) shows what the signed-in user's POS Role reaches:
+
+| Who | Sees |
+|---|---|
+| Cashier | Nothing: Settings is not offered |
+| Supervisor (**Approve Exceptions**) | **Receipt Printer**, with **Test Print** |
+| Administrator (**Manage Role Permissions**) | Everything: the ERPNext server, the local database, synchronization, data management and startup |
+
+- **Clear All Local Data** is refused while anything on the till has not reached ERPNext: sales, held orders, shifts and their closes, cash movements or audit events. The till says what is waiting; let it sync first, or settle refused sales in the unsynced-sales panel
+- Changing the server, the local database or the sync settings, and clearing local data, are recorded in the [Audit Log](31-audit-log.md)
+
+### A Till Updated Before Its Server
+
+<!-- audience: administrator -->
+
+A till can be upgraded before ERPNext is. It then asks for settings the server does not have yet. The till leaves those out and carries on with the rest; the new settings take effect once ERPNext is upgraded and the app restarts.
 
 ---
 

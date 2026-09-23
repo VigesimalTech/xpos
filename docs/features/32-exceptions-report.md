@@ -51,6 +51,7 @@ The **POS Exceptions** report shows, for each cashier, what happened outside a p
 | Manager Approvals | Approvals given with a manager's PIN |
 | Reprints | Receipts printed again |
 | Wrong PINs | Wrong PINs entered for this user's PIN |
+| Till Settings Changed | Changes to a till's system settings, and clearing its local data |
 | Count Difference | The counted drawer less what was expected, over the day's closed shifts |
 
 - The cashier is the one recorded on the sale. For sales made before that was recorded, it is whoever created the invoice
