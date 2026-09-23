@@ -192,6 +192,10 @@ export const usePosStore = defineStore("pos", () => {
 
 	const allowPurchasing = computed(() => !!posProfile.value?.xpos_allow_purchasing);
 
+	// The Loyalty Program button on the cart, where a cashier enrols a customer. Off by
+	// default: a shop may run a programme in ERPNext without enrolling at the till.
+	const showLoyalty = computed(() => !!posProfile.value?.xpos_show_loyalty);
+
 	// The POS Profile's Allow Rate Change rules price changes: off, no one changes a price.
 	const allowRateChange = computed(() => !!Number(posProfile.value?.allow_rate_change));
 	// Its Allow Discount Change rules line discounts the same way.
@@ -662,6 +666,7 @@ export const usePosStore = defineStore("pos", () => {
 		allowCashDeposit,
 		askForScreens,
 		allowPurchasing,
+		showLoyalty,
 		allowRateChange,
 		allowDiscountChange,
 		fetchCoupon,
