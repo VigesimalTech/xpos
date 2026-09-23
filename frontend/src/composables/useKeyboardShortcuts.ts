@@ -1,3 +1,4 @@
+import { reachesLevel } from "@/services/roleLevel";
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { isElectron } from "@/services/electronBridge";
@@ -99,7 +100,7 @@ export function useKeyboardShortcuts() {
 			category: "General",
 			global: true,
 			action: () => {
-				if (isElectron()) router.push("/settings");
+				if (isElectron() && reachesLevel("supervisor")) router.push("/settings");
 			},
 		},
 		{

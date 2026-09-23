@@ -9,24 +9,14 @@
  */
 
 import type { RouteLocationRaw } from "vue-router";
-import { hasPermission } from "@/services/userRights";
-import { useAuthStore } from "@/stores/authStore";
+import { roleLevel, type RoleLevel } from "@/services/roleLevel";
 
 /** Who the guide is written for, lowest first. Kept here so screens need not load the guide. */
-export type HelpAudience = "cashier" | "supervisor" | "administrator";
+export type HelpAudience = RoleLevel;
 
-/**
- * How much of the guide the signed-in user sees (K39): everything with Manage Role
- * Permissions, the supervisor sections too with Approve Exceptions, else the cashier's.
- * The rights are those of the open shift's POS Profile.
- */
+/** How much of the guide the signed-in user sees (K39): the reach of their POS Role. */
 export function helpAudience(signedIn = true): HelpAudience {
-	if (!signedIn) return "cashier";
-	// The web page's boot says so on the web POS; on the till it comes with the cashier.
-	if (hasPermission("manage_role_permissions") || useAuthStore().canManagePermissions)
-		return "administrator";
-	if (hasPermission("approve_exceptions")) return "supervisor";
-	return "cashier";
+	return roleLevel(signedIn);
 }
 
 /** The audience each "?" is pressed by: its section must be one they can read (tests/helpGuide.spec.ts). */

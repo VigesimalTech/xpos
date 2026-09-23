@@ -34,6 +34,7 @@ import {
 	summarizeShift,
 } from "./shiftSummary";
 import { onProfile, pinsOf } from "./profileAccess";
+import { countUnsent, describeUnsent } from "./unsentRecords";
 
 const log = createLogger("DB-IPC");
 
@@ -2121,10 +2122,21 @@ export function registerDbHandlers(): void {
 		return true;
 	});
 
+	// K40: what ERPNext does not have yet, for the Settings screen to say before clearing.
+	ipcMain.handle("db:count-unsent", () =>
+		countUnsent(query, (data) => isHeldOrderData(parseJsonColumn(data))),
+	);
+
+	// K40: never while anything is unsent. Checked here, whoever asks, not only by the screen.
 	ipcMain.handle("db:clear-pending-data", async () => {
+		const unsent = await countUnsent(query, (data) => isHeldOrderData(parseJsonColumn(data)));
+		if (unsent.total > 0) {
+			log.warn(`Refused to clear pending data: ${describeUnsent(unsent)} not yet in ERPNext`);
+			return { cleared: false, unsent, waiting: describeUnsent(unsent) };
+		}
 		await execute("DELETE FROM `pending_invoices`");
 		await execute("DELETE FROM `pending_purchases`");
-		return true;
+		return { cleared: true, unsent, waiting: "" };
 	});
 
 	log.info("All handlers registered");

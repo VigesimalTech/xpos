@@ -25,6 +25,8 @@ X POS records what happens at the POS that leaves no sale behind: deleted lines,
 | **Reprint** | A receipt is reprinted |
 | **Approval** | A manager approves an action with their PIN, including opening a screen the role lacks |
 | **PIN Failed** | A wrong PIN is entered, at sign-in or for an approval |
+| **Settings Changed** | An administrator changes the till's ERPNext server, local database or sync settings, or whether it opens at startup. The change is recorded as from and to |
+| **Local Data Cleared** | An administrator clears the till's synced data, or all its local data |
 | **No Sale**, **Void After Payment**, **Other** | Reserved for coming features |
 
 Approvals and wrong PINs are recorded where the PIN is checked, so no screen can leave them out.

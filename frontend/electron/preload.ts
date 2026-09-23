@@ -445,7 +445,14 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
 		clearCachedData: () => ipcRenderer.invoke("db:clear-cached-data"),
 		clearAllData: () => ipcRenderer.invoke("db:clear-all-data"),
-		clearPendingData: () => ipcRenderer.invoke("db:clear-pending-data"),
+		/** K40: refused, with what is waiting, while anything is not yet in ERPNext. */
+		clearPendingData: (): Promise<{
+			cleared: boolean;
+			unsent: Record<string, number>;
+			waiting: string;
+		}> => ipcRenderer.invoke("db:clear-pending-data"),
+		countUnsent: (): Promise<Record<string, number> & { total: number }> =>
+			ipcRenderer.invoke("db:count-unsent"),
 	},
 
 	update: {

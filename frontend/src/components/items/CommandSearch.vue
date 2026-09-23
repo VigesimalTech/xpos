@@ -250,6 +250,8 @@ import { usePaymentStore } from "@/stores/paymentStore";
 import type { POSItem } from "@/types/pos.types";
 import __ from "@/lib/translate";
 import { canOpenScreen, type Screen } from "@/services/screenAccess";
+import { reachesLevel } from "@/services/roleLevel";
+import { isElectron } from "@/services/electronBridge";
 
 interface CommandResult {
 	id: string;
@@ -672,6 +674,8 @@ function onSearch() {
 
 		for (const page of pages) {
 			if (page.screen && !canOpenScreen(page.screen)) continue;
+			// K40: the till's settings are for supervisors and administrators only.
+			if (page.id === "page-settings" && (!isElectron() || !reachesLevel("supervisor"))) continue;
 			const score = scoreMatch(page.label, isGoPrefix ? goQuery : query);
 			if (score > 0 || (isGoPrefix && goQuery === "")) {
 				localResults.push(page);

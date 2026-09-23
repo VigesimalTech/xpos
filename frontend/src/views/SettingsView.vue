@@ -2,12 +2,18 @@
 	<div class="flex flex-col h-full overflow-hidden bg-background">
 		<div class="shrink-0 p-4 pb-3 border-b border-border">
 			<h1 class="text-xl font-bold text-foreground">Settings</h1>
-			<p class="text-sm text-muted-foreground mt-1">Configure your POS application</p>
+			<p class="text-sm text-muted-foreground mt-1">
+				{{
+					isAdmin
+						? "Configure your POS application"
+						: "The receipt printer for this till. The rest of the settings are for an administrator."
+				}}
+			</p>
 		</div>
 
 		<ScrollArea class="flex-1 p-4">
 			<div class="max-w-2xl mx-auto space-y-6">
-				<Card class="p-5">
+				<Card v-if="isAdmin" class="p-5">
 					<div class="flex items-center gap-2 mb-4">
 						<Globe class="w-5 h-5 text-primary" />
 						<h2 class="text-base font-semibold text-foreground">Server Connection</h2>
@@ -41,7 +47,7 @@
 					</div>
 				</Card>
 
-				<Card v-if="isElectronMode" class="p-5">
+				<Card v-if="isElectronMode && isAdmin" class="p-5">
 					<div class="flex items-center gap-2 mb-4">
 						<Database class="w-5 h-5 text-primary" />
 						<h2 class="text-base font-semibold text-foreground">Local Database</h2>
@@ -82,7 +88,7 @@
 					</div>
 				</Card>
 
-				<Card v-if="isElectronMode" class="p-5">
+				<Card v-if="isElectronMode && isAdmin" class="p-5">
 					<div class="flex items-center gap-2 mb-4">
 						<RefreshCw class="w-5 h-5 text-primary" />
 						<h2 class="text-base font-semibold text-foreground">Synchronization</h2>
@@ -179,25 +185,22 @@
 						<Monitor class="w-5 h-5 text-primary" />
 						<h2 class="text-base font-semibold text-foreground">POS Profile</h2>
 					</div>
-					<div class="space-y-3">
-						<div class="flex items-center justify-between text-sm">
-							<span class="text-muted-foreground">Profile:</span>
-							<span class="text-foreground font-medium">{{
-								posStore.posProfile || "Not set"
-							}}</span>
+					<dl class="space-y-3 text-sm">
+						<div
+							v-for="row in profileRows"
+							:key="row.label"
+							class="flex items-center justify-between gap-4"
+							data-testid="profile-row"
+						>
+							<dt class="text-muted-foreground">{{ row.label }}</dt>
+							<dd class="text-foreground text-end" :class="{ 'font-medium': row.strong }">
+								{{ row.value || "—" }}
+							</dd>
 						</div>
-						<div class="flex items-center justify-between text-sm">
-							<span class="text-muted-foreground">Company:</span>
-							<span class="text-foreground">{{ posStore.companyName || "—" }}</span>
-						</div>
-						<div class="flex items-center justify-between text-sm">
-							<span class="text-muted-foreground">Warehouse:</span>
-							<span class="text-foreground">{{ posStore.warehouse || "—" }}</span>
-						</div>
-					</div>
+					</dl>
 				</Card>
 
-				<Card v-if="isElectronMode" class="p-5">
+				<Card v-if="isElectronMode && isAdmin" class="p-5">
 					<div class="flex items-center gap-2 mb-4">
 						<HardDrive class="w-5 h-5 text-primary" />
 						<h2 class="text-base font-semibold text-foreground">Data Management</h2>
@@ -223,7 +226,7 @@
 					</div>
 				</Card>
 
-				<Card v-if="isElectronMode" class="p-5">
+				<Card v-if="isElectronMode && isAdmin" class="p-5">
 					<div class="flex items-center gap-2 mb-4">
 						<Power class="w-5 h-5 text-primary" />
 						<h2 class="text-base font-semibold text-foreground">Startup</h2>
@@ -268,10 +271,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from "vue";
+import { computed, ref, reactive, onMounted } from "vue";
 import { isElectron, setServerUrl } from "@/services/electronBridge";
 import { getSetting, setSetting, countItems, clearAllData } from "@/services/dbBridge";
 import { usePosStore } from "@/stores/posStore";
+import { reachesLevel } from "@/services/roleLevel";
+import { recordAudit } from "@/services/auditLog";
 import { toast } from "vue-sonner";
 
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -295,6 +300,31 @@ import {
 
 const posStore = usePosStore();
 const isElectronMode = isElectron();
+/**
+ * K40: supervisors see the receipt printer; the system settings (server, database, sync,
+ * data, startup) are for administrators, and each change goes in the audit log.
+ */
+const isAdmin = computed(() => reachesLevel("administrator"));
+
+/** What the settings were when the screen loaded, so a change can be recorded as from and to. */
+const loaded = reactive({ serverUrl: "", syncInterval: 0, autoSync: true, db: "" });
+
+/** The open shift's POS Profile, as a few lines a person can read (not the whole record). */
+const profileRows = computed(() => [
+	{ label: "Profile", value: posStore.profileName || "Not set", strong: true },
+	{ label: "Company", value: posStore.companyName },
+	{ label: "Warehouse", value: posStore.warehouse },
+	{ label: "Price List", value: posStore.sellingPriceList },
+	{ label: "Currency", value: posStore.invoiceCurrency },
+]);
+
+function dbLabel(): string {
+	return `${settings.dbUser}@${settings.dbHost}:${settings.dbPort}/${settings.dbName}`;
+}
+
+function recordSettingChange(description: string, details: Record<string, unknown>) {
+	recordAudit({ event_type: "settings_changed", description, details, approved_by: null });
+}
 
 const settings = reactive({
 	serverUrl: "",
@@ -325,7 +355,11 @@ const platformInfo = reactive({
 const openAtLogin = ref(true);
 
 async function setOpenAtLogin(enabled: boolean) {
+	if (!isAdmin.value) return;
 	openAtLogin.value = await window.electronAPI!.startup.setOpenAtLogin(enabled);
+	recordSettingChange(enabled ? "Open at startup switched on" : "Open at startup switched off", {
+		open_at_login: openAtLogin.value,
+	});
 	toast.success(enabled ? "X POS will open when this PC starts" : "X POS will not open at startup");
 }
 
@@ -373,6 +407,12 @@ async function loadSettings() {
 	} catch {
 		/* use defaults */
 	}
+	Object.assign(loaded, {
+		serverUrl: settings.serverUrl,
+		syncInterval: settings.syncInterval,
+		autoSync: settings.autoSync,
+		db: dbLabel(),
+	});
 }
 
 async function loadPrinters() {
@@ -450,6 +490,11 @@ async function testServerConnection() {
 }
 
 async function saveServerUrl() {
+	if (!isAdmin.value) return;
+	if (settings.serverUrl !== loaded.serverUrl) {
+		recordSettingChange("ERPNext server changed", { from: loaded.serverUrl, to: settings.serverUrl });
+		loaded.serverUrl = settings.serverUrl;
+	}
 	// Through the bridge, so this session's server calls go to the new server too.
 	if (isElectronMode) await setServerUrl(settings.serverUrl);
 	await setSetting("server_url", settings.serverUrl, "connection");
@@ -480,7 +525,7 @@ async function testDbConnection() {
 }
 
 async function saveDbConfig() {
-	if (!isElectronMode) return;
+	if (!isElectronMode || !isAdmin.value) return;
 	try {
 		const result = await window.electronAPI!.db.reinit({
 			host: settings.dbHost,
@@ -490,6 +535,11 @@ async function saveDbConfig() {
 			database: settings.dbName,
 		});
 		if (result.success) {
+			if (dbLabel() !== loaded.db) {
+				// Recorded after the switch, so it lands in the database the till now uses.
+				recordSettingChange("Local database changed", { from: loaded.db, to: dbLabel() });
+				loaded.db = dbLabel();
+			}
 			toast.success("Database reconnected successfully");
 		} else {
 			toast.error(result.error || "Reconnection failed");
@@ -500,6 +550,15 @@ async function saveDbConfig() {
 }
 
 async function saveSyncSettings() {
+	if (!isAdmin.value) return;
+	if (settings.syncInterval !== loaded.syncInterval || settings.autoSync !== loaded.autoSync) {
+		recordSettingChange(settings.autoSync ? "Sync settings changed" : "Auto sync switched off", {
+			from: { interval_minutes: loaded.syncInterval, auto_sync: loaded.autoSync },
+			to: { interval_minutes: settings.syncInterval, auto_sync: settings.autoSync },
+		});
+		loaded.syncInterval = settings.syncInterval;
+		loaded.autoSync = settings.autoSync;
+	}
 	await setSetting("sync_interval", String(settings.syncInterval), "sync");
 	await setSetting("auto_sync", String(settings.autoSync), "sync");
 	toast.success("Sync settings saved");
@@ -517,12 +576,17 @@ async function triggerSync() {
 }
 
 async function clearSyncData() {
-	if (!isElectronMode) return;
+	if (!isElectronMode || !isAdmin.value) return;
 	if (!confirm("This will clear all synced master data. Pending records will not be affected. Continue?"))
 		return;
 	try {
 		await window.electronAPI!.db.clearAllData();
 		itemCount.value = 0;
+		recordAudit({
+			event_type: "local_data_cleared",
+			description: "Synced data cleared; it downloads again on the next sync",
+			approved_by: null,
+		});
 		toast.success("Synced data cleared");
 	} catch {
 		toast.error("Failed to clear data");
@@ -530,15 +594,30 @@ async function clearSyncData() {
 }
 
 async function clearAllLocalData() {
-	if (!isElectronMode) return;
-	if (
-		!confirm("This will clear ALL local data including pending records. This cannot be undone. Continue?")
-	)
+	if (!isElectronMode || !isAdmin.value) return;
+	// K40: a sale must never vanish from the till before ERPNext has it.
+	const unsent = await window.electronAPI!.db.countUnsent();
+	if (unsent.total > 0) {
+		const waiting = await window.electronAPI!.db.clearPendingData();
+		toast.error(
+			`Not cleared: ${waiting.waiting} not yet in ERPNext. Let them sync first, or settle the refused sales in the unsynced-sales panel.`,
+		);
 		return;
+	}
+	if (!confirm("This will clear all local data. Everything has reached ERPNext. Continue?")) return;
 	try {
+		const result = await window.electronAPI!.db.clearPendingData();
+		if (!result.cleared) {
+			toast.error(`Not cleared: ${result.waiting} not yet in ERPNext.`);
+			return;
+		}
 		await window.electronAPI!.db.clearAllData();
-		await window.electronAPI!.db.clearPendingData();
 		itemCount.value = 0;
+		recordAudit({
+			event_type: "local_data_cleared",
+			description: "All local data cleared (nothing was waiting to sync)",
+			approved_by: null,
+		});
 		toast.success("All local data cleared");
 	} catch {
 		toast.error("Failed to clear data");

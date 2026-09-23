@@ -6,6 +6,12 @@ The POS Profile is the central configuration hub for X POS. It controls every as
 
 ---
 
+## Change History
+
+Every change to a POS Profile is recorded in its history (the timeline at the bottom of the form): who changed which setting, when, and the old and new values. That includes the **Applicable for Users** rows, such as a cashier's **Discount Limit**. Changes to a **POS Role** and its permissions are recorded the same way.
+
+---
+
 ## View & Display Settings
 
 | Setting | Description |

@@ -38,7 +38,7 @@
    "fieldtype": "Select",
    "label": "Event Type",
    "read_only": 1,
-   "options": "Line Removed\nQuantity Lowered\nSale Cleared\nHeld Order Discarded\nReprint\nApproval\nPIN Failed\nNo Sale\nVoid After Payment\nOther",
+   "options": "Line Removed\nQuantity Lowered\nSale Cleared\nHeld Order Discarded\nReprint\nApproval\nPIN Failed\nSettings Changed\nLocal Data Cleared\nNo Sale\nVoid After Payment\nOther",
    "reqd": 1,
    "in_list_view": 1,
    "in_standard_filter": 1
@@ -203,7 +203,7 @@
  ],
  "in_create": 1,
  "links": [],
- "modified": "2026-09-23 09:00:00.000000",
+ "modified": "2026-09-23 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "X POS",
  "name": "POS Audit Event",

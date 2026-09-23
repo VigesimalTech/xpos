@@ -23,14 +23,14 @@
 			<Transition name="menu-drop">
 				<div
 					v-if="activeMenu === menu.label"
-					class="absolute top-full start-0 min-w-[220px] bg-[#252526] dark:bg-[#252526] border border-[#454545] shadow-2xl py-1 z-[200]"
+					class="absolute top-full start-0 min-w-[220px] w-max max-w-[calc(100vw-1rem)] bg-[#252526] dark:bg-[#252526] border border-[#454545] shadow-2xl py-1 z-[200]"
 				>
 					<template v-for="item in menu.items" :key="item.id">
 						<template v-if="item.hidden?.()" />
 						<div v-else-if="item.separator" class="h-px bg-[#3c3c3c] mx-0 my-1" />
 						<button
 							v-else
-							class="w-full flex items-center justify-between px-4 py-1 text-[13px] transition-colors duration-75 outline-none"
+							class="w-full flex items-center justify-between gap-8 px-4 py-1 text-[13px] whitespace-nowrap transition-colors duration-75 outline-none"
 							:class="
 								item.disabled?.()
 									? 'text-[#666666] cursor-default'
@@ -50,11 +50,61 @@
 								/>
 								<span>{{ __(item.label!) }}</span>
 							</div>
-							<span v-if="item.shortcut" class="ms-8 text-[11px] text-[#666666]">{{
+							<span v-if="item.shortcut" class="shrink-0 text-[11px] text-[#666666]">{{
 								item.shortcut
 							}}</span>
 						</button>
 					</template>
+				</div>
+			</Transition>
+		</div>
+
+		<!-- Who is signed in, and what their role lets them do on this profile. -->
+		<div v-if="authStore.isAuthenticated" class="ms-auto relative">
+			<button
+				class="h-7 px-2.5 flex items-center gap-2 text-[12px] rounded-sm text-[#cccccc] hover:bg-[#505050] dark:hover:bg-[#2a2d2e] hover:text-white outline-none"
+				data-testid="signed-in-user"
+				:title="__('Signed in')"
+				@click.stop="showUser = !showUser"
+			>
+				<UserRound class="w-3.5 h-3.5" />
+				<span class="font-medium">{{ signedIn.name }}</span>
+				<span
+					v-if="signedIn.role"
+					class="px-1.5 py-px rounded bg-[#094771] text-white text-[11px]"
+					data-testid="signed-in-role"
+					>{{ signedIn.role }}</span
+				>
+				<span v-if="signedIn.profile" class="text-[#999999]">· {{ signedIn.profile }}</span>
+			</button>
+			<Transition name="menu-drop">
+				<div
+					v-if="showUser"
+					class="absolute top-full end-0 min-w-[260px] bg-[#252526] border border-[#454545] shadow-2xl p-3 z-[200] text-[13px] text-[#cccccc] space-y-1.5"
+					data-testid="signed-in-card"
+				>
+					<p class="text-white font-medium">{{ signedIn.name }}</p>
+					<p class="text-[12px] text-[#999999]">{{ signedIn.email }}</p>
+					<div class="h-px bg-[#3c3c3c] my-2" />
+					<p>
+						<span class="text-[#999999]">{{ __("POS Role") }}:</span>
+						{{ signedIn.role || __("None") }}
+					</p>
+					<p>
+						<span class="text-[#999999]">{{ __("Can use") }}:</span> {{ __(signedIn.level) }}
+					</p>
+					<p>
+						<span class="text-[#999999]">{{ __("POS Profile") }}:</span>
+						{{ signedIn.profile || "—" }}
+					</p>
+					<div class="h-px bg-[#3c3c3c] my-2" />
+					<button
+						class="w-full flex items-center gap-2 px-2 py-1 rounded-sm hover:bg-[#094771] hover:text-white"
+						@click.stop="((showUser = false), authStore.logout())"
+					>
+						<LogOut class="w-3.5 h-3.5" />
+						{{ __("Sign Out") }}
+					</button>
 				</div>
 			</Transition>
 		</div>
@@ -73,8 +123,9 @@ import { usePaymentStore } from "@/stores/paymentStore";
 import { useCustomerStore } from "@/stores/customerStore";
 import { useAuthStore } from "@/stores/authStore";
 import { isElectron } from "@/services/electronBridge";
-import { canDoOrAsk } from "@/services/userRights";
+import { canDoOrAsk, getCurrentRole } from "@/services/userRights";
 import { canOpenScreen } from "@/services/screenAccess";
+import { reachesLevel, roleLevel } from "@/services/roleLevel";
 import __ from "@/lib/translate";
 import { usePrintInvoice } from "@/composables/usePrintInvoice";
 import AboutDialog from "@/components/dialogs/AboutDialog.vue";
@@ -94,6 +145,7 @@ import {
 	ArrowDownCircle,
 	HelpCircle,
 	Keyboard,
+	UserRound,
 	BookOpen,
 	Power,
 	FileText,
@@ -115,6 +167,22 @@ import {
 } from "lucide-vue-next";
 
 const router = useRouter();
+
+// Who is signed in on this till, their POS Role on the open shift's profile, and how far it reaches.
+const showUser = ref(false);
+const LEVEL_LABEL = {
+	cashier: "Cashier screens",
+	supervisor: "Supervisor screens and approvals",
+	administrator: "Everything, including settings",
+} as const;
+const signedIn = computed(() => ({
+	name: authStore.userFullName || authStore.userName || "",
+	email: authStore.userEmail || authStore.userName || "",
+	role: getCurrentRole(),
+	profile: posStore.profileName,
+	level: LEVEL_LABEL[roleLevel()],
+}));
+
 const posStore = usePosStore();
 const { reprint } = usePrintInvoice();
 const cartStore = useCartStore();
@@ -171,6 +239,7 @@ function handleItemHover(itemId: string) {
 }
 
 function closeAll() {
+	showUser.value = false;
 	activeMenu.value = null;
 	focusedMenuIndex.value = -1;
 	focusedItemId.value = null;
@@ -392,6 +461,8 @@ const allMenus = computed<Menu[]>(() => [
 				label: "Settings",
 				icon: Settings,
 				shortcut: "Ctrl+,",
+				// K40: supervisors see the printer settings, administrators everything.
+				hidden: () => !isElectron() || !reachesLevel("supervisor"),
 				action: () => router.push("/settings"),
 			},
 			{

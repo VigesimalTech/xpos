@@ -112,3 +112,7 @@ class TestPosExceptions(unittest.TestCase):
 		self.assertEqual(summary["Discounts Given"], 5)
 		self.assertEqual(summary["Count Difference"], 4)
 		self.assertEqual(summary["Wrong PINs"], 1)
+
+	def test_changes_to_a_tills_settings_are_counted_against_who_made_them(self):
+		(ann,) = rows(events=[event("Settings Changed"), event("Local Data Cleared")])
+		self.assertEqual(ann["settings_changes"], 2)

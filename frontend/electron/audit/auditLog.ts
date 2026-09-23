@@ -25,7 +25,10 @@ export type AuditEventType =
 	| "held_order_discarded"
 	| "reprint"
 	| "approval"
-	| "pin_failed";
+	| "pin_failed"
+	// K40: the till's system settings changed, and its local data cleared.
+	| "settings_changed"
+	| "local_data_cleared";
 
 /** What the renderer may record. Approvals and wrong PINs come from the main process only. */
 export const RENDERER_EVENTS: ReadonlySet<string> = new Set([
@@ -34,6 +37,8 @@ export const RENDERER_EVENTS: ReadonlySet<string> = new Set([
 	"sale_cleared",
 	"held_order_discarded",
 	"reprint",
+	"settings_changed",
+	"local_data_cleared",
 ]);
 
 export interface AuditEvent {

@@ -67,6 +67,8 @@ class TestAuditEventDoc(unittest.TestCase):
 			"reprint",
 			"approval",
 			"pin_failed",
+			"settings_changed",
+			"local_data_cleared",
 		):
 			self.assertIn(key, EVENT_TYPES)
 

@@ -1,4 +1,5 @@
 import { BrowserWindow, ipcMain, net } from "electron";
+import { unpermittedField } from "./unpermittedField";
 import {
 	SYNC_TABLES,
 	SYNC_DEFAULTS,
@@ -265,6 +266,45 @@ async function apiCall<T = unknown>(
 	});
 }
 
+/**
+ * K41: fields a server refused as unknown, per table, until the app restarts. A till newer
+ * than its ERPNext asks for fields the server does not have yet ("Field not permitted in
+ * query: xpos_sync_status_detail"), and Frappe then refuses the whole pull: the till lost
+ * every POS Profile setting over one new field. Leaving that field out keeps the rest.
+ */
+const refusedFields = new Map<string, Set<string>>();
+
+function fieldsFor(config: SyncTableConfig): string[] | undefined {
+	const refused = refusedFields.get(config.idbStore);
+	return refused ? config.fields?.filter((f) => !refused.has(f)) : config.fields;
+}
+
+/** One page of a pull, leaving out any field the server says it does not know. */
+async function pullPage(
+	config: SyncTableConfig,
+	args: Record<string, unknown>,
+): Promise<Record<string, unknown>[]> {
+	for (;;) {
+		const fields = fieldsFor(config);
+		try {
+			return await apiCall<Record<string, unknown>[]>(config.pullMethod || "frappe.client.get_list", {
+				...args,
+				fields,
+			});
+		} catch (error) {
+			const field = unpermittedField(
+				error instanceof Error ? error.message : String(error),
+				fields || [],
+			);
+			if (!field) throw error;
+			log.warn(`${config.label}: the server does not know ${field}; pulling without it until restart`);
+			const refused = refusedFields.get(config.idbStore) ?? new Set<string>();
+			refused.add(field);
+			refusedFields.set(config.idbStore, refused);
+		}
+	}
+}
+
 async function pullTable(config: SyncTableConfig): Promise<number> {
 	emitToRenderer("sync-status", {
 		phase: "pull",
@@ -288,18 +328,14 @@ async function pullTable(config: SyncTableConfig): Promise<number> {
 			filters["modified"] = [">", lastModified];
 		}
 
-		const batch = await apiCall<Record<string, unknown>[]>(
-			config.pullMethod || "frappe.client.get_list",
-			{
-				doctype: config.doctype,
-				fields: config.fields,
-				filters,
-				// Frappe v16 rejects "date desc asc" with HTTP 417, so only add a direction when none is given.
-				order_by: /\s(asc|desc)$/i.test(config.orderBy) ? config.orderBy : `${config.orderBy} asc`,
-				limit_start: start,
-				limit_page_length: config.batchSize,
-			},
-		);
+		const batch = await pullPage(config, {
+			doctype: config.doctype,
+			filters,
+			// Frappe v16 rejects "date desc asc" with HTTP 417, so only add a direction when none is given.
+			order_by: /\s(asc|desc)$/i.test(config.orderBy) ? config.orderBy : `${config.orderBy} asc`,
+			limit_start: start,
+			limit_page_length: config.batchSize,
+		});
 
 		if (!batch || batch.length === 0) {
 			hasMore = false;

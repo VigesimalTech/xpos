@@ -161,4 +161,5 @@ Reports, the Barcode Printer, the Price Checker and Purchasing each need a POS R
 - Keep **Sale Outside Policy** on **Flag** while you tune the roles, then review the **Outside Policy** column on sales invoices
 - Give **Approve Exceptions** to supervisors, and set their PINs, before cashiers start asking for approvals
 - Leave **Allow Self-Approval** off unless a shop has only one manager on duty
+- Review the history of a POS Profile or POS Role after anyone changes limits or permissions: every change is recorded with who made it
 - Use **Show, Ask a Manager** where cashiers occasionally need a screen, and **Hide** where they never do

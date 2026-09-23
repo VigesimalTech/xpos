@@ -34,7 +34,14 @@ TAKEN_OUT = {
 	"Sale Cleared": "sales_cleared",
 	"Held Order Discarded": "held_discarded",
 }
-COUNTED = {"Reprint": "reprints", "Approval": "approvals", "PIN Failed": "wrong_pins"}
+COUNTED = {
+	"Reprint": "reprints",
+	"Approval": "approvals",
+	"PIN Failed": "wrong_pins",
+	# K40: a till's system settings changed, or its local data cleared.
+	"Settings Changed": "settings_changes",
+	"Local Data Cleared": "settings_changes",
+}
 
 COUNT_FIELDS = (
 	"sales",
@@ -47,6 +54,7 @@ COUNT_FIELDS = (
 	"outside_policy",
 	"reprints",
 	"wrong_pins",
+	"settings_changes",
 )
 VALUE_FIELDS = (
 	"sales_value",
@@ -118,6 +126,7 @@ def get_columns(group_by: str = "Day") -> list[dict]:
 		count("approvals", "Manager Approvals", 110),
 		count("reprints", "Reprints"),
 		count("wrong_pins", "Wrong PINs"),
+		count("settings_changes", "Till Settings Changed", 130),
 		value("count_difference", "Count Difference", 130),
 	]
 
