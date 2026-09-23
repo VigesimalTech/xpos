@@ -442,7 +442,8 @@ const config = reactive({
 	dbHost: "127.0.0.1",
 	dbPort: 3306,
 	dbUser: "xpos",
-	dbPassword: "xpos",
+	// K43: no built-in password. The one chosen when MariaDB was set up, kept sealed by the OS.
+	dbPassword: "",
 	dbName: "xpos_local",
 	erpUrl: "",
 	apiKey: "",
