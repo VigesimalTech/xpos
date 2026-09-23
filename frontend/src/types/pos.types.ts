@@ -70,6 +70,8 @@ export interface POSProfile {
 	/** K27: what the cashier sees of a screen their role lacks. */
 	xpos_screen_access?: "Hide" | "Show, Ask a Manager";
 	xpos_allow_purchasing?: boolean | number;
+	/** K37: how much the sync status shows. Unset counts as Minimal. */
+	xpos_sync_status_detail?: "Minimal" | "Standard" | "Detailed";
 	max_discount_percentage_allowed?: number;
 	auto_fetch_coupons_gifts?: boolean;
 	hide_closing_shift?: boolean;

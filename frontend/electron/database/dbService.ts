@@ -284,6 +284,8 @@ async function runMigrations(): Promise<void> {
 		["xpos_screen_access", "VARCHAR(40) DEFAULT 'Hide'"],
 		["xpos_allow_purchasing", "TINYINT(1) DEFAULT 0"],
 		["xpos_show_loyalty", "TINYINT(1) DEFAULT 0"],
+		// K37: how much the sync pill shows.
+		["xpos_sync_status_detail", "VARCHAR(20) DEFAULT 'Minimal'"],
 		// What may go out of the drawer on the till (cashOutGuard.ts).
 		["cash_movement_max_amount", "DECIMAL(18,6) DEFAULT 0"],
 		["xpos_cash_out_within_drawer", "TINYINT(1) DEFAULT 1"],

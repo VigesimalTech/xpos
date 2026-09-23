@@ -26,6 +26,9 @@ export const useOfflineStore = defineStore("offline", () => {
 	const pendingInvoices = ref<OfflineInvoice[]>([]);
 	const lastSyncTime = ref("");
 	const syncErrors = ref<string[]>([]);
+	/** K37: the web POS's sync runs in a row that left sales failed, and the last reason. */
+	const errorCycles = ref(0);
+	const lastSyncError = ref<string | null>(null);
 	const isOnline = ref(typeof navigator !== "undefined" ? navigator.onLine : true);
 	const posStore = usePosStore();
 
@@ -311,6 +314,9 @@ export const useOfflineStore = defineStore("offline", () => {
 			await refreshPendingCount();
 			await loadPendingInvoices();
 			lastSyncTime.value = new Date().toISOString();
+			const lastFailure = invoices.find((i) => i.status === "failed")?.error ?? null;
+			errorCycles.value = failed > 0 ? errorCycles.value + 1 : 0;
+			lastSyncError.value = failed > 0 ? lastFailure : null;
 
 			if (synced > 0) {
 				showSuccess(`Synced ${synced} offline invoice${synced > 1 ? "s" : ""}`);
@@ -467,6 +473,8 @@ export const useOfflineStore = defineStore("offline", () => {
 		pendingInvoices,
 		lastSyncTime,
 		syncErrors,
+		errorCycles,
+		lastSyncError,
 		hasPending,
 		hasDeadLetters,
 		offlineModeEnabled,

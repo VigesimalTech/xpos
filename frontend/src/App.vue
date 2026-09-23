@@ -86,67 +86,17 @@
 		</Transition>
 
 		<Transition name="fade">
-			<TooltipWrapper
-				v-if="!isAuthPage && isElectronEnv"
-				:content="
-					offlineStore.deadLetterCount > 0
-						? offlineStore.deadLetterCount + ' invoice(s) failed to sync. Click to review'
-						: syncStatus.unreachable.value
-							? __(
-									'ERPNext is not answering. Sales are saved on this till and sent when it is back.',
-								)
-							: syncStatus.lastError.value ||
-								(syncStatus.lastSyncTime.value
-									? 'Last sync: ' + syncStatus.lastSyncTime.value
-									: 'Not synced yet')
-				"
-				side="right"
-			>
+			<TooltipWrapper v-if="!isAuthPage && isElectronEnv" :content="__(pill.tooltip)" side="right">
 				<button
 					type="button"
 					class="fixed bottom-3 start-3 z-50 flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium shadow-md select-none cursor-pointer"
-					:class="
-						syncStatus.isSyncing.value && !syncStatus.unreachable.value
-							? 'bg-blue-600 text-white'
-							: offlineStore.deadLetterCount > 0
-								? 'bg-destructive text-destructive-foreground'
-								: syncStatus.unreachable.value
-									? 'bg-amber-500 text-white'
-									: syncStatus.lastError.value
-										? 'bg-destructive text-destructive-foreground'
-										: 'bg-muted text-muted-foreground'
-					"
+					:class="PILL_TONE[pill.tone]"
+					data-testid="sync-pill"
 					@click="handleOpenOfflinePanel"
 				>
-					<span
-						v-if="syncStatus.isSyncing.value && !syncStatus.unreachable.value"
-						class="w-2 h-2 rounded-full bg-white animate-ping"
-					/>
-					<span
-						v-else
-						class="w-2 h-2 rounded-full"
-						:class="
-							offlineStore.deadLetterCount > 0 || syncStatus.lastError.value
-								? 'bg-white'
-								: 'bg-green-400'
-						"
-					/>
-					<span>
-						<template v-if="offlineStore.deadLetterCount > 0"
-							>{{ offlineStore.deadLetterCount }} need attention</template
-						>
-						<template v-else-if="syncStatus.unreachable.value">{{ offlineLabel }}</template>
-						<template v-else-if="syncStatus.isSyncing.value">
-							Syncing{{
-								syncStatus.syncTable.value ? ": " + syncStatus.syncTable.value : "..."
-							}}
-						</template>
-						<template v-else-if="syncStatus.lastError.value">Sync error</template>
-						<template v-else-if="syncStatus.lastSyncTime.value"
-							>Synced {{ syncStatus.lastSyncTime.value }}</template
-						>
-						<template v-else>Sync pending</template>
-					</span>
+					<span v-if="pill.busy" class="w-2 h-2 rounded-full bg-white animate-ping" />
+					<span v-else class="w-2 h-2 rounded-full" :class="PILL_DOT[pill.tone]" />
+					<span>{{ __(pill.label) }}</span>
 				</button>
 			</TooltipWrapper>
 		</Transition>
@@ -184,6 +134,7 @@ import { initSyncListeners } from "@/services/syncIpcHandler";
 import { showError } from "@/services/api";
 import __ from "@/lib/translate";
 import { useSyncStatus } from "@/composables/useSyncStatus";
+import { syncPillView, type SyncTone } from "@/services/syncPill";
 import { useKeyboardShortcuts } from "@/composables/useKeyboardShortcuts";
 import { isElectron } from "@/services/electronBridge";
 import ErrorInspector from "@/components/errors/ErrorInspector.vue";
@@ -433,14 +384,39 @@ watch(
 );
 
 /**
- * While ERPNext is not answering, the pill says so and how many sales wait to be sent:
- * selling offline is normal, not an error (the user's wording, 21 Sep 2026).
+ * The sync pill (K37): as much as the POS Profile's Sync Status Detail asks for, by the
+ * rule the web POS's indicator shares (syncPill.ts). Selling offline is normal, not an
+ * error; what needs attention always shows.
  */
-const offlineLabel = computed(() => {
-	const n = offlineStore.pendingCount;
-	if (!n) return __("Offline");
-	return n === 1 ? __("Offline – 1 sale waiting") : __("Offline – {0} sales waiting", [String(n)]);
-});
+const pill = computed(() =>
+	syncPillView(
+		{
+			needAttention: offlineStore.deadLetterCount,
+			// The PC's own network, the moment it drops (the same event as the "You are offline"
+			// notice), or ERPNext not answering while the network is up.
+			offline: !offlineStore.isOnline || syncStatus.unreachable.value,
+			waiting: offlineStore.pendingCount,
+			syncing: syncStatus.isSyncing.value,
+			syncTable: syncStatus.syncTable.value,
+			lastError: syncStatus.lastError.value,
+			errorCycles: syncStatus.errorCycles.value,
+			lastSyncTime: syncStatus.lastSyncTime.value,
+		},
+		posStore.syncStatusDetail,
+	),
+);
+const PILL_TONE: Record<SyncTone, string> = {
+	quiet: "bg-muted text-muted-foreground",
+	syncing: "bg-blue-600 text-white",
+	offline: "bg-amber-500 text-white",
+	attention: "bg-destructive text-destructive-foreground",
+};
+const PILL_DOT: Record<SyncTone, string> = {
+	quiet: "bg-green-400",
+	syncing: "bg-white",
+	offline: "bg-white",
+	attention: "bg-white",
+};
 
 let offlineCountTimer: ReturnType<typeof setInterval> | null = null;
 watch(
