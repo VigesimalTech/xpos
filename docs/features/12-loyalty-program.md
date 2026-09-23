@@ -17,8 +17,10 @@ The loyalty system allows customers to:
 ## Enrolling a Customer
 
 ### From the POS Screen
+The cart's **Loyalty Program** button shows only when the POS Profile's **Show Loyalty Program** is on. It is off by default, so a shop can run a programme in ERPNext without enrolling customers at the till. Points a customer already has are redeemed at payment either way.
+
 1. Select a customer who is not yet enrolled
-2. Open the **Loyalty Dialog** (accessible from the cart area)
+2. Open the **Loyalty Dialog** with the cart's **Loyalty Program** button
 3. Browse available loyalty programs showing:
    - Program name
    - Conversion factor (points per currency unit)

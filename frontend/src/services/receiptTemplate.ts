@@ -313,6 +313,8 @@ export function buildReceiptHtml(snapshot: ReceiptSnapshot, ctx: ReceiptContext)
 }
 
 export interface ShiftSummaryPrint {
+	/** K21: a blind cash-up prints the count without what was expected or the difference. */
+	blind?: boolean;
 	shift: string;
 	cashier: string;
 	pos_profile: string;
@@ -339,9 +341,8 @@ export function buildShiftSummaryHtml(s: ShiftSummaryPrint): string {
 		.map(
 			(r) => `<tr><th colspan="2">${esc(r.mode_of_payment)}</th></tr>
 <tr><td>Opening</td><td>${money(r.opening_amount, r.currency)}</td></tr>
-<tr><td>Expected</td><td>${money(r.expected_amount, r.currency)}</td></tr>
-<tr><td>Counted</td><td>${money(r.closing_amount, r.currency)}</td></tr>
-<tr><td>Difference</td><td>${money(r.difference, r.currency)}</td></tr>`,
+${s.blind ? "" : `<tr><td>Expected</td><td>${money(r.expected_amount, r.currency)}</td></tr>\n`}<tr><td>Counted</td><td>${money(r.closing_amount, r.currency)}</td></tr>
+${s.blind ? "" : `<tr><td>Difference</td><td>${money(r.difference, r.currency)}</td></tr>`}`,
 		)
 		.join("\n");
 	return `<style>

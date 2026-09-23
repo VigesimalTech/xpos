@@ -161,6 +161,7 @@
 												{{ __("Opening") }}
 											</th>
 											<th
+												v-if="!blindCount"
 												class="text-end px-4 py-2.5 text-muted-foreground font-medium"
 											>
 												{{ __("Expected") }}
@@ -171,6 +172,7 @@
 												{{ __("Closing") }}
 											</th>
 											<th
+												v-if="!blindCount"
 												class="text-end px-4 py-2.5 text-muted-foreground font-medium"
 											>
 												{{ __("Difference") }}
@@ -198,6 +200,7 @@
 												{{ formatFor(detail.currency, detail.opening_amount) }}
 											</td>
 											<td
+												v-if="!blindCount"
 												class="px-4 py-2.5 text-end text-muted-foreground"
 												data-testid="closing-expected"
 											>
@@ -214,6 +217,7 @@
 												/>
 											</td>
 											<td
+												v-if="!blindCount"
 												class="px-4 py-2.5 text-end font-bold"
 												data-testid="closing-difference"
 												:class="
@@ -338,6 +342,12 @@ const unsentCount = computed(() =>
 	Number((summary.value as { unsent_count?: number } | null)?.unsent_count || 0),
 );
 const closingDetails = ref<ClosingDetail[]>([]);
+/**
+ * K21: a blind cash-up (the POS Profile's Hide Expected Amount). The cashier counts the
+ * drawer without seeing what it should hold; the difference is for the supervisor, in
+ * ERPNext and the exceptions report.
+ */
+const blindCount = computed(() => posStore.hideExpectedAmount);
 
 function buildClosingDetails(data: ClosingSummary): ClosingDetail[] {
 	const expectedAmounts = data.expected_amounts || {};
@@ -361,16 +371,16 @@ function buildClosingDetails(data: ClosingSummary): ClosingDetail[] {
 
 	return modes.map((mode) => {
 		const expected = expectedAmounts[mode]?.amount ?? openingBalances[mode]?.amount ?? 0;
+		const currency =
+			expectedAmounts[mode]?.currency || openingBalances[mode]?.currency || posStore.invoiceCurrency;
 		return {
 			mode_of_payment: mode,
-			currency:
-				expectedAmounts[mode]?.currency ||
-				openingBalances[mode]?.currency ||
-				posStore.invoiceCurrency,
+			currency,
 			opening_amount: openingBalances[mode]?.amount ?? 0,
 			expected_amount: expected,
-			closing_amount: expected,
-			difference: 0,
+			// Filled in with what is expected, a count is only confirmed; blind, it starts empty.
+			closing_amount: blindCount.value ? 0 : expected,
+			difference: blindCount.value ? roundFor(currency, -expected) : 0,
 		};
 	});
 }
@@ -404,6 +414,7 @@ async function handleCloseShift() {
 
 	const shift = posStore.posOpeningShift;
 	const printable: ShiftSummaryPrint = {
+		blind: blindCount.value,
 		shift: String(shift?.name || ""),
 		cashier: String(shift?.user || ""),
 		pos_profile: posStore.profileName,

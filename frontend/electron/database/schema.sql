@@ -372,6 +372,7 @@ CREATE TABLE IF NOT EXISTS `pos_profiles` (
   `enable_cashier_settlement` TINYINT(1) DEFAULT 0,
   `enable_return_validity` TINYINT(1) DEFAULT 0,
   `hide_closing_shift` TINYINT(1) DEFAULT 0,
+  `hide_expected_amount` TINYINT(1) DEFAULT 0,
   `hide_variants_items` TINYINT(1) DEFAULT 0,
   `input_qty` TINYINT(1) DEFAULT 0,
   `max_discount_percentage_allowed` DECIMAL(9,3) DEFAULT 100,

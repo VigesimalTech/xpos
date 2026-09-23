@@ -180,6 +180,8 @@ export const usePosStore = defineStore("pos", () => {
 	const taxInclusive = computed(() => !!posProfile.value?.tax_inclusive);
 
 	const hideClosingShift = computed(() => !!posProfile.value?.hide_closing_shift);
+	// K21: a blind cash-up; the difference is for the supervisor, in ERPNext.
+	const hideExpectedAmount = computed(() => !!posProfile.value?.hide_expected_amount);
 
 	const enableCashMovement = computed(() => !!posProfile.value?.enable_cash_movement);
 
@@ -664,6 +666,7 @@ export const usePosStore = defineStore("pos", () => {
 		inputQty,
 		taxInclusive,
 		hideClosingShift,
+		hideExpectedAmount,
 		enableCashMovement,
 		allowPosExpense,
 		allowCashDeposit,
