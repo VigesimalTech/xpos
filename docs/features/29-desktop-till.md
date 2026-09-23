@@ -70,6 +70,15 @@ On first start, the setup wizard asks for:
 - Sign-in and manager approvals share the same count
 - Wrong PINs are recorded in the [Audit Log](31-audit-log.md)
 
+### Idle Lock
+- A till left alone locks after the POS Profile's **Lock After Idle (Minutes)**: 5 by default, **0** never
+- Any touch, click or key starts the count again
+- The lock screen shows who is signed in and asks for **their** PIN, or their password if they have no PIN
+- The sale in progress, the cart and the open shift are all kept
+- Wrong PINs count towards the same [Lockout](#lockout) and are recorded in the [Audit Log](31-audit-log.md)
+- **Sign out, for someone else to use the till** hands the till over. The next cashier signs in as usual
+- Nothing behind the lock can be used, including keyboard shortcuts
+
 ### Cashiers Leaving
 - A cashier **disabled** in ERPNext cannot sign in on the till, even with a cached password
 - A cashier **removed** from the POS Profile is removed from the till within a few sync cycles
