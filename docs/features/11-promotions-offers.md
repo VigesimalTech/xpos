@@ -60,6 +60,8 @@ Offers can be triggered based on:
 
 ### POS Coupon Setup
 
+<!-- audience: administrator -->
+
 | Field | Description |
 |---|---|
 | Coupon Code | Unique code the customer provides |
@@ -93,6 +95,8 @@ Offers can be triggered based on:
 
 ## Promotional Scheme Integration
 
+<!-- audience: administrator -->
+
 X POS integrates with ERPNext's **Promotional Scheme** feature:
 
 ### How It Works
@@ -111,6 +115,8 @@ X POS integrates with ERPNext's **Promotional Scheme** feature:
 ---
 
 ## Pricing Rules
+
+<!-- audience: administrator -->
 
 X POS also integrates with ERPNext's **Pricing Rules** engine for advanced pricing control.
 

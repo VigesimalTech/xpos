@@ -117,6 +117,8 @@ feature as `allow_multi_currency`, which switches the whole invoice into another
 
 ### Setup
 
+<!-- audience: administrator -->
+
 | Setting | Where | Why |
 |---|---|---|
 | `pos_tender_currency` | Mode of Payment | Tags the mode as taking foreign notes. Blank means the invoice currency. |
@@ -162,6 +164,8 @@ Invoice 5,892,300 LBP. Customer hands over a $100 note at 90,000.
 The drawer nets **+$70 and −407,700 LBP**, and `70 × 90,000 − 407,700` is 5,892,300 exactly.
 
 ### What gets recorded
+
+<!-- audience: supervisor -->
 
 | Field | Holds |
 |---|---|

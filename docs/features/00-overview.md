@@ -43,6 +43,8 @@
 
 ## System Requirements
 
+<!-- audience: administrator -->
+
 | Requirement | Version |
 |---|---|
 | Python | ≥ 3.14 |
@@ -53,6 +55,8 @@
 ---
 
 ## Architecture
+
+<!-- audience: administrator -->
 
 X POS consists of:
 

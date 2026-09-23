@@ -16,6 +16,8 @@ Delivery charges allow POS operators to:
 
 ## Configuration
 
+<!-- audience: administrator -->
+
 ### Delivery Charges Setup
 Each delivery charge option is defined in the system:
 
@@ -60,6 +62,8 @@ When auto-apply is enabled:
 ---
 
 ## Rate Resolution
+
+<!-- audience: supervisor -->
 
 The system resolves the delivery rate in this order:
 1. **Per-profile rate** — If the POS Profile has an override rate, use it

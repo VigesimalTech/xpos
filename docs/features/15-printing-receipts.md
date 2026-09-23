@@ -56,6 +56,8 @@ On the [Desktop Till](29-desktop-till.md), receipts print **silently**, with no 
 
 ## Print Format Configuration
 
+<!-- audience: administrator -->
+
 ### Available Print Formats
 - X POS lists all available print formats for the invoice doctype (Sales Invoice or POS Invoice)
 - The default print format is configured in the POS Profile
@@ -82,6 +84,8 @@ X POS ships with:
 
 ## Letter Head Support
 
+<!-- audience: administrator -->
+
 - Letter head inclusion is controlled by POS Profile print settings
 - Conditional letter head based on the `print_with_letterhead` option
 - Configure company letter head in ERPNext's Letter Head doctype
@@ -89,6 +93,8 @@ X POS ships with:
 ---
 
 ## Barcode Generation
+
+<!-- audience: administrator -->
 
 X POS provides Jinja template helpers for generating barcodes in print formats:
 
@@ -112,6 +118,8 @@ X POS provides Jinja template helpers for generating barcodes in print formats:
 
 ## QR Code Generation
 
+<!-- audience: administrator -->
+
 ### `xpos_qrcode(data)`
 - Generates an SVG QR code element
 - Parameter: `data` — The string to encode (e.g., invoice URL, payment link)
@@ -124,6 +132,8 @@ X POS provides Jinja template helpers for generating barcodes in print formats:
 ---
 
 ## Print Format Template Example
+
+<!-- audience: administrator -->
 
 In a custom Jinja print format, you can use the helpers like this:
 
@@ -143,6 +153,8 @@ In a custom Jinja print format, you can use the helpers like this:
 ---
 
 ## Invoice Data Available in Print
+
+<!-- audience: administrator -->
 
 When designing print formats, the following data is available:
 
@@ -187,6 +199,8 @@ When designing print formats, the following data is available:
 ---
 
 ## Invoice Type Support
+
+<!-- audience: administrator -->
 
 X POS supports printing for both:
 - **Sales Invoice** — Standard invoice type

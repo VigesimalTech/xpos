@@ -1,5 +1,7 @@
 # Cashier Rights & Manager Approval
 
+<!-- audience: supervisor -->
+
 X POS decides what each cashier may do from their **POS Role** and their row on the **POS Profile**. ERPNext checks every sale against those rights when it arrives. On the desktop till, a manager can approve with their PIN whatever the cashier may not do alone.
 
 ---
@@ -32,10 +34,10 @@ Permissions are ticked on the **POS Role** form in ERPNext, grouped as below.
 | | Recall Other Shifts' Tabs | See [Open Tabs](27-open-tabs.md) |
 | | Settle Outstanding Invoice | See [Open Tabs](27-open-tabs.md) |
 | | Remove Items From the Cart | Deleting a line, lowering one to 0, clearing the sale, discarding a held order |
-| | Void After Payment, Return Without Receipt | Reserved for coming features. No screen checks them yet |
+| | Void After Payment, Return Without Receipt | For coming features |
 | Cash Management | Expense | Recording an expense |
 | | Bank Drop | Recording a bank drop |
-| | Open Drawer Without a Sale | Reserved for a coming feature. No screen checks it yet |
+| | Open Drawer Without a Sale | For a coming feature |
 | Reports | Current Stock by Brand, Current Stock Report | Those reports |
 | Screens | Reports | The report catalog |
 | | Barcode Printer | The Barcode Printer screen |
@@ -96,6 +98,8 @@ The POS Profile's **Sale Outside Policy** setting decides what ERPNext does with
 
 ## Manager Approval on the Till
 
+<!-- audience: cashier -->
+
 On the desktop till, an action the cashier's role does not allow is **shown, not hidden**. Choosing it asks for a manager.
 
 ### How It Works
@@ -118,7 +122,7 @@ ERPNext checks the approval again when the record arrives. An approval that does
 | Action | Asks When |
 |---|---|
 | Paying for a sale | A price change, line or cart discount, or return beyond the cashier's rights. One approval covers the whole sale; a later change within that cover is not asked again |
-| Removing items | The role lacks **Remove Items From the Cart**. Lowering a quantity does not ask; taking a line to 0 does |
+| Removing items | The role lacks **Remove Items From the Cart**: deleting a line or taking it to 0, clearing the sale, discarding a held order |
 | Returns | The role lacks **Sale Return** |
 | Reprints | The role lacks **Reprint Invoice** (toolbar, menu, `Ctrl+P` and the receipt preview) |
 | Closing the shift | The role lacks **Close Shift**. The POS Closing Shift records **Approved By** |
@@ -128,8 +132,9 @@ ERPNext checks the approval again when the record arrives. An approval that does
 Every approval, and every wrong PIN, is recorded in the [Audit Log](31-audit-log.md).
 
 ### On the Web POS
-- No PIN is checked on the web POS, so no approval is offered
-- Actions the role lacks are hidden or refused, as before
+- The web POS has no PIN pad, so a manager cannot approve there
+- An action the cashier's role lacks is hidden, or refused with the reason; a manager does it instead
+- Removals are recorded in the [Audit Log](31-audit-log.md), as on the till
 
 ---
 

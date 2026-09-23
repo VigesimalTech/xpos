@@ -98,6 +98,7 @@ X POS enforces several validations before processing a return:
 - **Quantity limits** — Return qty cannot exceed the original qty minus already-returned qty
 - **Customer match** — Return customer must match the original invoice customer
 - **Item existence** — All return items must exist on the original invoice
+- **Original invoice** — Every return is made against the invoice it returns; ERPNext refuses one without it
 
 ### Return Validity
 When `enable_return_validity` is enabled on the POS Profile:
@@ -110,16 +111,6 @@ When `enable_return_validity` is enabled on the POS Profile:
 - The system tracks quantities already returned across all previous returns against the same invoice
 - The "remaining returnable qty" is calculated as: original qty − sum of all previous return quantities
 - If an item is fully returned, its returnable qty is 0 and it cannot be returned again
-
----
-
-## Return Without Original Invoice
-
-When enabled in your settings:
-- Returns can be processed without searching for an original invoice
-- Items are added directly to the cart with negative quantities
-- The return is not linked to any specific original invoice
-- Useful for businesses that accept returns based on receipts or other proof
 
 ---
 

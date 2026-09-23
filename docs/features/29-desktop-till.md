@@ -19,6 +19,8 @@ The web POS at `/xpos` is unchanged and can be used alongside it.
 
 ## Installing and Setting Up
 
+<!-- audience: administrator -->
+
 Installing the app on a Windows PC, including MariaDB and the API key, is covered step by step in [Installing the desktop app](../desktop-install.md).
 
 ### Setup Wizard
@@ -43,6 +45,8 @@ On first start, the setup wizard asks for:
 ## Signing In with a PIN
 
 ### Setting a PIN
+
+<!-- audience: administrator -->
 1. Open the POS Profile in ERPNext
 2. In the **Applicable for Users** table, open the cashier's row
 3. Enter **4 to 6 digits** in **Set Till PIN** and save
@@ -149,12 +153,14 @@ Selling offline is normal on a till. Waiting sales are not errors.
 | Held orders | Drafts in ERPNext | Kept on the till, never sent to ERPNext |
 | Shift close | Needs ERPNext | Works offline, synced later |
 | Receipts | Browser print | Silent print to the receipt printer |
-| Removing items | No approval | Needs a manager unless the role allows it |
-| Audit log | None | Sent to ERPNext as POS Audit Events |
+| Removing items | Needs the role's permission | Needs the role's permission, or a manager's PIN |
+| Audit log | Removals and reprints, sent to ERPNext | Everything, including approvals and wrong PINs, sent to ERPNext |
 
 ---
 
 ## Tips
+
+<!-- audience: administrator -->
 
 - Give each till its own API user, and assign it to that shop's POS Profile only
 - Set PINs for every cashier before go-live, so no one needs a password at the till

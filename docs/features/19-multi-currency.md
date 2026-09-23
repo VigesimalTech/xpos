@@ -1,5 +1,7 @@
 # Multi-Currency
 
+<!-- audience: supervisor -->
+
 X POS handles two different currency problems, and they are easy to confuse. This page separates
 them.
 

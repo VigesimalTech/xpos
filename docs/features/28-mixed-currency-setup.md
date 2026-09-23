@@ -1,5 +1,7 @@
 # Mixed-Currency Tender Setup
 
+<!-- audience: administrator -->
+
 The step-by-step configuration for a store that prices in one currency but takes cash notes in
 another. The worked example throughout is a Lebanese retailer with a base currency of LBP that
 also accepts US dollars at a hand-entered daily rate.

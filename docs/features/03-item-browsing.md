@@ -141,6 +141,8 @@ The Item Detail Dialog opens when an item requires additional information before
 - On the desktop till, stock refreshes after each sync, so a delivery or restock in ERPNext shows without restarting the app
 
 ### Selling Beyond Stock
+
+<!-- audience: supervisor -->
 One rule applies everywhere (the item grid, the cart and the server):
 - The POS Profile's **Block Sale Beyond Available Qty** decides. Unset counts as on
 - If ERPNext's **Stock Settings** allow negative stock, out-of-stock items can be sold whatever the profile says
