@@ -12,6 +12,7 @@ from frappe.utils.background_jobs import enqueue
 from xpos.api.auth import user_has_pos_permission
 from xpos.api.exchange import get_currency_precision
 from xpos.api.sale_policy import apply_sale_policy
+from xpos.api.sale_signature import check_till_signature, record_till_signature
 from xpos.api.tender import build_change_legs, build_tender_legs, invoice_currency_of
 from xpos.api.till import till_cashier
 from xpos.api.utilities import can_recall_other_shift_tabs, get_invoice_type, is_pos_cashier
@@ -305,6 +306,9 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 	if existing:
 		dt, name = existing
 		return {**_build_invoice_response(frappe.get_doc(dt, name)), "duplicate": True}
+
+	# K43: before anything reads the sale, so the check sees what the till signed.
+	till_flags, till_record = check_till_signature(data, local_id)
 
 	pos_profile = data.get("pos_profile")
 	customer = data.get("customer")
@@ -629,7 +633,8 @@ def create_invoice(data: str | dict, local_id: str | None = None):
 	except Exception:
 		pass
 
-	apply_sale_policy(invoice_doc, {**data, "items": items}, pos)
+	record_till_signature(invoice_doc, till_record)
+	apply_sale_policy(invoice_doc, {**data, "items": items}, pos, till_flags)
 
 	try:
 		if is_existing_draft:

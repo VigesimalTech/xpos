@@ -221,9 +221,13 @@ def check_sale_policy(data: dict, pos, cashier: str) -> list[str]:
 	)
 
 
-def apply_sale_policy(invoice_doc, data: dict, pos) -> None:
+def apply_sale_policy(invoice_doc, data: dict, pos, till_flags: list[str] | None = None) -> None:
 	"""Record who made the sale and who approved it, check it, and flag or reject it as
-	the POS Profile says."""
+	the POS Profile says.
+
+	`till_flags` are what the till's signature showed (K43): a sale changed after
+	payment. No manager's approval covers them, and a sale paid at a till is never
+	rejected, so they are only ever flagged."""
 	from xpos.api.approval import apply_approval, check_approver, resolve_approver
 
 	cashier = resolve_cashier(data)
@@ -238,6 +242,10 @@ def apply_sale_policy(invoice_doc, data: dict, pos) -> None:
 		approved_by = approved = None
 	invoice_doc.xpos_approved_by = approved_by
 	invoice_doc.xpos_approved_exceptions = approved
+	if till_flags:
+		# Paid at the till: flagged, never rejected, whatever the POS Profile says.
+		invoice_doc.xpos_policy_flags = "\n".join([*flags, *till_flags])
+		return
 	if not flags:
 		invoice_doc.xpos_policy_flags = None
 		return
