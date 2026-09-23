@@ -15,6 +15,8 @@ The referral system works through:
 
 ## Referral Code Setup
 
+<!-- audience: administrator -->
+
 Each referral code is defined with:
 
 | Field | Description |
@@ -51,6 +53,8 @@ Each referral code is defined with:
 ---
 
 ## Customer Fields for Referrals
+
+<!-- audience: administrator -->
 
 | Field | Description |
 |---|---|

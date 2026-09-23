@@ -1,5 +1,7 @@
 # Scale Barcode Support
 
+<!-- audience: administrator -->
+
 X POS supports barcode parsing for weighing scales — used in retail environments where items are weighed and a barcode label is printed containing the item code and weight (and optionally price).
 
 ---
@@ -106,6 +108,8 @@ software before going live.
 ---
 
 ## How It Works in the POS
+
+<!-- audience: cashier -->
 
 1. The cashier scans a scale barcode using the barcode scanner
 2. X POS first tries to match the barcode against Item Barcode records and direct item codes

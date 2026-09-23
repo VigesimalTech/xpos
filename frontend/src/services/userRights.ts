@@ -26,6 +26,8 @@ export interface PosPermissions {
 	barcode_printer: boolean;
 	price_checker: boolean;
 	purchasing: boolean;
+	/** Editing POS Roles; in the app it also opens the whole user guide (K39). */
+	manage_role_permissions: boolean;
 }
 
 const DEFAULT_PERMISSIONS: PosPermissions = {
@@ -52,6 +54,7 @@ const DEFAULT_PERMISSIONS: PosPermissions = {
 	barcode_printer: false,
 	price_checker: false,
 	purchasing: false,
+	manage_role_permissions: false,
 };
 
 const currentRole = ref<string>("");

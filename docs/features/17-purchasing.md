@@ -1,5 +1,7 @@
 # Purchasing Module
 
+<!-- audience: supervisor -->
+
 X POS includes a built-in purchasing module that allows POS operators to create purchase orders, receive stock, and manage in-transit transfers — all from the POS interface.
 
 ---

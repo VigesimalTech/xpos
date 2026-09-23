@@ -1,15 +1,16 @@
 # Audit Log
 
-The desktop till records what happens at the till that leaves no sale behind: deleted lines, cleared sales, reprints, approvals and wrong PINs. These events are sent to ERPNext as **POS Audit Events**, so a manager can review them alongside the sales.
+<!-- audience: supervisor -->
+
+X POS records what happens at the POS that leaves no sale behind: deleted lines, cleared sales, reprints, approvals and wrong PINs. These events are sent to ERPNext as **POS Audit Events**, so a manager can review them alongside the sales.
 
 ---
 
 ## Overview
 
-- Every event is written to the till's local database first, so nothing is lost offline
-- Events are sent to ERPNext in the background, after the shifts they belong to
+- On the [Desktop Till](29-desktop-till.md), every event is written to the till's local database first, so nothing is lost offline. Events are sent to ERPNext in the background, after the shifts they belong to
+- On the web POS, removals, lowered quantities and reprints are sent to ERPNext as they happen. While ERPNext cannot be reached they wait in the browser and are sent when it is back
 - ERPNext keeps **every** event it is sent. POS Audit Events are **read-only** and cannot be changed once stored
-- The web POS does not record audit events
 
 ---
 

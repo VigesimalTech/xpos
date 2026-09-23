@@ -21,6 +21,8 @@ export default defineConfig({
 			reporter: ["text", "json", "html"],
 		},
 	},
+	// The user guide is built from ../docs (src/help/guide.ts).
+	server: { fs: { allow: [resolve(__dirname, "..")] } },
 	resolve: {
 		alias: {
 			"@": resolve(__dirname, "./src"),

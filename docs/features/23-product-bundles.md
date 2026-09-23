@@ -66,6 +66,8 @@ When the cashier adds "Breakfast Combo" to the cart, X POS knows it needs 1 Coff
 
 ## Configuration
 
+<!-- audience: administrator -->
+
 ### Setting Up Product Bundles
 1. In ERPNext, navigate to **Product Bundle** doctype
 2. Create a new Product Bundle

@@ -5,9 +5,14 @@
  * manager's PIN on the till: deleting a line (or lowering it to 0), clearing the sale.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import * as api from "@/services/api";
 import { createPinia, setActivePinia } from "pinia";
 
-vi.mock("@/services/api", () => ({ call: vi.fn(), default: { call: vi.fn() } }));
+vi.mock("@/services/api", () => ({
+	call: vi.fn(async () => ({ accepted: [] })),
+	showError: vi.fn(),
+	default: { call: vi.fn() },
+}));
 const perms = vi.hoisted(() => ({ value: {} as Record<string, boolean> }));
 vi.mock("@/services/userRights", () => ({
 	hasPermission: (k: string) => perms.value[k] ?? false,
@@ -136,13 +141,28 @@ describe("K19: removing items from the sale", () => {
 		expect(cart.items).toHaveLength(1);
 	});
 
-	it("the web POS is left as it was: no PIN can be checked there", async () => {
+	it("the web POS refuses a removal the role lacks, with the reason: no PIN can be checked there (K38)", async () => {
 		window.electronAPI = undefined as never;
 		const cart = cartWith("A", "B");
 
-		await cart.requestRemoveItem(0);
+		expect(await cart.requestRemoveItem(0)).toBe(false);
 
 		expect(approval.requestApproval).not.toHaveBeenCalled();
+		expect(cart.items).toHaveLength(2);
+		expect(api.showError).toHaveBeenCalledWith(expect.stringContaining("Remove Items From the Cart"));
+	});
+
+	it("the web POS lets a role with the permission remove, and records it (K38)", async () => {
+		window.electronAPI = undefined as never;
+		perms.value.remove_cart_items = true;
+		const cart = cartWith("A", "B");
+
+		expect(await cart.requestRemoveItem(0)).toBe(true);
+
 		expect(cart.items).toHaveLength(1);
+		expect(api.call).toHaveBeenCalledWith(
+			"xpos.api.audit.record_web_audit_events",
+			expect.objectContaining({ events: [expect.objectContaining({ event_type: "line_removed" })] }),
+		);
 	});
 });

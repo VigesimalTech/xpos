@@ -130,6 +130,8 @@ On the [Desktop Till](29-desktop-till.md), expenses and bank drops are kept with
 
 ## Accounting Impact
 
+<!-- audience: supervisor -->
+
 ### POS Expense Journal Entry
 ```
 Account                    Debit     Credit

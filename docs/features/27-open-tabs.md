@@ -27,6 +27,8 @@ and locks it from further edits, which is the opposite of a tab you keep adding 
 
 ## Enabling it
 
+<!-- audience: administrator -->
+
 Both halves are **off by default**. Each needs two switches turned on.
 
 ### On the POS Profile

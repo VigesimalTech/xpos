@@ -48,6 +48,11 @@ router.beforeEach(async (to, from, next) => {
 		return;
 	}
 
+	if (to.name === "help-sign-in" && authStore.isAuthenticated) {
+		next({ name: "help" });
+		return;
+	}
+
 	if (isAuthPage && authStore.isAuthenticated) {
 		next({ name: "pos" });
 		return;

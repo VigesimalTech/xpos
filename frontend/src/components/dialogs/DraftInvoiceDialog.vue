@@ -284,7 +284,7 @@ import {
 	RefreshCw,
 } from "lucide-vue-next";
 import { __ } from "@/lib/translate";
-import { ensureAllowed } from "@/services/ensureAllowed";
+import { ensureAllowed, REMOVAL_REFUSED_ON_WEB } from "@/services/ensureAllowed";
 import { recordAudit } from "@/services/auditLog";
 import { isElectron } from "@/services/electronBridge";
 import { debounce } from "@/utils";
@@ -428,12 +428,13 @@ async function deleteDraft(draftName: string) {
 		return;
 	}
 	// K19: discarding a held order takes a customer's items away, as clearing a sale does.
-	let approvedBy: string | null = null;
-	if (isElectron()) {
-		const allowed = await ensureAllowed("remove_cart_items", __("Discard held order {0}", [draftName]));
-		if (!allowed.ok) return;
-		approvedBy = allowed.approvedBy ?? null;
+	// The web POS checks no PIN, so there it needs the cashier's own permission (K38).
+	const allowed = await ensureAllowed("remove_cart_items", __("Discard held order {0}", [draftName]));
+	if (!allowed.ok) {
+		if (!isElectron()) showError(REMOVAL_REFUSED_ON_WEB());
+		return;
 	}
+	const approvedBy: string | null = allowed.approvedBy ?? null;
 	// K20: a discarded held order goes in the till's audit log.
 	const draft = drafts.value.find((d) => d.name === draftName);
 	const logDiscard = () =>

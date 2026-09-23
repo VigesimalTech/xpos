@@ -16,6 +16,8 @@ When offline mode is enabled (`use_offline_mode` on POS Profile), X POS:
 
 ## Enabling Offline Mode
 
+<!-- audience: administrator -->
+
 1. Open your POS Profile settings
 2. Enable the **Use Offline Mode** option
 3. Save the profile
@@ -32,6 +34,8 @@ When offline mode is enabled (`use_offline_mode` on POS Profile), X POS:
 ---
 
 ## Data Pre-Caching
+
+<!-- audience: supervisor -->
 
 When a shift is opened with offline mode enabled, the following data is pre-loaded to your device:
 
@@ -62,6 +66,8 @@ When a shift is opened with offline mode enabled, the following data is pre-load
 ---
 
 ## Local Database Structure
+
+<!-- audience: administrator -->
 
 The app stores offline data in your browser with dedicated storage for:
 
@@ -123,6 +129,8 @@ The app stores offline data in your browser with dedicated storage for:
 ---
 
 ## Automatic Sync Engine
+
+<!-- audience: supervisor -->
 
 ### Periodic Sync
 - Every **5 minutes**, the system performs a background sync cycle:

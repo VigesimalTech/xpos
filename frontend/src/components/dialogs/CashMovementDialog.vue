@@ -22,12 +22,13 @@
 						<ArrowUpCircle v-else class="w-4 h-4" />
 					</div>
 					<div>
-						<DialogTitle class="text-base">
+						<DialogTitle class="text-base flex items-center gap-1.5">
 							{{
 								paymentStore.cashMovementType === "expense"
 									? __("POS Expense")
 									: __("Cash Deposit")
 							}}
+							<HelpLink topic="cashMovement" :label="__('Limits on cash out')" />
 						</DialogTitle>
 						<DialogDescription class="text-xs">
 							{{
@@ -143,6 +144,7 @@
 </template>
 
 <script setup lang="ts">
+import HelpLink from "@/components/help/HelpLink.vue";
 import { ref, computed, onMounted, watch } from "vue";
 import { usePosStore } from "@/stores/posStore";
 import { useMoney } from "@/composables/useMoney";

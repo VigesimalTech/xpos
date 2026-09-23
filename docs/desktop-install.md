@@ -1,5 +1,7 @@
 # Installing the desktop app on a Windows PC
 
+<!-- audience: administrator -->
+
 For trying out a build on one PC. The installer is not signed yet and does not
 include the database, so a PC needs MariaDB set up first.
 

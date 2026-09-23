@@ -1,5 +1,7 @@
 # POS Profile Configuration
 
+<!-- audience: administrator -->
+
 The POS Profile is the central configuration hub for X POS. It controls every aspect of the POS behavior — from item display to payments, permissions, and advanced features.
 
 ---
@@ -61,7 +63,6 @@ A discount on the whole order has no profile switch: the role's **Apply Addition
 | Allow Credit Sale | Allow sales on credit (no payment required) |
 | Allow Change Posting Date | Allow backdating invoices |
 | Allow Return | Enable the return feature |
-| Allow Return Without Invoice | Allow returns without original invoice |
 | Allow Free Batch Return | Allow returning to any batch |
 | Enable Return Validity | Enforce a return time window |
 | Return Validity Days | Days allowed for returns after purchase |

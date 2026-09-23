@@ -105,6 +105,8 @@ The [Desktop Till](29-desktop-till.md) closes a shift from its own records, so c
 - ERPNext adds a comment to the POS Closing Shift listing each refused sale, its reason and amount, for a manager to settle
 
 ### Several Tills
+
+<!-- audience: supervisor -->
 - Each till's shifts carry their own ID, so two tills on the same POS Profile never have their shifts or sales mixed up
 
 ---

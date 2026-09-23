@@ -24,7 +24,14 @@
 						<Wifi v-else class="w-4 h-4 text-white" />
 					</div>
 					<div>
-						<DialogTitle class="text-base">{{ __("Offline Invoices") }}</DialogTitle>
+						<DialogTitle class="text-base flex items-center gap-1.5">
+							{{ __("Offline Invoices") }}
+							<HelpLink
+								v-if="isElectron()"
+								topic="syncStatus"
+								:label="__('How the till syncs')"
+							/>
+						</DialogTitle>
 						<DialogDescription class="text-xs">
 							{{ offlineStore.isOnline ? __("Online") : __("Offline") }} &mdash;
 							{{ offlineStore.pendingCount }} {{ __("") }}
@@ -169,6 +176,8 @@
 </template>
 
 <script setup lang="ts">
+import HelpLink from "@/components/help/HelpLink.vue";
+import { isElectron } from "@/services/electronBridge";
 import { onMounted } from "vue";
 import { useOfflineStore } from "@/stores/offlineStore";
 import { usePosStore } from "@/stores/posStore";

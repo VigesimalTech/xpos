@@ -94,6 +94,7 @@ import {
 	ArrowDownCircle,
 	HelpCircle,
 	Keyboard,
+	BookOpen,
 	Power,
 	FileText,
 	Receipt,
@@ -615,6 +616,13 @@ const allMenus = computed<Menu[]>(() => [
 	{
 		label: "Help",
 		items: [
+			{
+				id: "user-guide",
+				label: "User Guide",
+				icon: BookOpen,
+				shortcut: "F1",
+				action: () => router.push({ name: "help" }),
+			},
 			{
 				id: "shortcuts",
 				label: "Keyboard Shortcuts",

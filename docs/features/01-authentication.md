@@ -30,6 +30,8 @@ On the [Desktop Till](29-desktop-till.md), cashiers sign in differently:
 - A cashier disabled in ERPNext, or removed from the POS Profile, can no longer sign in on the till
 
 ### Setting a Cashier's PIN
+
+<!-- audience: administrator -->
 1. Open the POS Profile in ERPNext
 2. In the **Applicable for Users** table, open the cashier's row
 3. Enter 4 to 6 digits in **Set Till PIN** and save
@@ -58,6 +60,8 @@ On the [Desktop Till](29-desktop-till.md), cashiers sign in differently:
 ---
 
 ## Security Notes
+
+<!-- audience: administrator -->
 
 - Authentication uses standard Frappe session management with secure cookies
 - POS access is controlled by Frappe user roles and POS Profile assignments

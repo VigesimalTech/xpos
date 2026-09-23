@@ -22,6 +22,8 @@ Under the hood this reuses the existing draft-invoice workflow. Unsettled bills 
 
 ## Enabling the Feature
 
+<!-- audience: administrator -->
+
 Two settings on the **POS Profile** control the terminal behavior:
 
 | Setting | Description |
@@ -32,6 +34,8 @@ Two settings on the **POS Profile** control the terminal behavior:
 ---
 
 ## Cashier Access Control
+
+<!-- audience: administrator -->
 
 Not every user is a cashier. Access is controlled per user on the POS Profile's **Applicable for Users** table:
 
@@ -84,6 +88,8 @@ A manual **Refresh** button is available if needed.
 ---
 
 ## Sales Invoice and POS Invoice Support
+
+<!-- audience: administrator -->
 
 Cashier Settlement works whether the system is configured for **Sales Invoice** or **POS Invoice** (set in POS Settings).
 

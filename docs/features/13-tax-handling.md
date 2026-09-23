@@ -1,5 +1,7 @@
 # Tax Handling
 
+<!-- audience: supervisor -->
+
 X POS provides a sophisticated tax engine supporting multiple tax accounts, per-item tax templates, tax-inclusive pricing, and bulk tax resolution.
 
 ---
@@ -84,6 +86,8 @@ Each tax line shows:
 ---
 
 ## Bulk Tax Resolution
+
+<!-- audience: administrator -->
 
 ### API Endpoints
 - `get_item_tax_template` — Resolves the applicable tax template for a single item

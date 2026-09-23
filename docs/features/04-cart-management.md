@@ -65,15 +65,15 @@ The cart is the central workspace of X POS where items are collected, quantities
 - Click to remove the item from the cart
 - No confirmation prompt — removal is instant
 
-### Removing Items on the Desktop Till
-- On the [Desktop Till](29-desktop-till.md), removing anything from the customer's sale needs the **Remove Items From the Cart** role permission, or a manager's PIN:
+### Removing Items
+- Taking items out of the customer's sale needs the **Remove Items From the Cart** role permission:
   - Deleting a line (its button or the Delete key)
   - Lowering a quantity to 0
   - Clearing the sale (the button, the shortcut, or **New Sale**)
   - Discarding a held order
-- Lowering a quantity (above 0), raising one, free items added by a pricing rule, and lines in a return do not ask
-- Every removal is recorded in the [Audit Log](31-audit-log.md), with the manager who approved it
-- The web POS does not ask for approval
+- On the [Desktop Till](29-desktop-till.md), a cashier without it can ask a manager, who approves with their PIN
+- On the web POS, the removal is refused with the reason, and a manager must do it
+- Every removal, and every lowered quantity, is recorded in the [Audit Log](31-audit-log.md), with the cashier and any manager who approved it
 
 ---
 

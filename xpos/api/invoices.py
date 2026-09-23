@@ -9,6 +9,7 @@ from frappe import _, cstr
 from frappe.utils import cint, flt, getdate, now_datetime, nowdate
 from frappe.utils.background_jobs import enqueue
 
+from xpos.api.auth import user_has_pos_permission
 from xpos.api.exchange import get_currency_precision
 from xpos.api.sale_policy import apply_sale_policy
 from xpos.api.tender import build_change_legs, build_tender_legs, invoice_currency_of
@@ -1347,6 +1348,13 @@ def delete_draft_invoice(name: str, doctype: str = "", pos_opening_shift: str = 
 	if is_foreign_tab and not can_recall_other_shift_tabs(doc.get("pos_profile")):
 		frappe.throw(
 			_("You are not permitted to delete an open tab from another shift."),
+			frappe.PermissionError,
+		)
+	# K38: discarding a held order takes a customer's items away, as clearing a sale does.
+	# The web POS has no manager's PIN, so it needs the cashier's own permission.
+	if not user_has_pos_permission("remove_cart_items", None, doc.get("pos_profile")):
+		frappe.throw(
+			_("Discarding a held order needs the Remove Items From the Cart permission."),
 			frappe.PermissionError,
 		)
 

@@ -18,6 +18,7 @@ const BarcodePrintView = () => import("@/views/BarcodePrintView.vue");
 const SetupWizardView = () => import("@/views/SetupWizardView.vue");
 const WaitingForDatabaseView = () => import("@/views/WaitingForDatabaseView.vue");
 const RolePermissionsView = () => import("@/views/RolePermissionsView.vue");
+const HelpView = () => import("@/views/HelpView.vue");
 import { RouteRecordRaw } from "vue-router";
 
 const routes: RouteRecordRaw[] = [
@@ -38,6 +39,19 @@ const routes: RouteRecordRaw[] = [
 		name: "login",
 		component: LoginView,
 		meta: { title: "Sign In", requiresAuth: false, isAuthPage: true },
+	},
+	{
+		// Before sign-in: only the sign-in sections of the user guide.
+		path: "/help/sign-in",
+		name: "help-sign-in",
+		component: HelpView,
+		meta: { title: "Help", requiresAuth: false, isAuthPage: true },
+	},
+	{
+		path: "/help/:page?",
+		name: "help",
+		component: HelpView,
+		meta: { title: "User Guide", requiresAuth: true },
 	},
 	{
 		path: "/reset-password",

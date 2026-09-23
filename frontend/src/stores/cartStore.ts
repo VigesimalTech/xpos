@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { ref, computed, watch } from "vue";
-import { call } from "@/services/api";
+import { call, showError } from "@/services/api";
 import { usePosStore } from "./posStore";
 import { useAuthStore } from "./authStore";
 import { useSettingsStore } from "./settingsStore";
@@ -15,7 +15,7 @@ import { isElectron } from "@/services/electronBridge";
 import { getDiscountLimit, hasPermission } from "@/services/userRights";
 import { saleNeeds, type SaleNeeds } from "@/services/tillSalePolicy";
 import { useApprovalStore } from "./approvalStore";
-import { ensureAllowed } from "@/services/ensureAllowed";
+import { ensureAllowed, REMOVAL_REFUSED_ON_WEB } from "@/services/ensureAllowed";
 import { recordAudit } from "@/services/auditLog";
 import type {
 	CartItem,
@@ -711,16 +711,18 @@ export const useCartStore = defineStore("cart", () => {
 	}
 
 	/**
-	 * K19: taking something out of the customer's sale on the desktop till needs Remove
-	 * Items From the Cart, or a manager's PIN. Not in a return (it only lowers a refund),
-	 * and not on the web POS, where no PIN can be checked. `logged` says whether the
-	 * removal goes in the audit log (K20), with who approved it.
+	 * K19: taking something out of the customer's sale needs Remove Items From the Cart.
+	 * On the desktop till a manager's PIN can stand in for it; the web POS checks no PIN,
+	 * so there it is refused, with the reason (K38). Not in a return (it only lowers a
+	 * refund). `logged` says whether the removal goes in the audit log (K20), with who
+	 * approved it.
 	 */
 	async function allowRemoval(
 		reason: string,
 	): Promise<{ ok: boolean; logged: boolean; approvedBy: string | null }> {
-		if (isReturnMode.value || !isElectron()) return { ok: true, logged: false, approvedBy: null };
+		if (isReturnMode.value) return { ok: true, logged: false, approvedBy: null };
 		const { ok, approvedBy } = await ensureAllowed("remove_cart_items", reason);
+		if (!ok && !isElectron()) showError(REMOVAL_REFUSED_ON_WEB());
 		return { ok, logged: true, approvedBy: approvedBy ?? null };
 	}
 
@@ -765,7 +767,7 @@ export const useCartStore = defineStore("cart", () => {
 		const lowering = Math.abs(qty) < Math.abs(before);
 		const result = updateItemQty(index, qty);
 		// A lower quantity that keeps the line needs no one; the audit log (K20) still has it.
-		const logged = lowering && !item.pos_is_free_item && !isReturnMode.value && isElectron();
+		const logged = lowering && !item.pos_is_free_item && !isReturnMode.value;
 		if (result.success && logged) {
 			const taken = Math.abs(before) - Math.abs(qty);
 			recordAudit({

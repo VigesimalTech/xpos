@@ -86,6 +86,20 @@ places. Keep the two apart:
   say "desktop till" without a link, or add the page when the changes justify one.
 - Where the two differ in several ways, add a `| Feature | Web POS | Desktop Till |` table.
 
+## Audience markers
+
+The app shows each person the sections their role reaches. A marker on the line after a
+heading says who it is for (see SKILL.md, "Mark who a section is for"):
+
+```markdown
+## Accounting Impact
+
+<!-- audience: supervisor -->
+```
+
+GitHub does not show it. Put a marker only where the audience changes; a subsection
+inherits its parent's.
+
 ## Cross-links
 
 - Link to other feature pages by their title: `see [Cash Movements](14-cash-movements.md)`.

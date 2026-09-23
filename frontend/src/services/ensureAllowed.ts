@@ -6,6 +6,11 @@
 import { isElectron } from "@/services/electronBridge";
 import { hasPermission, type PosPermissions } from "@/services/userRights";
 import { useApprovalStore } from "@/stores/approvalStore";
+import __ from "@/lib/translate";
+
+/** What the web POS says when it refuses a removal (K38): no manager's PIN can be asked there. */
+export const REMOVAL_REFUSED_ON_WEB = () =>
+	__("Taking items out of a sale needs the Remove Items From the Cart permission. Ask a manager.");
 
 export async function ensureAllowed(
 	permission: keyof PosPermissions,

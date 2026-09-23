@@ -86,6 +86,8 @@ export default defineConfig({
 	// In Electron mode, we use hash-based routing (no server to handle SPA fallback)
 	base: "./",
 	server: {
+		// The user guide is built from ../docs (src/help/guide.ts).
+		fs: { allow: [path.resolve(__dirname, "..")] },
 		port: 5175,
 	},
 	build: {
