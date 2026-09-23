@@ -39,6 +39,7 @@
 | 30 | [Cashier Rights & Manager Approval](30-cashier-rights-approval.md) | POS Role permissions, discount limits, server-side sale checks, manager PIN approval |
 | 31 | [Audit Log](31-audit-log.md) | Deleted lines, cleared sales, reprints, approvals and wrong PINs, stored in ERPNext |
 | 32 | [Exceptions Report](32-exceptions-report.md) | What each cashier took out of sales, returned, discounted and miscounted, by day or week |
+| 33 | [Signed Sales](33-signed-sales.md) | Sales signed and numbered at payment, checked by ERPNext, and the Missing Till Sales report |
 
 ---
 

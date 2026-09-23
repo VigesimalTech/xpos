@@ -27,6 +27,7 @@ X POS records what happens at the POS that leaves no sale behind: deleted lines,
 | **PIN Failed** | A wrong PIN is entered, at sign-in or for an approval |
 | **Settings Changed** | An administrator changes the till's ERPNext server, local database or sync settings, or whether it opens at startup. The change is recorded as from and to |
 | **Local Data Cleared** | An administrator clears the till's synced data, or all its local data |
+| **Till Key Refused** | A till's sales carry a different signing key from the one ERPNext holds for it. Recorded once per key. See [Signed Sales](33-signed-sales.md) |
 | **No Sale**, **Void After Payment**, **Other** | Reserved for coming features |
 
 Approvals and wrong PINs are recorded where the PIN is checked, so no screen can leave them out.
