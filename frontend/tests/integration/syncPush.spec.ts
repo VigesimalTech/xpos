@@ -11,6 +11,8 @@ import { query, execute } from "../../electron/database/dbService";
 import { registerDbHandlers } from "../../electron/database/ipcHandlers";
 import { initSyncEngine, runSyncCyclePublic, stopSyncEngine } from "../../electron/sync/syncEngine";
 import { SYNC_DEFAULTS } from "../../electron/sync/syncConfig";
+import { canonicalSale } from "../../electron/security/saleSignature";
+import crypto from "crypto";
 
 const CREATE_INVOICE = "xpos.api.invoices.create_invoice";
 const CREATE_PURCHASE_ORDER = "xpos.x_pos.api.purchase_orders.create_purchase_order";
@@ -98,6 +100,44 @@ describe("pushing sales to ERPNext", () => {
 		expect(await pendingInvoices()).toMatchObject([
 			{ local_id: localId, status: "synced", server_name: "SRV-1" },
 		]);
+	});
+
+	it("K43: a sale reaches ERPNext signed and numbered; one changed in the database no longer checks out", async () => {
+		const first = await queueSale(10);
+		const second = await queueSale(20);
+		// Someone with the database password lowers the second sale before it syncs.
+		const [row] = await query<{ data: string }>(
+			"SELECT `data` FROM `pending_invoices` WHERE `local_id` = ?",
+			[second],
+		);
+		const edited = JSON.parse(row.data);
+		edited.items[0].rate = 1;
+		edited.payments[0].amount = 1;
+		await execute("UPDATE `pending_invoices` SET `data` = ? WHERE `local_id` = ?", [
+			JSON.stringify(edited),
+			second,
+		]);
+
+		await runSyncCyclePublic();
+
+		const checks = frappe.callsTo(CREATE_INVOICE).map((call) => {
+			const sale = JSON.parse(String(call.args.data));
+			const sig = sale.xpos_signature;
+			const key = crypto.createPublicKey({
+				key: { kty: "OKP", crv: "Ed25519", x: sig.public_key },
+				format: "jwk",
+			});
+			const ok = crypto.verify(
+				null,
+				Buffer.from(canonicalSale(sale, String(call.args.local_id), sig.seq)),
+				key,
+				Buffer.from(sig.sig, "base64"),
+			);
+			return { local_id: call.args.local_id, seq: sig.seq, ok };
+		});
+		expect(checks).toHaveLength(2);
+		expect(checks[0]).toMatchObject({ local_id: first, ok: true });
+		expect(checks[1]).toMatchObject({ local_id: second, seq: checks[0].seq + 1, ok: false });
 	});
 
 	it("a held order (draft) stays on the till: it is not sent as a sale", async () => {

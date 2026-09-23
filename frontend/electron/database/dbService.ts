@@ -38,7 +38,8 @@ const DEFAULT_CONFIG: DbConfig = {
 	host: "127.0.0.1",
 	port: 3306,
 	user: "xpos",
-	password: "xpos",
+	// K43: none built in. The password chosen at install comes from the setup wizard, sealed by the OS.
+	password: "",
 	database: "xpos_local",
 };
 

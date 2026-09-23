@@ -24,6 +24,7 @@ import {
 	type DbConfig,
 } from "./dbService";
 import { createLogger } from "../logger";
+import { signSale } from "../security/tillKey";
 import { recordPinFailure } from "../audit/auditLog";
 import {
 	countWaitingSales,
@@ -418,7 +419,13 @@ export function registerDbHandlers(): void {
 			const result = await execute(
 				`INSERT INTO \`pending_invoices\` (\`local_id\`, \`data\`, \`status\`, \`customer_name\`, \`grand_total\`)
        VALUES (?, ?, 'pending', ?, ?)`,
-				[localId, JSON.stringify(record.data), record.customer_name || null, record.grand_total || 0],
+				[
+					localId,
+					// K43: a paid sale is signed and numbered as it is stored.
+					JSON.stringify(signSale((record.data ?? {}) as Record<string, unknown>, localId)),
+					record.customer_name || null,
+					record.grand_total || 0,
+				],
 			);
 			return { id: result.insertId, local_id: localId };
 		},
