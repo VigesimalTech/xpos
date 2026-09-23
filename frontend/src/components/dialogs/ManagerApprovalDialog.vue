@@ -9,8 +9,9 @@
 						<ShieldCheck class="w-4 h-4" />
 					</div>
 					<div>
-						<DialogTitle class="text-base">
+						<DialogTitle class="text-base flex items-center gap-1.5">
 							{{ chosen ? chosen.full_name : __("Manager approval") }}
+							<HelpLink topic="managerApproval" :label="__('How manager approval works')" />
 						</DialogTitle>
 						<DialogDescription class="text-xs">
 							{{ chosen ? __("Enter your PIN to approve") : store.reason }}
@@ -83,6 +84,7 @@
 </template>
 
 <script setup lang="ts">
+import HelpLink from "@/components/help/HelpLink.vue";
 /**
  * A manager approves, with their PIN, what the cashier may not do alone (K19). Opened
  * by `useApprovalStore().requestApproval`; lists only those who may approve this.

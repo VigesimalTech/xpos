@@ -34,6 +34,8 @@ export default defineConfig({
 	},
 	server: {
 		port: 5174,
+		// The user guide is built from ../docs (src/help/guide.ts).
+		fs: { allow: [path.resolve(__dirname, "..")] },
 		middlewareMode: false,
 		proxy: {
 			"/api": {

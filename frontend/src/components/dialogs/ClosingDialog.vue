@@ -9,7 +9,14 @@
 	>
 		<DialogScrollContent class="max-w-2xl p-0 gap-0 overflow-hidden">
 			<DialogHeader class="shrink-0 px-5 pt-5 pb-3 border-b border-border">
-				<DialogTitle>{{ __("Close Shift") }}</DialogTitle>
+				<DialogTitle class="flex items-center gap-1.5">
+					{{ __("Close Shift") }}
+					<HelpLink
+						v-if="isElectron()"
+						topic="closeShift"
+						:label="__('Closing a shift on the till')"
+					/>
+				</DialogTitle>
 				<DialogDescription>{{ __("Review and reconcile your shift") }}</DialogDescription>
 			</DialogHeader>
 
@@ -261,6 +268,7 @@
 </template>
 
 <script setup lang="ts">
+import HelpLink from "@/components/help/HelpLink.vue";
 import { computed, ref, onMounted } from "vue";
 import { usePosStore } from "@/stores/posStore";
 import { useMoney } from "@/composables/useMoney";

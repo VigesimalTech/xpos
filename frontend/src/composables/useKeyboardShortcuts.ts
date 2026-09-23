@@ -73,6 +73,16 @@ export function useKeyboardShortcuts() {
 			},
 		},
 		{
+			id: "user-guide",
+			keys: ["f1"],
+			description: "Open the User Guide",
+			category: "General",
+			global: true,
+			action: () => {
+				router.push({ name: "help" });
+			},
+		},
+		{
 			id: "error-inspector",
 			keys: ["ctrl", "shift", "e"],
 			description: "Toggle Error Inspector",

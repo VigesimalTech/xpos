@@ -575,7 +575,13 @@
 									])
 								}}
 							</p>
-							<p class="text-xs mt-0.5">{{ __("Change can only be given from cash.") }}</p>
+							<p class="text-xs mt-0.5 inline-flex items-center gap-1">
+								{{ __("Change can only be given from cash.") }}
+								<HelpLink
+									topic="changeFromCash"
+									:label="__('Why change comes only from cash')"
+								/>
+							</p>
 						</div>
 						<div
 							v-else-if="changeAmount > 0 && !showChangeAllocator"
@@ -714,6 +720,7 @@
 </template>
 
 <script setup lang="ts">
+import HelpLink from "@/components/help/HelpLink.vue";
 import { ref, computed, watch, onMounted, onUnmounted, nextTick } from "vue";
 import { usePosStore } from "@/stores/posStore";
 import { useMoney } from "@/composables/useMoney";

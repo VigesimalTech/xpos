@@ -14,8 +14,9 @@
 
 		<Card v-if="mode === 'pin'" class="w-full max-w-md">
 			<CardHeader class="text-center">
-				<CardTitle class="text-xl">
+				<CardTitle class="text-xl inline-flex items-center justify-center gap-1.5">
 					{{ selectedUser ? selectedUser.full_name : "Who is signing in?" }}
+					<HelpLink topic="signIn" label="Help with signing in" />
 				</CardTitle>
 				<CardDescription>
 					{{ selectedUser ? "Enter your PIN" : "Tap your name" }}
@@ -182,6 +183,7 @@
 </template>
 
 <script setup lang="ts">
+import HelpLink from "@/components/help/HelpLink.vue";
 import { ref, onMounted, onUnmounted, inject } from "vue";
 import { isElectron } from "@/services/electronBridge";
 import { useRouter } from "vue-router";
