@@ -231,3 +231,49 @@ class TestSyncAuditEvents(SyncCase):
 	def test_a_batch_is_capped(self):
 		events = [self.event(f"e{i}") for i in range(self.audit.MAX_BATCH + 5)]
 		self.assertEqual(len(self.audit.sync_audit_events(events)["accepted"]), self.audit.MAX_BATCH)
+
+
+class TestRecordWebAuditEvents(SyncCase):
+	"""K38: the web POS records what a cashier takes out of a sale, as the signed-in user."""
+
+	def setUp(self):
+		super().setUp()
+		self.sent_by_till.return_value = False
+		self.frappe.session.user = CASHIER
+
+	def test_an_event_is_stored_for_the_signed_in_cashier_whatever_it_says(self):
+		result = self.audit.record_web_audit_events(
+			[self.event(event_type="line_removed", cashier=MANAGER, approved_by=MANAGER)]
+		)
+		self.assertEqual(result, {"accepted": ["e1"]})
+		stored = self.stored["web:e1"]
+		self.assertEqual(stored["cashier"], CASHIER)
+		self.assertIsNone(stored["approved_by"])
+		self.assertIsNone(stored["till_user"])
+		self.assertTrue(stored["description"].startswith("Web POS."))
+
+	def test_approvals_and_wrong_pins_never_come_from_a_browser(self):
+		result = self.audit.record_web_audit_events(
+			[self.event("a", event_type="approval"), self.event("p", event_type="pin_failed")]
+		)
+		self.assertEqual(result, {"accepted": []})
+		self.assertEqual(self.stored, {})
+
+	def test_someone_not_on_the_pos_profile_cannot_fill_the_log(self):
+		self.frappe.session.user = "stranger@example.com"
+		with self.assertRaises(Refused):
+			self.audit.record_web_audit_events([self.event(event_type="sale_cleared")])
+		self.assertEqual(self.stored, {})
+
+	def test_a_resend_is_accepted_but_not_stored_twice(self):
+		self.audit.record_web_audit_events([self.event(event_type="qty_lowered")])
+		self.frappe.get_doc.reset_mock()
+		self.assertEqual(
+			self.audit.record_web_audit_events([self.event(event_type="qty_lowered")]), {"accepted": ["e1"]}
+		)
+		self.frappe.get_doc.assert_not_called()
+
+	def test_a_till_uses_its_own_endpoint(self):
+		self.sent_by_till.return_value = True
+		with self.assertRaises(Refused):
+			self.audit.record_web_audit_events([self.event(event_type="line_removed")])

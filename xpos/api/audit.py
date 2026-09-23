@@ -173,3 +173,55 @@ def sync_audit_events(events: str | list):
 			frappe.db.rollback(save_point="xpos_audit_event")
 			frappe.log_error(title=f"X POS audit event {local_id} not stored")
 	return {"accepted": accepted}
+
+
+# K38: what the web POS may log. Approvals and wrong PINs never come from a browser: no
+# PIN is checked there, so an event claiming one would be a forgery.
+WEB_EVENT_TYPES = {"line_removed", "qty_lowered", "sale_cleared", "held_order_discarded", "reprint"}
+
+
+@frappe.whitelist(methods=["POST"])
+def record_web_audit_events(events: str | list):
+	"""Store what a cashier on the web POS took out of a sale (K38). Returns the ids stored.
+
+	The web POS has no till to keep a log, so the page sends each event itself (queued in
+	the browser while offline). The cashier is the signed-in user, whatever the event says,
+	and there is never an approver: the web POS checks no PIN. The user must be on the
+	event's POS Profile, which also keeps anyone else from filling the log.
+	"""
+	if sent_by_till():
+		frappe.throw(_("A till sends its audit log with sync_audit_events."), frappe.PermissionError)
+
+	user = frappe.session.user
+	events = json.loads(events) if isinstance(events, str) else (events or [])
+	accepted: list[str] = []
+	for event in events[:MAX_BATCH]:
+		if not isinstance(event, dict):
+			continue
+		local_id = event.get("local_id")
+		pos_profile = event.get("pos_profile")
+		if not local_id or event.get("event_type") not in WEB_EVENT_TYPES:
+			continue
+		if not pos_profile or not _on_profile(user, pos_profile) or user == "Guest":
+			frappe.throw(
+				_("You are not a user of POS Profile {0}.").format(pos_profile), frappe.PermissionError
+			)
+		request_id = f"web:{local_id}"
+		if frappe.db.exists(DOCTYPE, {"client_request_id": request_id}):
+			accepted.append(local_id)
+			continue
+		shift = event.get("pos_opening_shift")
+		doc = audit_event_doc(
+			{**event, "cashier": user, "approved_by": None, "pin_user": None},
+			till_user=None,
+			cashier_on_profile=True,
+			pin_user_on_profile=True,
+			shift_exists=bool(shift and frappe.db.exists("POS Opening Shift", shift)),
+			approval_problems=[],
+		)
+		doc["client_request_id"] = request_id
+		parts = [_("Web POS."), doc.get("description")]
+		doc["description"] = _cut(" ".join(part for part in parts if part), 1000)
+		frappe.get_doc(doc).insert(ignore_permissions=True)
+		accepted.append(local_id)
+	return {"accepted": accepted}

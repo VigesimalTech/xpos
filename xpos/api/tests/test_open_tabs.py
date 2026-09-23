@@ -232,6 +232,11 @@ class TestSaveDraftInvoiceConcurrency(unittest.TestCase):
 class TestDeleteDraftInvoiceGuard(unittest.TestCase):
 	"""A colleague's live tab must not be one stray click from deletion."""
 
+	def setUp(self):
+		# K38: discarding needs Remove Items From the Cart; these cases hold it.
+		self.may_remove = patch("xpos.api.invoices.user_has_pos_permission", return_value=True).start()
+		self.addCleanup(patch.stopall)
+
 	def _draft(self, shift):
 		draft = MagicMock()
 		draft.docstatus = 0
@@ -275,6 +280,22 @@ class TestDeleteDraftInvoiceGuard(unittest.TestCase):
 		invoices.delete_draft_invoice("SI-001", pos_opening_shift=SHIFT_B)
 
 		draft.delete.assert_called_once()
+
+	@patch("xpos.api.invoices._detect_invoice_doctype", return_value="Sales Invoice")
+	@patch("xpos.api.invoices.can_recall_other_shift_tabs", return_value=True)
+	@patch("xpos.api.invoices.frappe")
+	def test_discarding_needs_remove_items_from_the_cart(self, mock_frappe, _mock_can_recall, _mock_detect):
+		"""K38: the web POS checks no PIN, so the cashier's own permission decides."""
+		draft = self._draft(SHIFT_B)
+		mock_frappe.get_doc.return_value = draft
+		mock_frappe.throw.side_effect = raising_throw
+		self.may_remove.return_value = False
+
+		with self.assertRaises(Exception):
+			invoices.delete_draft_invoice("SI-001", pos_opening_shift=SHIFT_B)
+
+		draft.delete.assert_not_called()
+		self.assertEqual(self.may_remove.call_args.args[0], "remove_cart_items")
 
 
 class TestGetOutstandingInvoices(unittest.TestCase):
