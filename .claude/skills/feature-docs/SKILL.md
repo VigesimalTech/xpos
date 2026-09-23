@@ -103,6 +103,10 @@ Things that went wrong before and are worth checking every time:
 - **Stale claims nearby.** While on a page, check the claims around your edit against
   the code. Fields get removed and rules change. Fix what is wrong, and tell the user
   what you corrected.
+- **Settings tables name real fields.** Every row on the POS Profile page (`24`) must
+  use the label ERPNext shows, not a paraphrase and not a field that has since been
+  removed or moved to **POS Settings**. Older rows drifted this way unnoticed.
+  `scripts/check_settings.py` checks every row, not only the ones you touched.
 - **Defaults and upgrades.** When a setting's default changed, or a patch switches it
   for existing sites, say so. That is what an administrator needs to know on upgrade.
 
@@ -130,6 +134,8 @@ anchor has moved.
 ```bash
 # every link between pages resolves, anchors included
 python3 .claude/skills/feature-docs/scripts/check_links.py
+# every row in the POS Profile settings tables is a real field label
+python3 .claude/skills/feature-docs/scripts/check_settings.py
 ```
 
 - Reread each new page once with the voice reference beside it.
