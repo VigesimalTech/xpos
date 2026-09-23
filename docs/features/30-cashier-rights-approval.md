@@ -9,7 +9,7 @@ X POS decides what each cashier may do from their **POS Role** and their row on 
 A cashier's rights come from three places:
 - **POS Role permissions** — What the role may do (change prices, give discounts, return, close a shift, open screens)
 - **Their row on the POS Profile** — Their own **Discount Limit**, and their PIN
-- **The POS Profile itself** — Switches that apply to everyone on it, such as **Allow Rate Change** and **Maximum Discount Percentage**
+- **The POS Profile itself** — Switches that apply to everyone on it, such as **Allow User to Edit Rate** and **Max Discount Percentage Allowed**
 
 A user on several POS Profiles can hold a different role and limit on each. The profile of the open shift applies.
 
@@ -55,7 +55,7 @@ Permissions are ticked on the **POS Role** form in ERPNext, grouped as below.
 
 - Each row in the POS Profile's **Applicable for Users** table has a **Discount Limit**, as a percentage of the list price
 - **0** means no discount, and **100** means no cap
-- The lower of the cashier's limit and the profile's **Maximum Discount Percentage** applies
+- The lower of the cashier's limit and the profile's **Max Discount Percentage Allowed** applies
 - A price changed **below the price list** counts as a discount
 - The limit applies to each line, the cart discount and the sale in total
 - New cashier rows start at **0**
@@ -66,11 +66,11 @@ Permissions are ticked on the **POS Role** form in ERPNext, grouped as below.
 
 | POS Profile Setting | Off | On |
 |---|---|---|
-| **Allow Rate Change** | No price field is offered, and ERPNext flags any changed price, whatever the role. A manager cannot approve it | The **Change Price** permission decides |
-| **Allow Discount Change** | No line discount is offered, and ERPNext flags one, whatever the role | The **Edit Discount Field** permission decides |
+| **Allow User to Edit Rate** | No price field is offered, and ERPNext flags any changed price, whatever the role. A manager cannot approve it | The **Change Price** permission decides |
+| **Allow User to Edit Discount** | No line discount is offered, and ERPNext flags one, whatever the role | The **Edit Discount Field** permission decides |
 
-- ERPNext leaves **Allow Rate Change** off by default
-- **Allow Discount Change** is switched on for existing profiles on upgrade, and new profiles default to on
+- ERPNext leaves **Allow User to Edit Rate** off by default
+- **Allow User to Edit Discount** is switched on for existing profiles on upgrade, and new profiles default to on
 - The cart discount keeps its own **Apply Additional Discount** permission
 
 ---
