@@ -31,7 +31,14 @@ vi.mock("@/services/dbBridge", () => ({
 	clearAllData: vi.fn(),
 }));
 vi.mock("@/stores/posStore", () => ({
-	usePosStore: () => ({ posProfile: "Shop 1", companyName: "Test", warehouse: "Stores" }),
+	usePosStore: () => ({
+		posProfile: { name: "Shop 1", company: "Test", warehouse: "Stores" },
+		profileName: "Shop 1",
+		companyName: "Test",
+		warehouse: "Stores",
+		sellingPriceList: "Standard Selling",
+		invoiceCurrency: "USD",
+	}),
 }));
 
 import SettingsView from "@/views/SettingsView.vue";
@@ -99,6 +106,24 @@ describe("who sees what in Settings", () => {
 				"Startup",
 			]),
 		);
+	});
+});
+
+describe("the POS Profile card", () => {
+	it("reads as a few named lines, not the profile's raw record", async () => {
+		level.value = "supervisor";
+		const wrapper = await open();
+		const rows = wrapper
+			.findAll('[data-testid="profile-row"]')
+			.map((r) => `${r.find("dt").text()} ${r.find("dd").text()}`);
+		expect(rows).toEqual([
+			"Profile Shop 1",
+			"Company Test",
+			"Warehouse Stores",
+			"Price List Standard Selling",
+			"Currency USD",
+		]);
+		expect(wrapper.find("dl").text()).not.toContain("{");
 	});
 });
 

@@ -185,22 +185,19 @@
 						<Monitor class="w-5 h-5 text-primary" />
 						<h2 class="text-base font-semibold text-foreground">POS Profile</h2>
 					</div>
-					<div class="space-y-3">
-						<div class="flex items-center justify-between text-sm">
-							<span class="text-muted-foreground">Profile:</span>
-							<span class="text-foreground font-medium">{{
-								posStore.posProfile || "Not set"
-							}}</span>
+					<dl class="space-y-3 text-sm">
+						<div
+							v-for="row in profileRows"
+							:key="row.label"
+							class="flex items-center justify-between gap-4"
+							data-testid="profile-row"
+						>
+							<dt class="text-muted-foreground">{{ row.label }}</dt>
+							<dd class="text-foreground text-end" :class="{ 'font-medium': row.strong }">
+								{{ row.value || "—" }}
+							</dd>
 						</div>
-						<div class="flex items-center justify-between text-sm">
-							<span class="text-muted-foreground">Company:</span>
-							<span class="text-foreground">{{ posStore.companyName || "—" }}</span>
-						</div>
-						<div class="flex items-center justify-between text-sm">
-							<span class="text-muted-foreground">Warehouse:</span>
-							<span class="text-foreground">{{ posStore.warehouse || "—" }}</span>
-						</div>
-					</div>
+					</dl>
 				</Card>
 
 				<Card v-if="isElectronMode && isAdmin" class="p-5">
@@ -311,6 +308,15 @@ const isAdmin = computed(() => reachesLevel("administrator"));
 
 /** What the settings were when the screen loaded, so a change can be recorded as from and to. */
 const loaded = reactive({ serverUrl: "", syncInterval: 0, autoSync: true, db: "" });
+
+/** The open shift's POS Profile, as a few lines a person can read (not the whole record). */
+const profileRows = computed(() => [
+	{ label: "Profile", value: posStore.profileName || "Not set", strong: true },
+	{ label: "Company", value: posStore.companyName },
+	{ label: "Warehouse", value: posStore.warehouse },
+	{ label: "Price List", value: posStore.sellingPriceList },
+	{ label: "Currency", value: posStore.invoiceCurrency },
+]);
 
 function dbLabel(): string {
 	return `${settings.dbUser}@${settings.dbHost}:${settings.dbPort}/${settings.dbName}`;
