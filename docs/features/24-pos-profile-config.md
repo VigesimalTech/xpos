@@ -20,6 +20,7 @@ The POS Profile is the central configuration hub for X POS. It controls every as
 | Hide Closing Shift | Hide the close shift button |
 | Hide Images | Hide item images (text-only display) |
 | Hide Unavailable Items | Hide items with zero stock |
+| Sync Status Detail | How much the sync status shows on the till and the web POS. **Minimal** (default): Online, Offline, or what needs attention. **Standard**: also syncing, the last sync time and sales waiting. **Detailed**: also what is syncing |
 
 ---
 

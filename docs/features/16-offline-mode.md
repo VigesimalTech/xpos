@@ -183,10 +183,9 @@ A dedicated dialog for managing queued offline data.
   - **Load to Cart** — Reopens an offline draft in the cart for editing/resubmission
 
 ### Status Indicators
-- **"Online"** — Connected and synced
-- **"Offline"** — No internet connection
-- **"Syncing..."** — Sync in progress
-- **"{N} pending"** — Number of invoices awaiting sync
+How much the indicator shows is set by the POS Profile's **Sync Status Detail**, as on the [Desktop Till](29-desktop-till.md#sync-status-pill):
+- **Minimal** (default) — **"Online"**, **"Offline"**, **"{N} need attention"**, or **"Sync problem"** when syncing keeps failing
+- **Standard** and **Detailed** — also **"Syncing..."**, **"Synced {time}"**, **"Sync error"** and **"{N} waiting to sync"**, with the count of invoices awaiting sync
 
 ---
 
