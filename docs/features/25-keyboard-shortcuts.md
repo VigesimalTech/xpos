@@ -15,6 +15,49 @@ X POS is designed for fast operation with extensive keyboard support for power u
 
 ---
 
+## Menu Bar Shortcuts
+
+These work from the menu bar and the command search. On the desktop till they work the same way. A shortcut for a screen or action the cashier's role lacks follows the POS Profile's **Screens the Role Lacks**: it is left out, or it asks for a manager's PIN on the till (see [Cashier Rights & Manager Approval](30-cashier-rights-approval.md)).
+
+| Key | Action | Menu |
+|---|---|---|
+| `Ctrl+N` | New Sale | File |
+| `Ctrl+G` | Repeat Invoice | File |
+| `Ctrl+R` | Return Invoice | File |
+| `Ctrl+P` | Print Last Receipt | File |
+| `Ctrl+,` | Settings | File |
+| `Alt+1` | Point of Sale | Sales |
+| `Alt+2` | Orders | Sales |
+| `F4` | Process Payment | Sales |
+| `F6` | Select Customer | Sales |
+| `F8` | Held Invoices | Sales |
+| `Alt+9` | Report Catalog | Reports |
+| `Alt+3` | Purchase Order | Purchasing |
+| `Alt+4` | Purchase Invoice | Purchasing |
+| `Alt+5` | Stock Receiving | Purchasing |
+| `Alt+6` | Expenses | Finance |
+| `Alt+7` | Bank Drops | Finance |
+| `Alt+8` | Barcode Printer | View |
+| `F11` | Toggle Full Screen | View |
+| `Ctrl+Shift+O` | Close Shift | Shift |
+| `Ctrl+Shift+D` | Cash Deposit | Shift |
+| `Ctrl+E` | Cash Expense | Shift |
+| `Ctrl+Shift+S` | Sync Now | Shift |
+
+---
+
+## PIN Pad (Desktop Till)
+
+| Key | Action | Context |
+|---|---|---|
+| `0`–`9` | Enter a PIN digit | Sign-in PIN pad and manager approval pad |
+| `Backspace` | Delete the last digit | PIN pad |
+| `Enter` | Submit the PIN | PIN pad |
+
+While the approval pad is open, these keys go to the pad only, so the POS shortcuts do not also act.
+
+---
+
 ## Item Search & Navigation
 
 | Key | Action | Context |

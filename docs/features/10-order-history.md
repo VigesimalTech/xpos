@@ -121,15 +121,25 @@ For each tax applied:
 - Click **Print** to open the invoice in a print preview window
 - Uses the configured print format from the POS Profile
 - Supports both POS Invoice and Sales Invoice doctypes
+- On the desktop till, the receipt prints straight to the receipt printer instead
+- Reprinting needs the **Reprint Invoice** role permission. On the desktop till, a cashier without it can reprint with a manager's PIN, and every reprint is recorded in the [Audit Log](31-audit-log.md)
 
 ### Return
-- Click **Return** to initiate a return against this invoice
+- Click **Return** to initiate a return against this invoice (needs the **Sale Return** role permission, or a manager's PIN on the desktop till)
 - The system fetches returnable items (accounting for already-returned quantities)
 - Redirects to the POS view in return mode with items pre-loaded
 - See [Returns & Refunds](08-returns.md) for full details
 
 ### Close
 - Close the detail dialog to return to the order list
+
+---
+
+## On the Desktop Till
+
+- Order History works on the [Desktop Till](29-desktop-till.md) as on the web POS
+- The invoice type comes from the POS settings the till fetches, falling back to Sales Invoice
+- Looking up past orders and returns needs ERPNext. While ERPNext is out of reach, the till says so rather than showing an empty list
 
 ---
 

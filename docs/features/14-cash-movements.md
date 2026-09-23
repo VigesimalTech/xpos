@@ -98,6 +98,36 @@ Record cash transfers from the register to a bank, safe, or back-office account.
 
 ---
 
+## Limits
+
+Cash out of the drawer is checked when it is entered, before any cash leaves:
+- **Cash Movement Max Amount** — No single expense or deposit may be more than this
+- **Cash Out Within the Drawer** (on by default) — No expense or deposit may be more than the cash the POS expects in the drawer. Turn it off to limit movements by **Cash Movement Max Amount** alone
+- When a movement is refused, the dialog says why (a limit, or an approval that did not count) rather than a general failure
+
+---
+
+## Permissions and Approval
+
+- Expenses need the **Expense** role permission, and deposits (bank drops) the **Bank Drop** permission
+- On the web POS, a cashier without the permission cannot record one
+- On the desktop till, the entry stays visible and asks for a manager's PIN. The manager is recorded as **Approved By** on the POS Cash Movement, and ERPNext checks the approval again when it arrives
+- See [Cashier Rights & Manager Approval](30-cashier-rights-approval.md)
+
+---
+
+## Cash Movements on the Desktop Till
+
+On the [Desktop Till](29-desktop-till.md), expenses and bank drops are kept with the shift and sent to ERPNext by the sync engine:
+- They can be recorded offline, from the Cash Movement dialog or the **Expenses** (`Alt+6`) and **Bank Drops** (`Alt+7`) screens
+- The allowed accounts are the ones the till last saw from ERPNext
+- The history list shows the till's own records for the shift
+- Each is sent after its shift reaches ERPNext and before the shift's close, and is booked once even if sent twice
+- ERPNext posts it for the cashier named by the till, on the till's date
+- A movement can be deleted on the till until it reaches ERPNext. After that, cancel it in ERPNext
+
+---
+
 ## Accounting Impact
 
 ### POS Expense Journal Entry
@@ -129,7 +159,7 @@ POS Cash Account                     500.00
 
 ## Tips
 
-- Set a maximum amount limit to prevent accidental large withdrawals
+- Set a maximum amount limit to prevent accidental large withdrawals, and leave **Cash Out Within the Drawer** on
 - Enable remarks requirement for full audit trail
 - Review cash movements during shift closing to ensure all are accounted for
 - Use specific expense accounts for different types of expenses (e.g., "Office Supplies", "Transportation")

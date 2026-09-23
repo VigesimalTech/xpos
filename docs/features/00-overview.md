@@ -8,7 +8,7 @@
 
 | # | Feature Area | Description |
 |---|---|---|
-| 01 | [Authentication & Login](01-authentication.md) | Secure login, session management, password reset |
+| 01 | [Authentication & Login](01-authentication.md) | Secure login, session management, password reset, till PINs |
 | 02 | [Shift Management](02-shift-management.md) | Open/close POS shifts with cash reconciliation |
 | 03 | [Item Browsing & Search](03-item-browsing.md) | Grid/list views, search, barcode scanning, variants |
 | 04 | [Cart Management](04-cart-management.md) | Add items, edit quantities, discounts, notes |
@@ -35,6 +35,9 @@
 | 26 | [Cashier Settlement](26-cashier-settlement.md) | Create bills at the terminal, collect payment at a separate cashier |
 | 27 | [Open Tabs](27-open-tabs.md) | Recall a customer's tab across shifts, and settle past credit sales |
 | 28 | [Mixed-Currency Tender Setup](28-mixed-currency-setup.md) | Configure a store that prices in one currency and takes cash in another |
+| 29 | [Desktop Till](29-desktop-till.md) | The installed till app: PIN sign-in, local database, silent printing, background sync |
+| 30 | [Cashier Rights & Manager Approval](30-cashier-rights-approval.md) | POS Role permissions, discount limits, server-side sale checks, manager PIN approval |
+| 31 | [Audit Log](31-audit-log.md) | Deleted lines, cleared sales, reprints, approvals and wrong PINs, stored in ERPNext |
 
 ---
 
@@ -55,7 +58,8 @@ X POS consists of:
 
 - **Vue.js 3 Frontend** — A single-page application (SPA) with Pinia state management, served at `/xpos`
 - **Python Backend API** — 56+ whitelisted API endpoints built on Frappe
-- **13 Custom Doctypes** — POS Offer, POS Coupon, POS Cash Movement, Delivery Charges, Referral Code, Scale Barcode Settings, and more
+- **Custom Doctypes** — POS Offer, POS Coupon, POS Cash Movement, POS Audit Event, Delivery Charges, Referral Code, Scale Barcode Settings, and more
 - **80+ Custom Fields** — Added to POS Profile, Sales Invoice, Customer, and Sales Order for extended POS functionality
 - **IndexedDB Offline Storage** — 8 object stores for items, customers, invoices, stock, and metadata caching
+- **Desktop Till (Electron)** — The same screens as an installed app with its own local MariaDB and a background sync engine (see [Desktop Till](29-desktop-till.md))
 - **ERPNext Integration** — Deep integration with Sales Invoice, POS Profile, Payment Entry, Pricing Rules, Loyalty Programs, and Inventory
