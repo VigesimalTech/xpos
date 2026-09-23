@@ -17,7 +17,16 @@ is part of the job, not a finishing touch: a page that suddenly reads differentl
 its neighbours looks unreliable.
 
 This repository is a **public** fork. Never put client names, hostnames, account IDs or
-internal ticket names in the docs. Commit messages mention decision codes (K19, D7) and
+internal ticket names in the docs.
+
+**Describe what the system does, never where it is weak.** The guide is also shown in the
+app, to cashiers, and the fork is public. A sentence like "no screen checks this yet", "the
+web POS does not ask for approval" or "lowering a quantity needs no manager" is a map for
+getting round a control. When a control has a gap, leave the gap out: say what the
+control does, and mark an unenforced permission as coming (or leave it out) rather than
+unchecked. Tell the user about the gap in your report so it goes to the private plan, where
+known gaps are tracked. Saying that an action is recorded and reviewed is fine: that
+deters. Commit messages mention decision codes (K19, D7) and
 bug-hunt dates. Those stay out of the docs too; describe the behavior instead.
 
 ## 1. Find what is undocumented
@@ -95,8 +104,8 @@ Things that went wrong before and are worth checking every time:
 
 - **Defined but not enforced.** A permission or event type can exist in the catalog
   with nothing checking it yet. Grep for where it is used. If only the catalog, the
-  migration and the sync mention it, document it as reserved for a coming feature. Do
-  not describe it as working.
+  migration and the sync mention it, call it coming, or leave it out. Don't describe it
+  as working, and don't say that nothing checks it (see the rule on gaps above).
 - **Web POS vs desktop till.** Many changes apply to only one. Check for `isElectron()`
   or code under `frontend/electron/`. Say which one a behavior belongs to. Don't write
   "the POS does X" when only the till does.
@@ -117,6 +126,16 @@ structure rather than rewriting it. Put till-only behavior in its own subsection
 ("On the Desktop Till", "… on the Desktop Till") or a clearly marked bullet. Keep each
 page's closing **Tips** section, and add a tip when the change gives the reader
 something to do.
+
+**Mark who a section is for.** The app shows the guide by role. A section for supervisors
+or administrators carries a marker on the line after its heading, `<!-- audience:
+supervisor -->` or `<!-- audience: administrator -->`; under the page's title it sets the
+whole page, and a section without one takes its parent's. Unmarked means cashier. Setup in
+ERPNext (POS Profile fields, roles, accounts, installing the till, print formats) is
+administrator; reviewing, approving and reconciling (the audit log, cashier rights, tax and
+accounting detail) is supervisor; what happens at the till is cashier. A section a "?" in
+the app opens must stay readable by the people on that screen (`TOPIC_AUDIENCE` in
+`frontend/src/help/helpLinks.ts`; `tests/helpGuide.spec.ts` checks it).
 
 **Headings are link targets.** Other pages link to them (`30-cashier-rights-approval.md#manager-approval-on-the-till`),
 and the app will open the guide at them. Renaming or removing a heading silently breaks
@@ -151,6 +170,7 @@ python3 .claude/skills/feature-docs/scripts/check_settings.py
   attribution lines.
 
 Report back briefly:
+- Control gaps you found and left out of the docs, for the private plan
 - The new pages, one line each
 - The pages you updated, grouped by what changed
 - Stale claims you corrected
