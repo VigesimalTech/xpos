@@ -75,6 +75,8 @@ export interface POSProfile {
 	max_discount_percentage_allowed?: number;
 	auto_fetch_coupons_gifts?: boolean;
 	hide_closing_shift?: boolean;
+	/** K21: the cashier counts the drawer without seeing what is expected. */
+	hide_expected_amount?: boolean | number;
 	use_offline_mode?: boolean;
 	cash_mode_of_payment?: string;
 	use_customer_credit?: boolean;

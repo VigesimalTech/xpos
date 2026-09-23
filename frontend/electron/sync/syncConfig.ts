@@ -266,6 +266,7 @@ export const SYNC_TABLES: SyncTableConfig[] = [
 			"enable_cashier_settlement",
 			"enable_return_validity",
 			"hide_closing_shift",
+			"hide_expected_amount",
 			"hide_variants_items",
 			"input_qty",
 			"max_discount_percentage_allowed",
