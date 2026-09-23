@@ -9,6 +9,7 @@ export default defineConfig({
 		environment: "node",
 		include: ["tests/roundtrip/**/*.spec.ts"],
 		fileParallelism: false,
+		setupFiles: ["tests/roundtrip/tillKeySetup.ts"],
 		testTimeout: 120_000,
 		hookTimeout: 120_000,
 	},
