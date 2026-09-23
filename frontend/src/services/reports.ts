@@ -212,6 +212,17 @@ const reportDefinitions: ReportDefinition[] = [
 		permissionKey: "shift_report",
 		thermalPrint: true,
 	},
+	{
+		slug: "pos-exceptions",
+		title: __("Exceptions by Cashier"),
+		reportName: "POS Exceptions",
+		description: __(
+			"Items taken out of sales before payment, returns, discounts, approvals, wrong PINs and count differences, by cashier and day.",
+		),
+		category: "Operations",
+		// K21: for whoever approves exceptions.
+		permissionKey: "approve_exceptions",
+	},
 ];
 
 const reportMap = new Map(reportDefinitions.map((report) => [report.slug, report]));
