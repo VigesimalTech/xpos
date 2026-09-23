@@ -57,7 +57,7 @@ The cart is the central workspace of X POS where items are collected, quantities
 - Toggle between **percentage (%)** and **amount** discount per line item
 - Enter the discount value — the line total updates in real time
 - The POS Profile can set a `max_discount_percentage_allowed` to cap discounts, and each cashier has their own **Discount Limit**; the lower applies
-- Line discounts need the POS Profile's **Allow Discount Change** and the role's **Edit Discount Field** permission
+- Line discounts need the POS Profile's **Allow User to Edit Discount** and the role's **Edit Discount Field** permission
 - Cashiers choose the discount mode directly in the cart when editing a line item
 
 ### Delete Item
@@ -100,7 +100,7 @@ Each tax from the POS Profile's Sales Taxes and Charges template is shown as a s
   - **Tax-inclusive pricing** — When `tax_inclusive` is enabled, taxes are back-calculated from prices
 
 ### Additional Discount
-- Available when `allow_user_to_edit_additional_discount` is enabled
+- Available when the cashier's role has the **Apply Additional Discount** permission
 - Apply a **percentage** or **flat amount** discount to the entire order
 - Toggle between percentage and amount using the mode switch
 - Cashiers choose the discount mode directly in the discount panel
