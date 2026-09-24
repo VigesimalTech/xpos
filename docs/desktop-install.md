@@ -16,7 +16,8 @@ The app keeps its items, customers and unsynced sales in a local MariaDB.
 
 1. Download **MariaDB Server 11.8** (Windows x86_64, MSI) from mariadb.org and
    run it. Set a root password, keep port **3306**, and leave "Install as
-   service" ticked so it starts with Windows.
+   service" ticked so it starts with Windows. Leave "Enable access from remote
+   machines for 'root' user" unticked.
 2. Open **MySQL Client (MariaDB 11.8)** from the Start menu, sign in as root,
    and create the app's user. Choose your own password:
 
@@ -26,6 +27,12 @@ The app keeps its items, customers and unsynced sales in a local MariaDB.
    ```
 
    The app creates the `xpos_local` database and its tables itself on first start.
+
+   Use a long password of your own for both, and keep them with whoever
+   administers the till, not the shop floor: anyone with them can read and
+   change the sales waiting on the till. The app stores its password sealed by
+   Windows; changes made to a paid sale in the database are flagged when it
+   reaches ERPNext (see [Signed Sales](features/33-signed-sales.md)).
 
 ## 3. Get an API key from ERPNext
 

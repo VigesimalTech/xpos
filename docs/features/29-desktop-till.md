@@ -117,6 +117,9 @@ The sync engine runs in the background and sends the till's records to ERPNext i
 - Records left half-sent by a crash are sent again when the app next starts
 - Purchase orders are deduplicated in the same way
 
+### Signed Sales
+- Every paid sale is signed and numbered on the till at payment. ERPNext flags a sale changed on the till before it synced, and lists sale numbers that never arrived. See [Signed Sales](33-signed-sales.md)
+
 ### When ERPNext Does Not Answer
 - A request ERPNext does not answer (no network, a timeout, a proxy error such as 502, 503 or 504) **never uses up a sale's tries**. The sale waits and is sent once ERPNext answers again
 - Only an answer from ERPNext itself counts as a failed try. After three, the sale is set aside for review in the unsynced-sales panel

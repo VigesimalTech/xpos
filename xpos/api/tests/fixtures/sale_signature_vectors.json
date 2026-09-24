@@ -1,0 +1,115 @@
+{
+ "description": "K43: sales the till signs and ERPNext checks. Both frontend/tests/saleSignature.spec.ts and xpos/api/tests/test_sale_signature.py read this file: the canonical string must be the same on both sides.",
+ "private_key_pkcs8_hex": "302e020100300506032b6570042204200707070707070707070707070707070707070707070707070707070707070707",
+ "public_key": "6kpsY-KcUgq-9VB7Ey7F-ZVHdq6-vnuSQh7qaRRG0iw",
+ "cases": [
+  {
+   "name": "cash sale with change",
+   "local_id": "inv_1790000000000_abc123def",
+   "sequence": 1,
+   "sale": {
+    "pos_profile": "Shop 1",
+    "customer": "Walk-in",
+    "xpos_cashier": "ann@example.com",
+    "currency": "NGN",
+    "items": [
+     {
+      "item_code": "BREAD",
+      "item_name": "Bread",
+      "uom": "Nos",
+      "qty": 2,
+      "rate": 1500,
+      "discount_percentage": 0
+     },
+     {
+      "item_code": "MILK",
+      "uom": "Nos",
+      "qty": "1",
+      "rate": "850.50"
+     }
+    ],
+    "payments": [
+     {
+      "mode_of_payment": "Cash",
+      "amount": 5000
+     }
+    ],
+    "change_amount": 1149.5,
+    "is_return": false,
+    "is_draft": false
+   },
+   "canonical": "[1,\"inv_1790000000000_abc123def\",1,[\"Shop 1\",\"ann@example.com\",\"\",\"\",\"NGN\",\"\",0,0,0,0,0,0,1149500000,0,0,0],[[\"BREAD\",\"Nos\",\"\",\"\",2000000,1500000000,0,0,0],[\"MILK\",\"Nos\",\"\",\"\",1000000,850500000,0,0,0]],[[\"Cash\",5000000000]],[]]",
+   "signature": "M0wQ8oWAGBZ3ssMZtf7uV6GYbJV5IYTHenmzZwWlYqtF/Pa1c7Due3puTda6d2WzErZV7rXMpOxKTl5JRNqEAQ=="
+  },
+  {
+   "name": "return approved by a manager",
+   "local_id": "inv_1790000000001_xyz",
+   "sequence": 42,
+   "sale": {
+    "pos_profile": "Shop 1",
+    "xpos_cashier": "ann@example.com",
+    "xpos_approved_by": "sam@example.com",
+    "is_return": 1,
+    "return_against": "ACC-SINV-2026-00012",
+    "additional_discount_percentage": 12.5,
+    "loyalty_points": 10,
+    "redeem_loyalty_points": true,
+    "items": [
+     {
+      "item_code": "ÉCLAIR-ñ",
+      "uom": "Box",
+      "qty": -1,
+      "rate": 2999.99,
+      "discount_amount": 100,
+      "serial_no": "SN1\nSN2",
+      "batch_no": {
+       "b": 1
+      }
+     }
+    ],
+    "payments": [
+     {
+      "mode_of_payment": "Card",
+      "amount": -2899.99
+     }
+    ],
+    "pos_change_legs": [
+     {
+      "mode_of_payment": "Cash",
+      "amount": 0.3
+     }
+    ]
+   },
+   "canonical": "[1,\"inv_1790000000001_xyz\",42,[\"Shop 1\",\"ann@example.com\",\"sam@example.com\",\"ACC-SINV-2026-00012\",\"\",\"\",1000000,12500000,0,10000000,1000000,0,0,0,0,0],[[\"ÉCLAIR-ñ\",\"Box\",\"SN1\\nSN2\",\"{\\\"b\\\":1}\",-1000000,2999990000,0,100000000,0]],[[\"Card\",-2899990000]],[[\"Cash\",300000]]]",
+   "signature": "LWYbNpfLc0ZrI1Y0iq3SIaBe26q+XRWLt/7lKeIf9rbzb2r/iJ362IqM80lk4bJz1POca3CLLH4LJG7jkEsaCA=="
+  },
+  {
+   "name": "awkward numbers",
+   "local_id": "inv_x",
+   "sequence": 7,
+   "sale": {
+    "pos_profile": null,
+    "discount_amount": "",
+    "write_off_amount": null,
+    "conversion_rate": "12.345678951",
+    "pos_delivery_charges_rate": 0.30000000000000004,
+    "is_credit_sale": "0",
+    "items": [
+     {
+      "item_code": "A",
+      "qty": 0.1,
+      "rate": 0.2,
+      "is_free_item": true
+     },
+     null,
+     {
+      "qty": "abc",
+      "rate": 1e-7
+     }
+    ]
+   },
+   "canonical": "[1,\"inv_x\",7,[\"\",\"\",\"\",\"\",\"\",\"\",0,0,0,0,0,0,0,300000,12345679,0],[[\"A\",\"\",\"\",\"\",100000,200000,0,0,1000000],[\"\",\"\",\"\",\"\",0,0,0,0,0],[\"\",\"\",\"\",\"\",0,0,0,0,0]],[],[]]",
+   "signature": "cN32DEP0KRLWdqB5id/NBs9dWbD0MlTV/BYzFi2IWZdNgMFFPc9dY3lTfNH+VVbKLJIqXNk49alap8onAUsBCg=="
+  }
+ ]
+}

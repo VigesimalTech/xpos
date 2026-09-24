@@ -52,6 +52,9 @@ async function invoicesFor(localId: string) {
 			"update_stock",
 			"pos_profile",
 			"change_amount",
+			"xpos_till_key",
+			"xpos_till_sequence",
+			"xpos_policy_flags",
 		]),
 	);
 	const { data } = await erp<{ data: Record<string, unknown>[] }>(
@@ -200,5 +203,37 @@ describe.skipIf(!configPath)("O2: a sale from the till lands correctly in ERPNex
 
 		expect(await invoicesFor(localId)).toHaveLength(1);
 		expect(await stockQty()).toBe(stockAfterFirst);
+	});
+
+	it("K43: a signed sale lands with its till key and number, and no flag", async () => {
+		const localId = await ringUpSale(shiftId, 1);
+		await sync();
+
+		const [invoice] = await invoicesFor(localId);
+		expect(invoice).toMatchObject({ docstatus: 1 });
+		expect(String(invoice.xpos_till_key)).toMatch(/^[0-9a-f]{16}$/);
+		expect(Number(invoice.xpos_till_sequence)).toBeGreaterThan(0);
+		expect(invoice.xpos_policy_flags ?? "").not.toMatch(/signature|signed|after payment/);
+	});
+
+	it("K43: a sale changed in the till's database before it synced is booked and flagged", async () => {
+		const localId = await ringUpSale(shiftId, 2);
+		const [row] = await query<{ data: string }>(
+			"SELECT `data` FROM `pending_invoices` WHERE `local_id` = ?",
+			[localId],
+		);
+		const sale = JSON.parse(row.data);
+		sale.items[0].qty = 1;
+		sale.payments[0].amount = site.rate;
+		await execute("UPDATE `pending_invoices` SET `data` = ? WHERE `local_id` = ?", [
+			JSON.stringify(sale),
+			localId,
+		]);
+
+		await sync();
+
+		const [invoice] = await invoicesFor(localId);
+		expect(invoice).toMatchObject({ docstatus: 1, grand_total: site.rate });
+		expect(String(invoice.xpos_policy_flags)).toContain("changed on the till after payment");
 	});
 });

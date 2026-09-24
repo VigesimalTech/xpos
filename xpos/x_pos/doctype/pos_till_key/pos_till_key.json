@@ -1,0 +1,102 @@
+{
+ "actions": [],
+ "autoname": "field:till_user",
+ "creation": "2026-09-23 18:00:00.000000",
+ "description": "The public half of each till's signing key. A till signs every sale at payment; ERPNext checks the signature when the sale arrives and flags a sale changed on the till after payment. Delete a till's key to let it register a new one, after reinstalling it.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "till_user",
+  "key_id",
+  "column_break_1",
+  "device_name",
+  "registered_on",
+  "section_break_key",
+  "public_key"
+ ],
+ "fields": [
+  {
+   "fieldname": "till_user",
+   "fieldtype": "Link",
+   "label": "Till User",
+   "options": "User",
+   "read_only": 1,
+   "reqd": 1,
+   "unique": 1,
+   "in_list_view": 1,
+   "description": "The API user the till syncs as."
+  },
+  {
+   "fieldname": "key_id",
+   "fieldtype": "Data",
+   "label": "Key ID",
+   "read_only": 1,
+   "in_list_view": 1,
+   "description": "Shown on each sale the till signs."
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "device_name",
+   "fieldtype": "Data",
+   "label": "Device",
+   "read_only": 1,
+   "in_list_view": 1,
+   "description": "The PC's name, as the till reported it."
+  },
+  {
+   "fieldname": "registered_on",
+   "fieldtype": "Datetime",
+   "label": "Registered On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_key",
+   "fieldtype": "Section Break",
+   "label": "Public Key",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "public_key",
+   "fieldtype": "Small Text",
+   "label": "Public Key",
+   "read_only": 1,
+   "reqd": 1
+  }
+ ],
+ "in_create": 1,
+ "links": [],
+ "modified": "2026-09-23 18:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "X POS",
+ "name": "POS Till Key",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1
+  },
+  {
+   "role": "Sales Manager",
+   "read": 1,
+   "report": 1
+  },
+  {
+   "role": "Accounts Manager",
+   "read": 1,
+   "report": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "till_user",
+ "track_changes": 1
+}

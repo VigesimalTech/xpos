@@ -4,6 +4,7 @@ import fs from "fs";
 import { fileURLToPath } from "url";
 import { execFile } from "child_process";
 import { initDatabase, closeDatabase } from "./database/dbService";
+import { prepareTillKey } from "./security/tillKey";
 import { registerDbHandlers } from "./database/ipcHandlers";
 import { initRealtimeStock, disconnectRealtime } from "./sync/realtimeStock";
 import { initSyncEngine, stopSyncEngine, updateSyncContext, runSyncCyclePublic } from "./sync/syncEngine";
@@ -713,6 +714,8 @@ async function databaseAnswers(): Promise<boolean> {
 
 /** Everything that reads the local database at start: the saved server, the role, sync. */
 async function startAfterDatabase(): Promise<void> {
+	// K43: the key paid sales are signed with, made here the first time.
+	await prepareTillKey().catch((e) => log.error("Could not prepare the signing key", e));
 	try {
 		savedServerUrl = await getMeta("server_url");
 	} catch {

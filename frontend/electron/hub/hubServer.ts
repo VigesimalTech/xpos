@@ -3,6 +3,8 @@ import { query, execute, upsertBatch, getMeta, setMeta } from "../database/dbSer
 import { DEFAULT_HUB_PORT } from "./nodeConfig";
 import crypto from "crypto";
 import { createLogger } from "../logger";
+import { signSale } from "../security/tillKey";
+import { parseJsonColumn } from "../database/shiftSummary";
 
 const log = createLogger("HubAPI");
 
@@ -201,6 +203,17 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
 			const body = JSON.parse(await readBody(req));
 			const localId = body.local_id || crypto.randomUUID();
 			const tillId = body.till_id || req.headers["x-till-id"] || "unknown";
+			const sale = (typeof body.data === "string" ? JSON.parse(body.data) : body.data) ?? {};
+			// K43: the hub signs what it will send to ERPNext. The same sale sent again keeps its number.
+			const earlier = await query<{ data: string }>(
+				"SELECT `data` FROM `pending_invoices` WHERE `local_id` = ?",
+				[localId],
+			);
+			const earlierSignature = earlier.length
+				? (parseJsonColumn(earlier[0].data).xpos_signature as { seq?: number } | undefined)
+				: undefined;
+			const earlierSeq = Number(earlierSignature?.seq) || 0;
+			delete sale.xpos_signature;
 
 			await execute(
 				`INSERT INTO \`pending_invoices\` (\`local_id\`, \`data\`, \`status\`, \`customer_name\`, \`grand_total\`)
@@ -208,7 +221,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
          ON DUPLICATE KEY UPDATE \`data\` = VALUES(\`data\`), \`status\` = 'pending'`,
 				[
 					localId,
-					typeof body.data === "string" ? body.data : JSON.stringify(body.data),
+					JSON.stringify(signSale(sale, localId, earlierSeq || undefined)),
 					body.customer_name || null,
 					body.grand_total || 0,
 				],

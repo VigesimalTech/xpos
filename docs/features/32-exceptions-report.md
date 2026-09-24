@@ -47,7 +47,7 @@ The **POS Exceptions** report shows, for each cashier, what happened outside a p
 | Lines Removed, Quantities Lowered, Sales Cleared, Held Orders Discarded | Each kind of removal, with its count and value |
 | Returns, Returns Value | Returns made, and their total |
 | Discounts Given | Cart discounts, and lines sold under their price-list price |
-| Outside Policy | Sales ERPNext flagged as beyond the cashier's rights |
+| Outside Policy | Sales ERPNext flagged as beyond the cashier's rights, or changed on the till after payment (see [Signed Sales](33-signed-sales.md)) |
 | Manager Approvals | Approvals given with a manager's PIN |
 | Reprints | Receipts printed again |
 | Wrong PINs | Wrong PINs entered for this user's PIN |
