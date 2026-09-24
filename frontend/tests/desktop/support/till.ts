@@ -279,3 +279,44 @@ export async function databaseRelay(): Promise<DatabaseRelay> {
 			}),
 	};
 }
+
+/** Set one field on a record in ERPNext as Administrator, e.g. a POS Profile setting for a test. */
+export async function erpSetValue(
+	s: Site,
+	doctype: string,
+	name: string,
+	fieldname: string,
+	value: unknown,
+): Promise<void> {
+	const response = await fetch(`${s.url}/api/method/frappe.client.set_value`, {
+		method: "POST",
+		headers: {
+			Authorization: `token ${s.api_key}:${s.api_secret}`,
+			"Content-Type": "application/json",
+		},
+		body: JSON.stringify({ doctype, name, fieldname, value }),
+	});
+	if (!response.ok) throw new Error(`${doctype} ${name}: ${response.status} ${await response.text()}`);
+}
+
+/** Give a user a till PIN on a POS Profile, as a manager does on their row in ERPNext. */
+export async function erpSetTillPin(s: Site, posProfile: string, user: string, pin: string): Promise<void> {
+	const headers = {
+		Authorization: `token ${s.api_key}:${s.api_secret}`,
+		"Content-Type": "application/json",
+	};
+	const url = `${s.url}/api/resource/POS Profile/${encodeURIComponent(posProfile)}`;
+	const got = await fetch(url, { headers });
+	if (!got.ok) throw new Error(`POS Profile ${posProfile}: ${got.status} ${await got.text()}`);
+	const { data } = (await got.json()) as { data: { applicable_for_users: Record<string, unknown>[] } };
+	const rows = data.applicable_for_users.map((row) =>
+		row.user === user ? { ...row, xpos_pin: pin } : row,
+	);
+	if (!rows.some((row) => row.user === user)) throw new Error(`${user} is not on ${posProfile}`);
+	const put = await fetch(url, {
+		method: "PUT",
+		headers,
+		body: JSON.stringify({ applicable_for_users: rows }),
+	});
+	if (!put.ok) throw new Error(`POS Profile ${posProfile}: ${put.status} ${await put.text()}`);
+}

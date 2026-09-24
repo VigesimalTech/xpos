@@ -45,3 +45,16 @@ export function pinsOf(row: Row): { hash: string; salt: string }[] {
 	for (const entry of Object.values(profileAccessOf(row))) add(entry.pin_hash, entry.pin_salt);
 	return pins;
 }
+
+const SECRETS = ["password_hash", "password_salt", "pin_hash", "pin_salt", "profile_access"];
+
+/**
+ * A user's row as the screens may see it: whether they have a password and a PIN, never
+ * the hashes (K43). A 4–6 digit PIN's hash cracks in seconds, so hashes stay in the main
+ * process, where every PIN and password is checked.
+ */
+export function withoutSecrets<T extends Row>(row: T): Row {
+	const out: Row = { ...row, has_password: !!row.password_hash, has_pin: pinsOf(row).length > 0 };
+	for (const key of SECRETS) delete out[key];
+	return out;
+}

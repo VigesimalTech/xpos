@@ -41,6 +41,10 @@ function pinErrorMessage(result: { reason?: string; attemptsLeft?: number; locke
 export const useAuthStore = defineStore("auth", () => {
 	const isLoading = ref(false);
 	const isAuthenticated = ref(false);
+	/** K44: the till locked itself after being left idle; the session and the sale stay. */
+	const locked = ref(false);
+	/** Whether the signed-in cashier has a PIN on this till, so the lock asks for it. */
+	const lockUsesPin = ref(false);
 	const user = ref<UserSession | null>(null);
 	const error = ref("");
 	const resetEmailSent = ref(false);
@@ -212,10 +216,10 @@ export const useAuthStore = defineStore("auth", () => {
 			// A user pulled from ERPNext has no local password until it has been checked against
 			// the server once. A failed local check also goes to the server when online, so a
 			// password changed in ERPNext reaches the till.
-			const valid = !!userData.password_hash && (await db.verifyPassword(username, password));
+			const valid = !!userData.has_password && (await db.verifyPassword(username, password));
 			if (!valid) {
 				if (!isOnline()) {
-					error.value = userData.password_hash
+					error.value = userData.has_password
 						? "Invalid password"
 						: "Sign in once while online to set up this user on this till.";
 					return false;
@@ -223,7 +227,7 @@ export const useAuthStore = defineStore("auth", () => {
 				const result = await db.cachePasswordFromServer(username, password);
 				if (!result.success) {
 					error.value =
-						result.unreachable && !userData.password_hash
+						result.unreachable && !userData.has_password
 							? "Cannot reach the server. Sign in once while online to set up this user on this till."
 							: result.unreachable
 								? "Invalid password"
@@ -323,7 +327,43 @@ export const useAuthStore = defineStore("auth", () => {
 		}
 	}
 
+	/** K44: lock the till for the signed-in cashier. Desktop only: the web POS has no PINs. */
+	async function lock(): Promise<void> {
+		if (!isElectron() || !isAuthenticated.value || locked.value) return;
+		const row = (await window
+			.electronAPI!.db.getPosUser(user.value?.user || "")
+			.catch(() => null)) as Record<string, unknown> | null;
+		lockUsesPin.value = !!row?.has_pin;
+		error.value = "";
+		locked.value = true;
+	}
+
+	/** K44: the same cashier's PIN opens the till again, checked with the sign-in lockout. */
+	async function unlockWithPin(pin: string): Promise<boolean> {
+		error.value = "";
+		const result = await window.electronAPI!.db.verifyPin(user.value?.user || "", pin);
+		if (!result.ok) {
+			error.value = pinErrorMessage(result);
+			return false;
+		}
+		locked.value = false;
+		return true;
+	}
+
+	/** K44: or their password, for a cashier without a PIN; checked on the till, offline too. */
+	async function unlockWithPassword(password: string): Promise<boolean> {
+		error.value = "";
+		const ok = await window.electronAPI!.db.verifyPassword(user.value?.user || "", password);
+		if (!ok) {
+			error.value = "Invalid password";
+			return false;
+		}
+		locked.value = false;
+		return true;
+	}
+
 	async function logout(): Promise<void> {
+		locked.value = false;
 		forgetSession();
 		try {
 			isLoading.value = true;
@@ -385,6 +425,11 @@ export const useAuthStore = defineStore("auth", () => {
 		checkAuth,
 		login,
 		loginWithPin,
+		locked,
+		lockUsesPin,
+		lock,
+		unlockWithPin,
+		unlockWithPassword,
 		sendResetPasswordEmail,
 		logout,
 		clearError,

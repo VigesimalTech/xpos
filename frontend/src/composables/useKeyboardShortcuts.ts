@@ -1,3 +1,4 @@
+import { useAuthStore } from "@/stores/authStore";
 import { reachesLevel } from "@/services/roleLevel";
 import { ref } from "vue";
 import { useRouter } from "vue-router";
@@ -420,6 +421,8 @@ export function useKeyboardShortcuts() {
 	}
 
 	function handleKeyDown(e: KeyboardEvent): void {
+		// K44: nothing behind the lock screen answers the keyboard.
+		if (useAuthStore().locked) return;
 		const tag = (document.activeElement?.tagName ?? "").toLowerCase();
 		const isInput = tag === "input" || tag === "textarea" || tag === "select";
 		const isInDialog = !!document.activeElement?.closest("[role='dialog']");

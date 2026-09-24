@@ -381,6 +381,7 @@ CREATE TABLE IF NOT EXISTS `pos_profiles` (
   `xpos_allow_purchasing` TINYINT(1) DEFAULT 0,
   `xpos_show_loyalty` TINYINT(1) DEFAULT 0,
   `xpos_sync_status_detail` VARCHAR(20) DEFAULT 'Minimal',
+  `xpos_idle_lock_minutes` INT DEFAULT 5,
   `cash_movement_max_amount` DECIMAL(18,6) DEFAULT 0,
   `xpos_cash_out_within_drawer` TINYINT(1) DEFAULT 1,
   `pos_mixed_currency_tender` TINYINT(1) DEFAULT 0,

@@ -26,6 +26,7 @@ On the [Desktop Till](29-desktop-till.md), cashiers sign in differently:
 - **Use password instead** opens the email and password form
 - PIN sign-in works offline. Password sign-in needs ERPNext the first time only
 - **Five wrong PINs** lock that cashier out of PIN sign-in for **five minutes**
+- A till left idle locks itself and asks the same cashier's PIN to go on. See [Idle Lock](29-desktop-till.md#idle-lock)
 - Only ERPNext users on the till's POS Profile can sign in. There is no local admin account
 - A cashier disabled in ERPNext, or removed from the POS Profile, can no longer sign in on the till
 

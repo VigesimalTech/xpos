@@ -33,7 +33,7 @@ import {
 	shiftOfSale,
 	summarizeShift,
 } from "./shiftSummary";
-import { onProfile, pinsOf } from "./profileAccess";
+import { onProfile, pinsOf, withoutSecrets } from "./profileAccess";
 import { countUnsent, describeUnsent } from "./unsentRecords";
 
 const log = createLogger("DB-IPC");
@@ -931,7 +931,8 @@ export function registerDbHandlers(): void {
 					[row.name],
 				)
 			)?.pos_profile;
-		return onProfile(row, profile);
+		// K43: whether they have a password and a PIN, never the hashes.
+		return withoutSecrets(onProfile(row, profile));
 	});
 
 	ipcMain.handle("db:upsert-pos-users", async (_e, rows: Record<string, unknown>[]) => {
