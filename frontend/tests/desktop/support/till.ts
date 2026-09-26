@@ -95,13 +95,14 @@ export interface Till {
 }
 
 /**
- * Start the app on a profile of its own. With `fresh`, a new database and profile, so
- * the setup wizard shows; without, the till reopens where the last one left off.
+ * Start the app on a profile of its own. With `fresh`, a new database and profile, so the
+ * setup wizard shows; without, the till reopens where the last one left off.
  * `dbPort` points the till at another port for its database (see `databaseRelay`).
+ * `slowMo` delays every input action (ms) — for demos where each click should be watchable.
  */
 export async function launchTill(
 	profile: string,
-	{ fresh = true, dbPort }: { fresh?: boolean; dbPort?: number } = {},
+	{ fresh = true, dbPort, slowMo }: { fresh?: boolean; dbPort?: number; slowMo?: number } = {},
 ): Promise<Till> {
 	if (fresh) {
 		rmSync(profile, { recursive: true, force: true });
@@ -117,6 +118,7 @@ export async function launchTill(
 		args: [join(frontend, "dist-electron/main.js")],
 		cwd: frontend,
 		env: { ...process.env, XPOS_USER_DATA_DIR: profile, NODE_ENV: "test" } as Record<string, string>,
+		...(slowMo ? { slowMo } : {}),
 	});
 	const page = await app.firstWindow();
 	await page.waitForLoadState("domcontentloaded");
@@ -144,37 +146,85 @@ export function newProfile(): string {
 	return mkdtempSync(join(tmpdir(), "xpos-desktop-"));
 }
 
+/**
+ * How a person works the form when the run is being watched: keystroke delay while
+ * typing, and a beat after each step. Omit it and everything fills instantly (CI).
+ */
+export interface HumanPace {
+	/** ms between keystrokes in a text field. */
+	typeMs?: number;
+	/** ms to hold after each click / screen change. */
+	stepMs?: number;
+}
+
+const NO_PACE: Required<HumanPace> = { typeMs: 0, stepMs: 0 };
+
+/** Click a field, type into it the way a person does, then hold so it can be read. */
+async function humanFill(
+	page: Page,
+	field: ReturnType<Page["getByPlaceholder"]>,
+	text: string,
+	pace: Required<HumanPace>,
+): Promise<void> {
+	await field.click();
+	if (pace.typeMs > 0) {
+		// Defaults/placeholder text would otherwise stay under the keystrokes.
+		await page.keyboard.press("ControlOrMeta+a");
+		await page.keyboard.press("Delete");
+		await field.pressSequentially(text, { delay: pace.typeMs });
+	} else {
+		await field.fill(text);
+	}
+	if (pace.stepMs > 0) await page.waitForTimeout(pace.stepMs);
+}
+
+async function humanClick(page: Page, target: ReturnType<Page["getByRole"]>, pace: Required<HumanPace>): Promise<void> {
+	// Dwell on the control first, the way someone lines up a click.
+	await target.hover();
+	if (pace.stepMs > 0) await page.waitForTimeout(Math.min(pace.stepMs, 800));
+	await target.click();
+	if (pace.stepMs > 0) await page.waitForTimeout(pace.stepMs);
+}
+
 /** First run: the setup wizard, as the one till of a shop talking to ERPNext itself. */
-export async function setUpTill(page: Page, s: Site, keys: Keys = s.tills[s.pos_profile]): Promise<void> {
+export async function setUpTill(
+	page: Page,
+	s: Site,
+	keys: Keys = s.tills[s.pos_profile],
+	pace: HumanPace = {},
+): Promise<void> {
+	const p = { ...NO_PACE, ...pace };
 	await expect(page.getByText("Select Installation Type")).toBeVisible();
-	await page.getByText("Hub (Server)").click();
-	await page.getByRole("button", { name: "Next", exact: true }).click();
+	if (p.stepMs > 0) await page.waitForTimeout(p.stepMs);
+	await humanClick(page, page.getByText("Hub (Server)"), p);
+	await humanClick(page, page.getByRole("button", { name: "Next", exact: true }), p);
 
-	await page.getByPlaceholder("127.0.0.1").fill(db.host);
-	await page.getByPlaceholder("3306").fill(String(db.port));
-	await page.getByPlaceholder("xpos", { exact: true }).fill(db.user);
-	await page.getByPlaceholder("••••••").fill(db.password);
-	await page.getByPlaceholder("xpos_local").fill(db.database);
-	await page.getByRole("button", { name: "Test Connection" }).click();
+	await humanFill(page, page.getByPlaceholder("127.0.0.1"), db.host, p);
+	await humanFill(page, page.getByPlaceholder("3306"), String(db.port), p);
+	await humanFill(page, page.getByPlaceholder("xpos", { exact: true }), db.user, p);
+	await humanFill(page, page.getByPlaceholder("••••••"), db.password, p);
+	await humanFill(page, page.getByPlaceholder("xpos_local"), db.database, p);
+	await humanClick(page, page.getByRole("button", { name: "Test Connection" }), p);
 	await expect(page.getByText("Connected!")).toBeVisible();
-	await page.getByRole("button", { name: "Next", exact: true }).click();
+	await humanClick(page, page.getByRole("button", { name: "Next", exact: true }), p);
 
-	await page.getByPlaceholder("https://erp.example.com").fill(s.url);
-	await page.getByPlaceholder("API Key").fill(keys.api_key);
-	await page.getByPlaceholder("API Secret").fill(keys.api_secret);
-	await page.getByPlaceholder("6789").fill(String(await freePort()));
-	await page.getByRole("button", { name: "Test ERPNext Connection" }).click();
+	await humanFill(page, page.getByPlaceholder("https://erp.example.com"), s.url, p);
+	await humanFill(page, page.getByPlaceholder("API Key"), keys.api_key, p);
+	await humanFill(page, page.getByPlaceholder("API Secret"), keys.api_secret, p);
+	await humanFill(page, page.getByPlaceholder("6789"), String(await freePort()), p);
+	await humanClick(page, page.getByRole("button", { name: "Test ERPNext Connection" }), p);
 	await expect(page.getByText("Connected!")).toBeVisible();
-	await page.getByRole("button", { name: "Next", exact: true }).click();
+	await humanClick(page, page.getByRole("button", { name: "Next", exact: true }), p);
 
-	await page.getByRole("button", { name: "Complete Setup" }).click();
+	await humanClick(page, page.getByRole("button", { name: "Complete Setup" }), p);
 }
 
 /**
  * Sign a cashier in with their password, the first time on this till. A new till knows its
  * cashiers only once its first sync has pulled them from ERPNext, so wait for that first.
  */
-export async function signIn(page: Page, user: string, password: string): Promise<void> {
+export async function signIn(page: Page, user: string, password: string, pace: HumanPace = {}): Promise<void> {
+	const p = { ...NO_PACE, ...pace };
 	await expect
 		.poll(async () => (await tillDb("SELECT `name` FROM `pos_users` WHERE `name` = ?", [user])).length, {
 			message: `${user} pulled to the till`,
@@ -186,11 +236,11 @@ export async function signIn(page: Page, user: string, password: string): Promis
 	const email = page.getByPlaceholder("Enter your email or username");
 	const usePassword = page.getByText("Use password instead");
 	await expect(email.or(usePassword).first()).toBeVisible({ timeout: 30_000 });
-	if (!(await email.isVisible())) await usePassword.click();
-	await email.fill(user);
-	await page.getByPlaceholder("Enter your password").fill(password);
+	if (!(await email.isVisible())) await humanClick(page, usePassword, p);
+	await humanFill(page, email, user, p);
+	await humanFill(page, page.getByPlaceholder("Enter your password"), password, p);
 	// Not "Sign in with a PIN", which sits under the form.
-	await page.getByRole("button", { name: /^(sign in|log in|login)$/i }).click();
+	await humanClick(page, page.getByRole("button", { name: /^(sign in|log in|login)$/i }), p);
 }
 
 /** Read from ERPNext as Administrator, to check what the till sent. */
