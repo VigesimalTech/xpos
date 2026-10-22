@@ -14,7 +14,11 @@ X POS provides multiple ways to find and add items to the cart — from visual b
   - **Item code** (if `display_item_code` is enabled)
   - **Price** (from the POS Profile's price list)
   - **Stock quantity** (actual qty in the POS warehouse)
-- Out-of-stock items can be hidden entirely with the `hide_unavailable_items` setting
+- Out-of-stock items can be hidden with the POS Profile's **Hide Unavailable Items**, on the web POS and the desktop till alike
+  - Hidden from the grid, the list, the categories and a typed search
+  - Items not kept in stock (services, for example) are always shown
+  - **A barcode scan still finds a hidden item**, so the cashier is told it is out of stock rather than that the barcode is unknown (desktop till)
+  - Stock is the POS Profile's warehouse's, as shown on the cards
 
 ### List View
 - Compact row-based layout showing item name, code, price, and stock in columns

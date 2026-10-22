@@ -25,7 +25,7 @@ Every change to a POS Profile is recorded in its history (the timeline at the bo
 | Hide Expected Amount | A blind cash-up: the closing dialog and printed close hide what is expected and the difference, and each count starts empty. The difference is still recorded for the supervisor |
 | Hide Closing Shift | Hide the close shift button |
 | Hide Images | Hide item images (text-only display) |
-| Hide Unavailable Items | Hide items with zero stock |
+| Hide Unavailable Items | Hide items with no stock in the profile's warehouse from the item list and typed search; a scan on the desktop till still finds them |
 | Sync Status Detail | How much the sync status shows on the till and the web POS. **Minimal** (default): Online, Offline, or what needs attention. **Standard**: also syncing, the last sync time and sales waiting. **Detailed**: also what is syncing |
 | Lock After Idle (Minutes) | The desktop till locks after this many minutes with no touch, click or key, and asks the signed-in cashier's PIN (or password) to go on. The sale in progress is kept. Default **5**; **0** never locks. See [Desktop Till](29-desktop-till.md#idle-lock) |
 
