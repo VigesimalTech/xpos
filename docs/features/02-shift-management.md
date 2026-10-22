@@ -21,6 +21,12 @@ X POS uses a shift-based workflow. Every POS session starts with opening a shift
    - Other payment modes can have zero opening balances
 3. **Click "Open Shift"** — This creates a POS Opening Shift document and initializes the POS session
 
+### Leaving Without Opening a Shift
+- On the desktop till, the Opening Dialog shows who is signed in and a **Sign Out** button, also while it is still loading
+- Sign Out returns to the sign-in screen, so another cashier can sign in
+- If the POS Profiles cannot be loaded, the dialog says why under the profile list; if none is offered, ask an administrator to add you to the shop's POS Profile, or to check the till's sync
+- On the web POS, **Back to Desk** leaves the dialog
+
 ### What Happens on Shift Open
 - A **POS Opening Shift** document is created and submitted
 - The POS loads all configuration from the selected POS Profile:
