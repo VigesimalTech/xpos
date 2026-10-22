@@ -66,6 +66,16 @@ test("a new till is set up and a cashier signs in with their ERPNext password", 
 	await expect(page.getByText("Open your shift to get started")).toBeVisible();
 });
 
+test("K55: a cashier who cannot open a shift can sign out from it, back to sign-in", async () => {
+	// The open-shift screen hides the menu bar and the till has no app menu: a cashier
+	// stuck there (no POS Profile, a refused sync) could only quit the app.
+	await expect(page.getByText(`Signed in as`)).toBeVisible();
+	await page.getByRole("button", { name: "Sign Out" }).click();
+	await expect(page.getByText("Open your shift to get started")).toBeHidden();
+	await signIn(page, site!.supervisor, site!.cashier_password);
+	await expect(page.getByText("Open your shift to get started")).toBeVisible();
+});
+
 test("the cashier opens a shift on their POS Profile", async () => {
 	// Only the user's own profiles are offered; with one, it is already chosen.
 	const profile = `${site!.pos_profile} (${site!.company})`;

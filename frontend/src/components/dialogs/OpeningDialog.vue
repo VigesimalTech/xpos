@@ -58,7 +58,14 @@
 								@update:model-value="onProfileChange"
 								class="h-10 w-full px-10"
 							/>
-							<p v-if="profiles.length === 0" class="mt-1 text-xs text-muted-foreground">
+							<p
+								v-if="loadError"
+								data-testid="opening-error"
+								class="mt-1 text-xs text-destructive"
+							>
+								{{ __("Could not load the POS Profiles:") }} {{ loadError }}
+							</p>
+							<p v-else-if="profiles.length === 0" class="mt-1 text-xs text-muted-foreground">
 								{{
 									syncStatus.isSyncing.value
 										? __("Downloading profiles from server…")
@@ -121,7 +128,24 @@
 				</CardContent>
 			</Card>
 
-			<div v-if="!isElectronMode" class="text-center mt-4">
+			<!-- K55: this screen hides the menu bar, and the till has no app menu: without this a
+			     cashier who cannot open a shift cannot leave it. Shown while loading too. -->
+			<div v-if="isElectronMode" class="text-center mt-4 space-y-1">
+				<p data-testid="opening-signed-in-as" class="text-primary-foreground/70 text-sm">
+					{{ __("Signed in as") }} {{ authStore.userFullName || authStore.userName }}
+				</p>
+				<button
+					type="button"
+					data-testid="opening-sign-out"
+					class="inline-flex items-center gap-1.5 text-primary-foreground/80 hover:text-primary-foreground text-sm transition-colors"
+					@click="authStore.logout()"
+				>
+					<LogOut class="w-4 h-4" />
+					{{ __("Sign Out") }}
+				</button>
+			</div>
+
+			<div v-else class="text-center mt-4">
 				<a
 					href="/desk"
 					class="text-primary-foreground/60 hover:text-primary-foreground text-sm transition-colors no-underline"
@@ -142,7 +166,8 @@ import { Button } from "@/components/ui/button";
 import { NumberInput } from "@/components/ui/number-input";
 import { Card, CardContent } from "@/components/ui/card";
 import { TooltipWrapper } from "@/components/ui/tooltip";
-import { Loader2, Lock, RefreshCw } from "lucide-vue-next";
+import { Loader2, Lock, LogOut, RefreshCw } from "lucide-vue-next";
+import { useAuthStore } from "@/stores/authStore";
 import { useSyncStatus } from "@/composables/useSyncStatus";
 import { isElectron } from "@/services/electronBridge";
 import __ from "@/lib/translate";
@@ -166,6 +191,7 @@ interface PaymentMethodEntry {
 }
 
 const posStore = usePosStore();
+const authStore = useAuthStore();
 const { moneyPrecision } = useMoney();
 const syncStatus = useSyncStatus();
 
@@ -175,9 +201,11 @@ const profiles = ref<ProfileOption[]>([]);
 const selectedProfile = ref("");
 const selectedCompany = ref("");
 const paymentMethodsList = ref<PaymentMethodEntry[]>([]);
+const loadError = ref("");
 
 async function loadProfiles() {
 	isLoadingData.value = true;
+	loadError.value = "";
 	try {
 		const data = await posStore.fetchOpeningData();
 		profiles.value = (data?.pos_profiles || []) as ProfileOption[];
@@ -187,6 +215,8 @@ async function loadProfiles() {
 			onProfileChange();
 		}
 	} catch (error) {
+		// K55: the toast passes; the reason stays on the screen.
+		loadError.value = (error as Error)?.message || String(error);
 		showError("Failed to load POS data. Please refresh.");
 	} finally {
 		isLoadingData.value = false;
