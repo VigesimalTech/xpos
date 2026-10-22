@@ -1033,6 +1033,10 @@ const canSubmit = computed(() => {
 });
 
 onMounted(async () => {
+	// K56: before any wait. Added after the customer lookup, a dialog closed first never
+	// removed it, and on the next sale it answered Enter too: the sale was saved twice.
+	document.addEventListener("keydown", handleGlobalKeydown);
+
 	if (!posStore.allowChangePostingDate || !cartStore.postingDate) {
 		cartStore.postingDate = nowDate();
 	}
@@ -1080,8 +1084,6 @@ onMounted(async () => {
 			/* non-critical */
 		}
 	}
-
-	document.addEventListener("keydown", handleGlobalKeydown);
 });
 
 watch(
@@ -1351,29 +1353,30 @@ function buildInvoicePayload(): InvoiceData {
 
 async function submitPayment(withPrint: boolean = true) {
 	if (isSubmitting.value) return;
-
-	if (showLoyaltyInput.value && !cartStore.redeemLoyaltyPoints && (redeemPointsInput.value || 0) > 0) {
-		applyLoyalty();
-	}
-
-	if (!canSubmit.value) return;
-
-	const validation = validateForSubmission();
-	if (!validation.valid) {
-		showError(validation.message || "Validation failed");
-		return;
-	}
-
-	const stockCheck = await cartStore.revalidateStock();
-	if (!stockCheck.valid) {
-		showError(stockCheck.messages.join("\n"));
-		return;
-	}
-
+	// K56: claimed before the first wait (the stock check), or a second click or Enter in
+	// that wait passed the check above too and saved the sale again.
 	isSubmitting.value = true;
 	printAfterSave.value = withPrint;
 
 	try {
+		if (showLoyaltyInput.value && !cartStore.redeemLoyaltyPoints && (redeemPointsInput.value || 0) > 0) {
+			applyLoyalty();
+		}
+
+		if (!canSubmit.value) return;
+
+		const validation = validateForSubmission();
+		if (!validation.valid) {
+			showError(validation.message || "Validation failed");
+			return;
+		}
+
+		const stockCheck = await cartStore.revalidateStock();
+		if (!stockCheck.valid) {
+			showError(stockCheck.messages.join("\n"));
+			return;
+		}
+
 		const shiftName = posStore.posOpeningShift?.name || "";
 		const invoiceData = buildInvoicePayload();
 
