@@ -161,6 +161,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 			offset?: number;
 			priceList?: string;
 			warehouse?: string;
+			inStockOnly?: boolean;
 		}) => ipcRenderer.invoke("db:get-items", opts),
 		getItem: (itemCode: string) => ipcRenderer.invoke("db:get-item", itemCode),
 		upsertItems: (rows: Record<string, unknown>[]) => ipcRenderer.invoke("db:upsert-items", rows),

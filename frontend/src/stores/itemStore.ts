@@ -151,6 +151,8 @@ export const useItemStore = defineStore("items", () => {
 					offset: append ? items.value.length : undefined,
 					priceList: posStoreRef.sellingPriceList || undefined,
 					warehouse: posStoreRef.warehouse || undefined,
+					// K54: the list only; a scan (searchByBarcode) still finds an out-of-stock item.
+					inStockOnly: posStoreRef.hideUnavailableItems || undefined,
 				})) as POSItem[];
 
 				if (append) {

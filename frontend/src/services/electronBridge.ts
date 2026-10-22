@@ -277,6 +277,8 @@ export interface ElectronDbAPI {
 		offset?: number;
 		priceList?: string;
 		warehouse?: string;
+		/** K54: only items in stock in `warehouse`, and items not kept in stock. */
+		inStockOnly?: boolean;
 	}) => Promise<Record<string, unknown>[]>;
 	getItem: (itemCode: string) => Promise<Record<string, unknown> | null>;
 	upsertItems: (rows: Record<string, unknown>[]) => Promise<void>;

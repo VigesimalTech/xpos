@@ -223,6 +223,8 @@ export function registerDbHandlers(): void {
 				offset?: number;
 				priceList?: string;
 				warehouse?: string;
+				/** Only items in stock in `warehouse`, and items not kept in stock. */
+				inStockOnly?: boolean;
 			},
 		) => {
 			// Correlated subqueries for price and stock avoid duplicate rows from JOINs.
@@ -263,6 +265,11 @@ export function registerDbHandlers(): void {
 				sql += ` AND (${clauses.join(" OR ")})`;
 				const like = `%${opts.search}%`;
 				for (let i = 0; i < clauses.length; i++) params.push(like);
+			}
+			// K54: the POS Profile's Hide Unavailable Items. In the query, so a page is still full;
+			// on the stock worked out above. Items not kept in stock are always listed.
+			if (opts?.inStockOnly && opts.warehouse) {
+				sql += " HAVING (`is_stock_item` = 0 OR `actual_qty` > 0)";
 			}
 			sql += " ORDER BY i.`item_name` ASC";
 			if (opts?.limit) {
